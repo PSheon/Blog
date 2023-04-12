@@ -1,3 +1,4 @@
 {
-  "free-ssl": "Free SSL"
+  "free-ssl": "Free SSL",
+  "nginx-reverse-proxy": "Nginx Reverse Proxy"
 }

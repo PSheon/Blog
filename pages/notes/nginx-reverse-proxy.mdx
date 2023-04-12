@@ -1,0 +1,137 @@
+{/* Nextra Imports */}
+import { Callout, Steps } from "nextra-theme-docs";
+
+# Node + Nginx: Reverse Proxy
+
+If you want to deploy both front-end and back-end applications on a single server simultaneously, you can use Nginx as a reverse proxy to reduce the server's workload
+
+### Install [Nginx](https://www.nginx.com/)
+
+```bash
+sudo apt update && sudo apt install nginx -y
+```
+
+### Install [PM2](https://www.npmjs.com/package/pm2)
+
+```bash
+npm i -g pm2
+```
+
+### Configuration
+
+The following example demonstrates deploying an application using front-end and back-end separation, with React as the front-end and Express as the back-end.The compiled build files of React are stored in `~/frontend/build`, The application of Express is located in `~/backend`.
+
+<Callout>
+  You can also use Next.js, just pay attention to the route configuration.
+</Callout>
+
+Use `PM2` to manage applications and start the frontend and backend applications separately.
+
+```bash
+# Frontend
+cd ~/path/to/frontend/build
+pm2 start npm --name "Frontend" -- start
+# Backend
+cd ~/path/to/backend
+pm2 start npm --name "Backend" -- start
+```
+
+Next, configure the Nginx configuration file to route specific paths to the backend application and the remaining paths to the frontend application.
+
+For example, route paths starting with `/api` to the backend application, and the remaining paths will automatically be routed to the frontend application.
+
+The final Nginx configuration file is as follows:
+
+```nginx
+server {
+	listen 80;
+	listen [::]:80;
+	server_name cool.yourdomain.com;
+	return 301 https://$server_name$request_uri;
+}
+
+upstream apiServer {
+	server localhost:3000;
+}
+
+upstream socketServer {
+	hash $remote_addr consistent;
+
+	server localhost:3000;
+}
+
+server {
+	listen 443 ssl http2;
+	listen [::]:443 ssl http2;
+	root /home/ubuntu/frontend/build;
+
+	client_max_body_size 20M;
+
+	ssl_certificate /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
+	ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
+	ssl_session_cache shared:SSL:50m;
+	ssl_session_timeout 5m;
+	ssl_prefer_server_ciphers on;
+	ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+
+	charset UTF-8;
+	add_header X-Frame-Options SAMEORIGIN;
+	add_header X-Content-Type-Options nosniff;
+	add_header X-XSS-Protection "1; mode=block";
+	add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+	gzip on;
+	gzip_disable "msie6";
+
+	gzip_comp_level 6;
+	gzip_min_length 1100;
+	gzip_buffers 16 8k;
+	gzip_proxied any;
+	gzip_types
+		text/plain
+		text/css
+		text/js
+		text/xml
+		text/javascript
+		application/javascript
+		application/x-javascript
+		application/json
+		application/xml
+		application/rss+xml
+		image/svg+xml;
+
+	location / {
+		try_files $uri /index.html; # redirect all request to index.html
+	}
+
+	location ~ ^/(api|auth|uploads)/ {
+		proxy_buffers 8 32k;
+		proxy_buffer_size 64k;
+
+		proxy_pass http://apiServer;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header Host $http_host;
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header X-NginX-Proxy true;
+
+		proxy_http_version 1.1;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection "upgrade";
+
+		proxy_read_timeout 86400s;
+		proxy_send_timeout 86400s;
+	}
+
+	location ~ ^/websocket {
+		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+		proxy_set_header Host $host;
+
+		proxy_pass http://socketServer;
+
+		# enable WebSockets
+		proxy_http_version 1.1;
+		proxy_set_header Upgrade $http_upgrade;
+		proxy_set_header Connection "upgrade";
+	}
+}
+```
