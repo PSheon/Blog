@@ -9,6 +9,9 @@
       "pagination": false
     }
   },
+  "notes": {
+    "title": "Notes"
+  },
   "about": {
     "title": "About",
     "type": "page"
