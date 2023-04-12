@@ -1,0 +1,147 @@
+{/* Next Import */}
+import Image from 'next/image'
+
+{/* Nextra Imports */}
+import { Callout, Steps } from "nextra-theme-docs";
+
+{/* Components Imports */}
+import PostImage from 'src/components/shared/PostImage'
+
+{/* Assets Imports */}
+import GENERATE_SSL_STEP_01 from 'src/assets/images/notes/free-ssl/generate-ssl-step-01.png'
+import GENERATE_SSL_STEP_02_VERIFY_DOMAIN from 'src/assets/images/notes/free-ssl/generate-ssl-step-02-verify-domain.png'
+import GENERATE_SSL_STEP_02_VERIFY_DNS from 'src/assets/images/notes/free-ssl/generate-ssl-step-02-verify-dns.png'
+
+# Node + Express + LetsEncrypt: Generate a free SSL certificate
+
+<Callout emoji="⚠️">
+  Most often, your host will provide a one-click solution to setup and renew SSL
+  certificates on your server. But if like me you’re working on a VPS, you’ll
+  have to deal with it manually.
+</Callout>
+
+### What you actually came for
+
+**First**, you need those few things:
+
+- A server running on a linux distribution with root access (via SSH)
+- [NodeJS](https://nodejs.org)
+- [Express](https://www.npmjs.com/package/express)
+- [Certbot](https://certbot.eff.org/)
+
+<Steps>
+### Check your distribution
+
+make sure all of your dependencies are up to date:
+
+```bash
+sudo apt update && sudo apt upgrade
+```
+
+### Install NodeJS
+
+Then, you need to install `NodeJS LTS`, I recommend using [NVM](https://github.com/nvm-sh/nvm) to manage your NodeJS versions:
+
+```bash
+# Installing NVM
+wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+# Reload your shell
+exec $SHELL
+# Installing the latest LTS version
+nvm install --lts
+```
+
+### Install Certbot
+
+install `Certbot`:
+
+```bash
+sudo apt install certbot -y
+```
+
+### Verify your domain
+
+Now, you will generate an SSL certificate with certbot:
+
+```bash
+sudo certbot certonly --manual
+```
+
+<PostImage src={GENERATE_SSL_STEP_01} alt="generate ssl step 01" />
+
+Type your domain name(s) without the protocol part.
+
+For instance: **cool.yourdomain.com** or even **\*.yourdomain.com**.
+
+<PostImage
+  src={GENERATE_SSL_STEP_02_VERIFY_DOMAIN}
+  alt="generate ssl step 02 verify domain"
+  containerHeight="16rem"
+/>
+
+Note two things :
+
+1. **a-string** : The name of the file you have to create, right now. Just create it, we’ll take care of the directories later.
+2. **a-challenge**: Open the file you just created and put this challenge string into it. Nothing else, just this challenge string.
+
+**Now, don’t continue. You need to run a web server with Node & Express.**
+
+<Callout type="info" emoji="ℹ️">
+  Keep your terminal opened somewhere
+</Callout>
+
+- **Create a directory** with the name you want, e.g : server
+- **In this directory, create a JS file which will run your server.** Keep it empty for the moment as I’ll provide you with a ready-to-copy/paste source code.
+- In this directory, create two directories : .well-known , and inside this one, create : acme-challenge .
+- In the directory : acme-challenge place the file you created before : **a-string**
+
+This is what you should have :
+
+```bash
+.
+└── server/
+    ├── .well-known/
+    │   └── acme-challenge/
+    │       └── a-string
+    └── index.js
+```
+
+#### You’re almost done !
+
+Use your favorite code editor and copy-paste this code and run it :
+
+```javascript
+// Dependencies
+const express = require("express");
+
+// Configure & Run the http server
+const app = express();
+
+app.use(express.static(__dirname, { dotfiles: "allow" }));
+
+app.listen(80, () => {
+  console.log("HTTP server running on port 80");
+});
+```
+
+To verify that everything is fine, open up your browser and navigate to : **http://cool.yourdomain.com/.well-known/acme-challenge/a-string**
+
+Your browser should download your challenge file. If it’s not the case, take everything back from the start. Don’t touch your shell, restart from directory & file creation.
+
+If everything is okay, go back to your shell and type **ENTER**.
+
+Certbo will verify your DNS and generate your certificate. Your certificate will be stored in the directory : **/etc/letsencrypt/live/cool.yourdomain.com/**
+
+#### Verify via DNS
+
+You can verify via DNS directly with domain like **\*.yourdomain.com**.
+
+<PostImage
+  src={GENERATE_SSL_STEP_02_VERIFY_DNS}
+  alt="generate ssl step 02 verify dns"
+  containerHeight="26rem"
+/>
+
+follow the instructions and you’ll be fine.
+
+</Steps>
