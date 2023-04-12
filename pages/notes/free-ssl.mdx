@@ -16,11 +16,11 @@ import GENERATE_SSL_STEP_02_VERIFY_DNS from 'src/assets/images/notes/free-ssl/ge
 
 <Callout emoji="⚠️">
   Most often, your host will provide a one-click solution to setup and renew SSL
-  certificates on your server. But if like me you’re working on a VPS, you’ll
+  certificates on your server. But if like me you're working on a VPS, you'll
   have to deal with it manually.
 </Callout>
 
-I couldn’t find a step by step tutorial just working like expected, thus I decided to write my own
+I couldn't find a step by step tutorial just working like expected, thus I decided to write my own
 
 **First**, you need those few things:
 
@@ -81,17 +81,17 @@ For instance: **cool.yourdomain.com** or even **\*.yourdomain.com**.
 
 Note two things :
 
-1. **a-string** : The name of the file you have to create, right now. Just create it, we’ll take care of the directories later.
+1. **a-string** : The name of the file you have to create, right now. Just create it, we'll take care of the directories later.
 2. **a-challenge**: Open the file you just created and put this challenge string into it. Nothing else, just this challenge string.
 
 **Now, don’t continue. You need to run a web server with Node & Express.**
 
-<Callout type="info" emoji="ℹ️">
+<Callout type="info" emoji="⚠️">
   Keep your terminal opened somewhere
 </Callout>
 
 - **Create a directory** with the name you want, e.g : server
-- **In this directory, create a JS file which will run your server.** Keep it empty for the moment as I’ll provide you with a ready-to-copy/paste source code.
+- **In this directory, create a JS file which will run your server.** Keep it empty for the moment as I'll provide you with a ready-to-copy/paste source code.
 - In this directory, create two directories : .well-known , and inside this one, create : acme-challenge .
 - In the directory : acme-challenge place the file you created before : **a-string**
 
@@ -126,7 +126,7 @@ app.listen(80, () => {
 
 To verify that everything is fine, open up your browser and navigate to : **http://cool.yourdomain.com/.well-known/acme-challenge/a-string**
 
-Your browser should download your challenge file. If it’s not the case, take everything back from the start. Don’t touch your shell, restart from directory & file creation.
+Your browser should download your challenge file. If it's not the case, take everything back from the start. Don't touch your shell, restart from directory & file creation.
 
 If everything is okay, go back to your shell and type **ENTER**.
 
@@ -142,7 +142,7 @@ You can verify via DNS directly with domain like **\*.yourdomain.com**.
   containerHeight="26rem"
 />
 
-follow the instructions and you’ll be fine.
+follow the instructions and you'll be fine.
 
 </Steps>
 
