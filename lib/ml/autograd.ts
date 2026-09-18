@@ -241,6 +241,169 @@ export class Tape {
     return count ? loss / count : 0;
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Image ops. A feature map is a Mat with one row per channel and height·width columns, so the
+  // element-wise ops above (add, relu, scale) work on images unchanged.
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Stride-1, "same"-padded convolution (cross-correlation, as in every DL framework).
+   * x: [Cin, h·w], kernel: [Cout, Cin·k·k], bias: [1, Cout] → [Cout, h·w].
+   */
+  conv2d(x: Mat, kernel: Mat, bias: Mat, { h, w, k }: { h: number; w: number; k: number }): Mat {
+    const cIn = x.rows, cOut = kernel.rows, kk = k * k, pad = (k - 1) >> 1;
+    if (kernel.cols !== cIn * kk) {
+      throw new Error(`conv2d: kernel expects ${kernel.cols / kk} input channels, got ${cIn}`);
+    }
+    if (x.cols !== h * w) throw new Error(`conv2d: input has ${x.cols} pixels, expected ${h}×${w}`);
+    const out = new Mat(cOut, h * w);
+
+    const hw = h * w;
+    const X = x.data, K = kernel.data, O = out.data;
+
+    // Loop order: kernel tap outermost, pixels innermost. For one tap (ky, kx) the set of output
+    // pixels whose window stays inside the image is a plain rectangle, so the inner loop is a
+    // branch-free run over contiguous memory — several times faster in a JS engine than testing
+    // bounds per pixel. Forward and backward share `taps` so their index arithmetic cannot drift.
+    const taps = (visit: (oBase: number, xBase: number, wi: number, y0: number, y1: number, x0: number, x1: number, shift: number) => void) => {
+      for (let oc = 0; oc < cOut; oc++) {
+        for (let ic = 0; ic < cIn; ic++) {
+          for (let ky = 0; ky < k; ky++) {
+            const dy = ky - pad;
+            const y0 = Math.max(0, -dy), y1 = Math.min(h, h - dy);
+            for (let kx = 0; kx < k; kx++) {
+              const dx = kx - pad;
+              const x0 = Math.max(0, -dx), x1 = Math.min(w, w - dx);
+              visit(oc * hw, ic * hw, oc * cIn * kk + ic * kk + ky * k + kx, y0, y1, x0, x1, dy * w + dx);
+            }
+          }
+        }
+      }
+    };
+
+    for (let oc = 0; oc < cOut; oc++) O.fill(bias.data[oc], oc * hw, (oc + 1) * hw);
+    taps((oBase, xBase, wi, y0, y1, x0, x1, shift) => {
+      const wv = K[wi];
+      if (wv === 0) return;
+      for (let y = y0; y < y1; y++) {
+        const o = oBase + y * w, xi = xBase + y * w + shift;
+        for (let xx = x0; xx < x1; xx++) O[o + xx] += X[xi + xx] * wv;
+      }
+    });
+
+    this.record(() => {
+      const G = out.grad, dX = x.grad, dK = kernel.grad;
+      for (let oc = 0; oc < cOut; oc++) {
+        let sum = 0;
+        for (let i = oc * hw; i < (oc + 1) * hw; i++) sum += G[i];
+        bias.grad[oc] += sum;
+      }
+      taps((oBase, xBase, wi, y0, y1, x0, x1, shift) => {
+        const wv = K[wi];
+        let acc = 0;
+        for (let y = y0; y < y1; y++) {
+          const o = oBase + y * w, xi = xBase + y * w + shift;
+          for (let xx = x0; xx < x1; xx++) {
+            const g = G[o + xx];
+            acc += g * X[xi + xx];
+            dX[xi + xx] += g * wv;
+          }
+        }
+        dK[wi] += acc;
+      });
+    });
+    return out;
+  }
+
+  /** 2×2 max pooling, stride 2. Only the winning pixel of each block receives gradient. */
+  maxPool2(x: Mat, { h, w }: { h: number; w: number }): Mat {
+    const oh = h >> 1, ow = w >> 1;
+    const out = new Mat(x.rows, oh * ow);
+    const winner = new Int32Array(out.data.length);
+    for (let c = 0; c < x.rows; c++) {
+      for (let y = 0; y < oh; y++) {
+        for (let xx = 0; xx < ow; xx++) {
+          let best = -1;
+          for (let dy = 0; dy < 2; dy++) {
+            for (let dx = 0; dx < 2; dx++) {
+              const i = c * h * w + (y * 2 + dy) * w + xx * 2 + dx;
+              if (best < 0 || x.data[i] > x.data[best]) best = i;
+            }
+          }
+          const o = c * oh * ow + y * ow + xx;
+          out.data[o] = x.data[best];
+          winner[o] = best;
+        }
+      }
+    }
+    this.record(() => {
+      for (let o = 0; o < winner.length; o++) x.grad[winner[o]] += out.grad[o];
+    });
+    return out;
+  }
+
+  /** Nearest-neighbour ×2 upsampling; the gradient of a pixel is the sum over its 2×2 block. */
+  upsample2(x: Mat, { h, w }: { h: number; w: number }): Mat {
+    const oh = h * 2, ow = w * 2;
+    const out = new Mat(x.rows, oh * ow);
+    const source = (o: number) => {
+      const c = Math.floor(o / (oh * ow));
+      const r = o - c * oh * ow;
+      return c * h * w + (Math.floor(r / ow) >> 1) * w + ((r % ow) >> 1);
+    };
+    for (let o = 0; o < out.data.length; o++) out.data[o] = x.data[source(o)];
+    this.record(() => {
+      for (let o = 0; o < out.grad.length; o++) x.grad[source(o)] += out.grad[o];
+    });
+    return out;
+  }
+
+  /**
+   * Binary cross-entropy on raw logits, averaged with optional per-element weights (0 = ignore).
+   * Uses max(z,0) − z·t + log(1 + e^−|z|), which cannot overflow. `scale` multiplies the gradient
+   * only, so several losses can be mixed; the returned value is always the plain loss.
+   */
+  bceWithLogits(logits: Mat, targets: ArrayLike<number>, weights?: ArrayLike<number>, scale = 1): number {
+    const n = logits.data.length;
+    let total = 0, norm = 0;
+    for (let i = 0; i < n; i++) {
+      const wgt = weights ? weights[i] : 1;
+      if (wgt === 0) continue;
+      const z = logits.data[i];
+      total += wgt * (Math.max(z, 0) - z * targets[i] + Math.log1p(Math.exp(-Math.abs(z))));
+      norm += wgt;
+    }
+    if (norm === 0) return 0;
+    this.record(() => {
+      for (let i = 0; i < n; i++) {
+        const wgt = weights ? weights[i] : 1;
+        if (wgt === 0) continue;
+        const p = 1 / (1 + Math.exp(-logits.data[i]));
+        logits.grad[i] += (scale * wgt * (p - targets[i])) / norm;
+      }
+    });
+    return total / norm;
+  }
+
+  /** Mean squared error over the elements where mask is non-zero. `scale` multiplies the gradient only. */
+  mse(pred: Mat, targets: ArrayLike<number>, mask?: ArrayLike<number>, scale = 1): number {
+    const n = pred.data.length;
+    let total = 0, count = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask && !mask[i]) continue;
+      total += (pred.data[i] - targets[i]) ** 2;
+      count++;
+    }
+    if (count === 0) return 0;
+    this.record(() => {
+      for (let i = 0; i < n; i++) {
+        if (mask && !mask[i]) continue;
+        pred.grad[i] += (scale * 2 * (pred.data[i] - targets[i])) / count;
+      }
+    });
+    return total / count;
+  }
+
   /** Σ aᵢ·wᵢ with constant w — a scalar probe, used to test gradients. */
   sumProduct(a: Mat, w: Mat): number {
     let s = 0;
