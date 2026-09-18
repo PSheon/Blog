@@ -1,0 +1,545 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "../styles/launch-ui.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  /* Latin from web fonts; Chinese from whatever the system ships (Apple → Android/Linux → Windows). */
+  --font-sans: var(--font-ui), "PingFang TC", "Noto Sans CJK TC", "Noto Sans TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-body), "Songti TC", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "PMingLiU", ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", ui-monospace, monospace;
+  --font-heading: var(--font-body), "Songti TC", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "PMingLiU", ui-serif, Georgia, serif;
+  --color-signal: var(--signal);
+  --color-signal-2: var(--signal-2);
+  --color-signal-3: var(--signal-3);
+  --color-panel: var(--panel);
+  --color-rule: var(--rule);
+  --color-grid: var(--grid);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+
+/*
+ * Lab Notebook palette.
+ * Light is cool paper with navy ink; dark is the navy of the bench at night.
+ * The three signals are the See / Think / Act triad of the GitHub profile banner:
+ * --signal cyan (the trace colour of every instrument), --signal-3 violet, --signal-2 pink
+ * (the second channel: negative values, warnings). Light values are darkened to hold AA on paper.
+ */
+:root {
+  --background: #fbfbfe;
+  --foreground: #1c2033;
+  --card: #ffffff;
+  --card-foreground: #1c2033;
+  --popover: #ffffff;
+  --popover-foreground: #1c2033;
+  --primary: #086c99;
+  --primary-foreground: #fbfbfe;
+  --secondary: #eceef5;
+  --secondary-foreground: #1c2033;
+  --muted: #f0f1f7;
+  --muted-foreground: #565b78;
+  --accent: #e6e8f3;
+  --accent-foreground: #1c2033;
+  --destructive: #b3261e;
+  --border: #1c20331f;
+  --input: #1c203333;
+  --ring: #086c99;
+  --signal: #086c99;
+  --signal-2: #c2255c;
+  --signal-3: #6347d9;
+  --panel: #f4f5fa;
+  --rule: #1c203326;
+  --grid: #1c203314;
+  --line-width: 1px;
+  --glow-a: #79dafa26;
+  --glow-b: #ff6e961a;
+  --chart-1: #086c99;
+  --chart-2: #c2255c;
+  --chart-3: #6347d9;
+  --chart-4: #4b5072;
+  --chart-5: #2f7d6b;
+  --radius: 0.375rem;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+}
+
+.dark {
+  /* Sampled from the profile banner: near-black ink navy, lavender-grey secondary text. */
+  --background: #070918;
+  --foreground: #e9eaf6;
+  --card: #0b0d20;
+  --card-foreground: #e9eaf6;
+  --popover: #0e1026;
+  --popover-foreground: #e9eaf6;
+  --primary: #79dafa;
+  --primary-foreground: #050714;
+  --secondary: #121430;
+  --secondary-foreground: #e9eaf6;
+  --muted: #0f1128;
+  --muted-foreground: #9b9bc4;
+  --accent: #171a3a;
+  --accent-foreground: #e9eaf6;
+  --destructive: #ff6e96;
+  --border: #9b9bc42e;
+  --input: #9b9bc447;
+  --ring: #79dafa;
+  --signal: #79dafa;
+  --signal-2: #ff6e96;
+  --signal-3: #b9a5ff;
+  --panel: #0a0c1e;
+  --rule: #9b9bc433;
+  --grid: #9b9bc41f;
+  --glow-a: #79dafa14;
+  --glow-b: #ff6e9617;
+  --chart-1: #79dafa;
+  --chart-2: #ff6e96;
+  --chart-3: #b9a5ff;
+  --chart-4: #9b9bc4;
+  --chart-5: #6fd6b5;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "kern", "liga", "calt";
+    /* The banner's atmosphere: a cyan haze on the "see" side, a plum one on the "act" side. */
+    background-image:
+      radial-gradient(60rem 36rem at 8% -6rem, var(--glow-a), transparent 70%),
+      radial-gradient(64rem 40rem at 96% 4rem, var(--glow-b), transparent 70%);
+    background-repeat: no-repeat;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--signal) 35%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* The dot grid every instrument sits on. */
+  .dot-grid {
+    background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+    background-size: 12px 12px;
+  }
+
+  /* Small instrument lettering: lowercase mono, never shouted. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    letter-spacing: 0.01em;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* The profile banner's See → Think → Act sweep: one continuous gradient, never three flat colours. */
+  .triad-gradient {
+    background-image: linear-gradient(90deg, var(--signal), var(--signal-3) 55%, var(--signal-2));
+  }
+  /*
+   * Soft light behind the hero instrument. Two things keep it from reading as a cut-off shape:
+   * it stays inside its own box (closest-side), and the stops follow an ease-out curve so the
+   * falloff reaches zero with zero slope — a linear ramp that stops dead looks like an edge.
+   */
+  .hero-glow {
+    position: absolute;
+    inset: -34% -30%;
+    z-index: -1;
+    pointer-events: none;
+    --c: var(--signal-3);
+    background: radial-gradient(
+      ellipse closest-side,
+      color-mix(in oklab, var(--c) 40%, transparent) 0%,
+      color-mix(in oklab, var(--c) 34%, transparent) 18%,
+      color-mix(in oklab, var(--c) 23%, transparent) 36%,
+      color-mix(in oklab, var(--c) 13%, transparent) 54%,
+      color-mix(in oklab, var(--c) 5.5%, transparent) 72%,
+      color-mix(in oklab, var(--c) 1.4%, transparent) 88%,
+      transparent 100%
+    );
+
+  }
+  :root:not(.dark) .hero-glow {
+    --c: var(--signal);
+    opacity: 0.55;
+  }
+
+  /* The banner's measurement grid behind the hero, dissolving before it reaches the content below. */
+  .hero-grid {
+    position: absolute;
+    inset: -3rem -50vw 0;
+    z-index: -2;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: center top;
+    mask-image: radial-gradient(ellipse 70% 85% at 50% 0%, #000 20%, transparent 100%);
+    opacity: 0.7;
+  }
+
+  .triad-text {
+    background-image: linear-gradient(160deg, var(--signal) 8%, var(--signal-3) 52%, var(--signal-2) 94%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .dark .triad-text {
+    filter: drop-shadow(0 0 1.75rem color-mix(in oklab, var(--signal-3) 35%, transparent));
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Long-form prose ----------
+   * Figures and instruments opt out with .not-prose, so list and link rules stop at their border.
+   */
+  .prose-notebook {
+    font-family: var(--font-serif);
+    font-size: 1.125rem;
+    line-height: 1.8;
+    counter-reset: sidenote;
+  }
+  :lang(en) .prose-notebook {
+    font-size: 1.1875rem;
+    line-height: 1.7;
+  }
+  .prose-notebook > * + * {
+    margin-top: 1.5rem;
+  }
+  .prose-notebook :where(h2, h3, h4) {
+    font-family: var(--font-heading);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .prose-notebook h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+  }
+  .prose-notebook h3 {
+    font-size: 1.3125rem;
+    font-weight: 600;
+    margin-top: 2.75rem;
+  }
+  .prose-notebook h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 2rem;
+  }
+  .prose-notebook :where(h2, h3, h4) + * {
+    margin-top: 1rem;
+  }
+  .prose-notebook :where(h2, h3, h4) a.heading-anchor {
+    color: inherit;
+    text-decoration: none;
+  }
+  .prose-notebook :where(h2, h3, h4) a.heading-anchor::after {
+    content: "#";
+    margin-left: 0.4em;
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    color: var(--signal);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .prose-notebook :where(h2, h3, h4):hover a.heading-anchor::after,
+  .prose-notebook a.heading-anchor:focus-visible::after {
+    opacity: 1;
+  }
+  .prose-notebook a:not(.heading-anchor):not(:where(.not-prose *)) {
+    color: var(--signal);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: color-mix(in oklab, var(--signal) 45%, transparent);
+  }
+  .prose-notebook a:not(.heading-anchor):not(:where(.not-prose *)):hover {
+    text-decoration-color: currentColor;
+  }
+  .prose-notebook strong {
+    font-weight: 650;
+  }
+  .prose-notebook :where(ul, ol):not(:where(.not-prose *)) {
+    padding-left: 1.4em;
+  }
+  .prose-notebook ul:not(:where(.not-prose *)) {
+    list-style: none;
+  }
+  .prose-notebook ul:not(:where(.not-prose *)) > li {
+    position: relative;
+  }
+  .prose-notebook ul:not(:where(.not-prose *)) > li::before {
+    content: "";
+    position: absolute;
+    left: -1.05em;
+    top: 0.78em;
+    width: 0.4em;
+    height: 0.4em;
+    background: var(--signal);
+  }
+  .prose-notebook ol:not(:where(.not-prose *)) {
+    list-style: decimal;
+  }
+  .prose-notebook ol:not(:where(.not-prose *)) > li::marker {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--muted-foreground);
+  }
+  .prose-notebook li:not(:where(.not-prose *)) + li {
+    margin-top: 0.5rem;
+  }
+  .prose-notebook blockquote {
+    border-left: 2px solid var(--signal);
+    padding-left: 1.25rem;
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .prose-notebook hr {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin-block: 3rem;
+  }
+  .prose-notebook :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    padding: 0.12em 0.36em;
+    border-radius: 0.25rem;
+    background: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .prose-notebook .table-scroll {
+    overflow-x: auto;
+  }
+  .prose-notebook table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .prose-notebook th {
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--foreground);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+  }
+  .prose-notebook td {
+    border-bottom: 1px solid var(--rule);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Code blocks (rehype-pretty-code) */
+  .prose-notebook figure[data-rehype-pretty-code-figure] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .prose-notebook [data-rehype-pretty-code-title] {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .prose-notebook pre {
+    overflow-x: auto;
+    padding-block: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    tab-size: 2;
+  }
+  .prose-notebook pre > code {
+    display: grid;
+    min-width: max-content;
+  }
+  .prose-notebook pre [data-line] {
+    padding-inline: 1rem;
+    border-left: 2px solid transparent;
+  }
+  .prose-notebook pre [data-highlighted-line] {
+    background: color-mix(in oklab, var(--signal) 12%, transparent);
+    border-left-color: var(--signal);
+  }
+  .prose-notebook code[data-theme] span {
+    color: var(--shiki-light);
+  }
+  .dark .prose-notebook code[data-theme] span {
+    color: var(--shiki-dark);
+  }
+  /*
+   * Shiki colours tokens through inline custom properties, so a theme's comment grey can only be
+   * replaced by matching it. Both GitHub themes fall short of WCAG AA for comments on our panels;
+   * use the secondary text colour, whose contrast is already verified in both themes.
+   */
+  .prose-notebook code[data-theme] span[style*="--shiki-dark:#6A737D"] {
+    --shiki-dark: var(--muted-foreground) !important;
+    --shiki-light: var(--muted-foreground) !important;
+  }
+
+  /* Math */
+  .prose-notebook .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block: 0.5rem;
+  }
+  .prose-notebook .katex {
+    font-size: 1.05em;
+  }
+}
+
+@layer components {
+  /* Sidenote numbering: the reference increments, both ends print the same number. */
+  .sidenote-ref {
+    counter-increment: sidenote;
+  }
+  .sidenote-ref::after {
+    content: counter(sidenote);
+  }
+  .sidenote::before {
+    content: counter(sidenote);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--signal);
+    margin-right: 0.5em;
+    vertical-align: super;
+    line-height: 0;
+  }
+}
+
+/*
+ * Page transitions (React <ViewTransition> → the browser's View Transitions API).
+ * The routed content fades and rises a few pixels; header and footer are not part of it.
+ * Short on purpose: a transition that makes people wait is worse than none.
+ */
+/* Header and footer are identical before and after: swap the document snapshot instantly instead of cross-fading it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+::view-transition-old(.page-swap) {
+  animation: page-out 120ms ease-in both;
+}
+::view-transition-new(.page-swap) {
+  animation: page-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms both;
+}
+/* Old and new pages differ in height; don't stretch one into the other while they swap. */
+::view-transition-group(.page-swap) {
+  animation: none;
+}
+::view-transition-old(.page-swap),
+::view-transition-new(.page-swap) {
+  height: auto;
+  width: 100%;
+  object-fit: none;
+  object-position: top;
+}
+/* A post title travelling from the index into the article headline. */
+::view-transition-group(.title-morph) {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.3, 0.7, 0.1, 1);
+}
+::view-transition-old(.title-morph),
+::view-transition-new(.title-morph) {
+  /* Two line-wraps of different size: keep each at its own aspect ratio while they cross-fade. */
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}

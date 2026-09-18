@@ -1,0 +1,130 @@
+---
+title: "Building a neuroevolution trading squad: AI strategies that adapt to the market"
+description: Let a crowd of random trading bots compete, breed and mutate on Apple's 2024 share price. Train one yourself, then look closely at what it learned and what it didn't.
+date: 2026-09-18
+tags: [ai-agent, neuroevolution, trading]
+no: 3
+interactive: true
+---
+
+import { TradingLab } from "./components";
+
+## Train your own trading bot
+
+Below is Apple's (AAPL) daily closing price for 2024. Use the dashboard to train your own trading bot: the system generates a random crowd of bots, lets them trade through the year, keeps the strategies that did best and breeds the next generation from them.
+
+<Instrument fig="01" title="neuroevolution / trading" size="wide" caption="Every bot starts with $10,000 and may do one thing a day: buy one share, sell the share it has held longest, or nothing. Return on investment values any shares still held at year end at the final close.">
+  <TradingLab />
+</Instrument>
+
+### What the dashboard shows
+
+When training finishes you'll see:
+
+- **A summary of trading activity**: number of buys and sells, total profit or loss, return on investment, and the buy-and-hold return to compare it with
+- **The price chart**: cyan triangles are buys, pink triangles are sells
+- **The evolution curve**: the best bot's ROI in each generation, with buy-and-hold as the dashed line
+- **The trade log**: date, price, the return on that share and the cash balance after each trade
+
+Your result is saved in your browser and loaded automatically the next time you visit.<Sidenote>Training runs entirely in your browser in TypeScript, using the same `lib/ml/neuroevolution.ts` as the Flappy Bird article. With a population of 50, one generation takes about 10 ms on my laptop, so no GPU is needed.</Sidenote>
+
+### Parameters
+
+- **Generations** (1–100): how many generations to evolve. More generations train more thoroughly and take longer. Each one discards weak strategies and keeps strong ones.
+- **Population** (10–500): how many bots there are in each generation. A larger population searches more widely and takes longer. 50 is a good place to start.
+- **Mutation rate** (1–100%): how much randomness is applied to the network weights. Higher is more experimental, lower is more stable.
+
+The tool lets you watch neuroevolution go from random trading to something that looks like a strategy. Every run can end differently, and that randomness is part of how evolution works.
+
+## What is a neuroevolution trading strategy?
+
+In financial markets, a strategy is only as good as its decision model's ability to adapt. Neuroevolution is a machine-learning method based on natural selection: trading bots evolve like organisms and gradually learn to buy and sell more cleverly. It is automated trading, and it is also a survival contest between AIs.
+
+## How evolution learns to trade
+
+Unlike conventional deep learning, neuroevolution doesn't rely on backpropagation. It imitates biological evolution, using selection, mutation and crossover to breed better decision makers. The core steps are:
+
+1. **Initial population**: generate many random strategies, each one a neural network.
+2. **Market simulation**: let them trade on historical data and measure how they do.
+3. **Survival of the fittest**: the best strategies survive and the weak ones are discarded.
+4. **Mutation**: randomly adjust the survivors' parameters to test for better decisions.
+5. **Crossover**: combine the traits of winning strategies into new ones.
+6. **Iteration**: repeat until a strategy emerges that fits this stretch of the market.
+
+Each bot's brain is a small 30 → 24 → 3 network. Its input is the daily percentage change over the past 30 days, and its three outputs are scores for hold, buy and sell; the highest one wins.
+
+```ts title="content/posts/trading-agent/components/trading.ts"
+export function observe(closes: number[], day: number): Float32Array {
+  const out = new Float32Array(WINDOW); // WINDOW = 30
+  for (let i = 0; i < WINDOW; i++) {
+    const t = day - (WINDOW - 1) + i;
+    if (t >= 1) out[i] = ((closes[t] - closes[t - 1]) / closes[t - 1]) * 100;
+  }
+  return out;
+}
+```
+
+## Why use neuroevolution for trading?
+
+Conventional machine learning usually needs a lot of labelled data, and markets (non-linear, prone to black swans) make that approach inflexible. Neuroevolution has some advantages:
+
+- **No gradients needed.** "How much did I make this year" isn't a differentiable objective. Neuroevolution doesn't use gradient descent; it searches by trial and error.
+- **Exploration and exploitation together.** Keeping an elite while constantly injecting random individuals balances trying new strategies against refining existing ones, which helps avoid local optima.
+- **It suits problems with no right answer.** Nobody can label the "correct" days to buy and sell. Neuroevolution lets a bot learn directly from the result of its own trading.
+
+## How a trading bot learns
+
+Think of your bots as rookie traders who have just arrived in the market with no experience, learning purely by trial and error.
+
+### 1. At first: a gambler
+
+- Bots buy and sell at random, with no strategy at all.
+- The first generation's trade log is usually chaos.
+
+### 2. Early adaptation: getting to know this market
+
+- After a few generations the survivors trade less, and their trades start to cluster around certain periods.
+- Their decisions begin to look logical instead of like pure gambling.
+
+### 3. A strategy takes shape: avoiding the big holes
+
+- The best bots settle into more consistent habits, such as buying after a run of falls.
+- This is when the evolution curve crosses the dashed buy-and-hold line.
+
+### 4. Continued evolution: the ROI keeps climbing
+
+- With enough generations, the buys on the chart gather more and more in the cheaper first half of the year.
+
+Don't get excited yet. The next section is the one that matters.
+
+## What did it actually learn?
+
+Train for thirty generations with the default parameters and the best strategy returns roughly **+43%**, comfortably above buy-and-hold at **+34%**. It looks as though the bot beat the market.
+
+It didn't. I trained six different random seeds for thirty generations each. Every one landed at 43–44%, and the winners all do much the same thing: **most of their buying happens in the first half of the year, while the price is still low (the year's low was $165 on 19 April), and they end the year almost fully invested**, with a few dozen small sell-high-buy-low round trips in between, about nine in ten of them profitable.
+
+Apple rose 35% in 2024. In a year like that, any strategy that fills up while shares are cheap and holds to December beats one that spends everything at $185 on 2 January.
+
+<Callout type="warn" title="This is hindsight, not foresight">
+The bots are trained and scored on the same stretch of prices. They did not learn to recognise a low. Evolution picked, out of thousands of random strategies, the ones that happened to act at this particular year's lows. Given a different year, there is no reason for these strategies to keep working.
+</Callout>
+
+That is exactly what the following risks look like in practice.
+
+## The risks of AI trading
+
+Neuroevolution can find an attractive strategy on a stretch of history, but it is not a cure-all:
+
+- **Overfitting.** An AI can find meaningless patterns in historical data that fail in the future. The +43% above is a live example.
+- **Abnormal market moves.** Sudden news or policy changes can leave a bot unable to adapt and losing money. It cannot learn from events its training data never contained.
+- **Algorithmic bias.** Without enough variety in the training environment (here: one share, one bull year), an AI develops habits that only suit that environment, such as "fill up and hold". In a falling year the same habit would lose heavily.
+
+To make this experiment more honest you would at least split the data into a training period and a test period, add trading costs, and score strategies across several shares and several kinds of market.
+
+## Conclusion: AI trading is no myth, and no magic either
+
+Neuroevolution gives trading bots a powerful way to learn, automatically finding a strategy that works on a given stretch of the market. But trading always carries risk, and past performance doesn't guarantee future returns. What the bots on this page do best is find the ideal script for a story whose ending is already known.
+
+---
+
+*This article first appeared on my previous site in April 2025. The interactive parts were rewritten from scratch in TypeScript when it moved into this notebook.*
