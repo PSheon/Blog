@@ -1,0 +1,19 @@
+---
+title: （草稿）照著一隻果蠅的接線圖，訓練一個會看方向的網路
+description: 草稿。接線來自一隻真的果蠅的電子顯微鏡切片，固定不動；只學 156 個數字，半分鐘內學會分辨東西往哪個方向移動。
+date: 2026-09-18
+tags: [computer-vision, neuroscience, from-scratch]
+no: 7
+interactive: true
+draft: true
+---
+
+import { SpikeLab } from "./components";
+
+這是草稿，只在本機開發時看得到。下面是第一版儀器。左邊是 256 個小眼看到的畫面；右邊八個圓盤是八種方向偵測細胞（T4 青色、T5 粉紅色），虛線是接線圖上量到的不對稱方向，箭頭是訓練後它實際偏好的方向，箭頭越長越挑方向。
+
+<Instrument fig="00" title="fly / spike" size="wide" caption="按 Train。真的接線大約 25 秒到 100%，四根青色箭頭會各自貼上虛線。換成 symmetrised，它永遠分不出左和右，停在 50% 上下。">
+  <SpikeLab />
+</Instrument>
+
+接線資料：FlyEM male CNS connectome v1.0（Janelia，CC-BY）。做法與量測見 `docs/research/2026-09-18-fly-connectome-spike.md`。
