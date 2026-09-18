@@ -1,0 +1,52 @@
+import { readFileSync } from "node:fs";
+import load from "@mujoco/mujoco";
+const ROOT = "../model/Lite3/Lite3_mjcf";
+const DEFAULT = [0, -0.65, 1.3, 0, -0.65, 1.3, 0, -0.65, 1.3, 0, -0.65, 1.3], SCALE = [0.125, 0.25, 0.25, 0.125, 0.25, 0.25, 0.125, 0.25, 0.25, 0.125, 0.25, 0.25];
+const mujoco = await load();
+mujoco.FS.mkdirTree("/lite3/mjcf"); mujoco.FS.mkdirTree("/lite3/meshes");
+mujoco.FS.writeFile("/lite3/mjcf/Lite3.xml", readFileSync(`${ROOT}/mjcf/Lite3.xml`));
+for (const f of ["hip", "thigh", "shank", "torso"]) mujoco.FS.writeFile(`/lite3/meshes/${f}.STL`, readFileSync(`${ROOT}/meshes/${f}.STL`));
+const layers = JSON.parse(readFileSync("../weights.json", "utf8")).layers.map((l) => ({ ...l, w: Float32Array.from(l.w), b: Float32Array.from(l.b) }));
+const mlp = (x) => { layers.forEach(({ w, b, rows, cols }, li) => { const y = new Float32Array(rows); for (let r = 0; r < rows; r++) { let s = b[r]; for (let c = 0; c < cols; c++) s += w[r * cols + c] * x[c]; y[r] = li < 3 && s < 0 ? Math.expm1(s) : s; } x = y; }); return x; };
+let seed = 1; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 2 ** 32 - 0.5; };
+
+function run({ cmd = [0.5, 0, 0], kp = 30, kd = 1, friction = 1, push = 0, latency = 0, noise = 0, zero = null, seconds = 10 }) {
+  const model = mujoco.MjModel.from_xml_path("/lite3/mjcf/Lite3.xml");
+  model.opt.timestep = 0.001;
+  const fr = model.geom_friction; for (let i = 0; i < model.ngeom; i++) fr[i * 3] = friction;
+  const data = new mujoco.MjData(model);
+  const qpos = data.qpos, qvel = data.qvel, ctrl = data.ctrl, xfrc = data.xfrc_applied;
+  qpos.set([0, 0, 0.36, 1, 0, 0, 0, ...DEFAULT]); mujoco.mj_forward(model, data);
+  let last = new Float32Array(12); const target = Float64Array.from(DEFAULT), queue = [];
+  let fellAt = null, x5 = 0;
+  for (let k = 0; k < seconds * 1000; k++) {
+    if (k % 12 === 0) {
+      const [w, x, y, z] = [qpos[3], qpos[4], qpos[5], qpos[6]];
+      const g = [-2 * (x * z - w * y), -2 * (y * z + w * x), -(1 - 2 * (x * x + y * y))];
+      if (fellAt === null && (g[2] > -0.5 || qpos[2] < 0.15)) fellAt = k / 1000;
+      const obs = new Float32Array(45);
+      for (let i = 0; i < 3; i++) { obs[i] = qvel[3 + i] * 0.25; obs[3 + i] = g[i]; obs[6 + i] = cmd[i]; }
+      for (let i = 0; i < 12; i++) { obs[9 + i] = qpos[7 + i] - DEFAULT[i]; obs[21 + i] = qvel[6 + i] * 0.05; obs[33 + i] = last[i]; }
+      if (noise) for (let i = 0; i < 45; i++) if (i < 6 || (i >= 9 && i < 33)) obs[i] += rnd() * 2 * noise;
+      if (zero) for (let i = zero[0]; i < zero[1]; i++) obs[i] = 0;
+      queue.push(obs); const used = queue.length > latency ? queue.shift() : queue[0];
+      last = mlp(used);
+      for (let i = 0; i < 12; i++) target[i] = last[i] * SCALE[i] + DEFAULT[i];
+    }
+    // sideways shove on the torso (body 1) for 0.1 s at t = 5 s
+    xfrc[6 + 1] = k >= 5000 && k < 5100 ? push : 0;
+    for (let i = 0; i < 12; i++) ctrl[i] = Math.max(-30, Math.min(30, kp * (target[i] - qpos[7 + i]) - kd * qvel[6 + i]));
+    mujoco.mj_step(model, data);
+    if (k === 4999) x5 = qpos[0];
+  }
+  const out = { vx: +((qpos[0]) / seconds).toFixed(2), y: +qpos[1].toFixed(2), z: +qpos[2].toFixed(2), fellAt };
+  data.delete(); model.delete(); return out;
+}
+const show = (name, list) => { console.log(`\n${name}`); for (const [label, opts] of list) console.log(`  ${label.padEnd(26)} ${JSON.stringify(run(opts))}`); };
+show("command tracking (asked → got)", [[0, 0.25, 0.5, 0.8, 1.2, 2.0].map((v) => [`vx ${v}`, { cmd: [v, 0, 0] }]), [[`vy 0.5`, { cmd: [0, 0.5, 0] }], [`back -0.5`, { cmd: [-0.5, 0, 0] }]]].flat());
+show("sideways push, 0.1 s at t=5 s", [50, 100, 150, 200, 300, 400].map((f) => [`${f} N (${f * 0.1} N·s)`, { push: f }]));
+show("floor friction", [1, 0.5, 0.3, 0.2, 0.1, 0.05].map((f) => [`μ ${f}`, { friction: f }]));
+show("observation latency", [0, 1, 2, 3, 4, 6].map((l) => [`${l} policy steps (${l * 12} ms)`, { latency: l }]));
+show("sensor noise (uniform ±)", [0.05, 0.1, 0.2, 0.4, 0.8].map((n) => [`±${n}`, { noise: n }]));
+show("blind one sense (zeroed)", [["gyro", [0, 3]], ["gravity", [3, 6]], ["joint pos", [9, 21]], ["joint vel", [21, 33]], ["last action", [33, 45]]].map(([n, z]) => [n, { zero: z }]));
+show("PD gains", [[10, 1], [20, 1], [30, 1], [60, 1], [100, 1], [30, 0.2], [30, 3]].map(([kp, kd]) => [`kp ${kp} kd ${kd}`, { kp, kd }]));

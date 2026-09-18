@@ -1,0 +1,80 @@
+// Same rollout as reference.py, but MuJoCo is the official WASM build and the policy is a hand-written MLP.
+import { readFileSync, writeFileSync } from "node:fs";
+import load from "@mujoco/mujoco";
+
+const ROOT = "../model/Lite3/Lite3_mjcf";
+const DT = 0.001, DECIMATION = 12, KP = 30, KD = 1, SECONDS = 10;
+const DEFAULT = [0, -0.65, 1.3, 0, -0.65, 1.3, 0, -0.65, 1.3, 0, -0.65, 1.3];
+const SCALE = [0.125, 0.25, 0.25, 0.125, 0.25, 0.25, 0.125, 0.25, 0.25, 0.125, 0.25, 0.25];
+
+const tLoad = performance.now();
+const mujoco = await load();
+const tWasm = performance.now();
+mujoco.FS.mkdirTree("/lite3/mjcf"); mujoco.FS.mkdirTree("/lite3/meshes");
+mujoco.FS.writeFile("/lite3/mjcf/Lite3.xml", readFileSync(`${ROOT}/mjcf/Lite3.xml`));
+for (const f of ["hip", "thigh", "shank", "torso"]) mujoco.FS.writeFile(`/lite3/meshes/${f}.STL`, readFileSync(`${ROOT}/meshes/${f}.STL`));
+const model = mujoco.MjModel.from_xml_path("/lite3/mjcf/Lite3.xml");
+const tModel = performance.now();
+model.opt.timestep = DT;
+const data = new mujoco.MjData(model);
+console.log(`wasm init ${(tWasm - tLoad).toFixed(0)} ms, compile model ${(tModel - tWasm).toFixed(0)} ms; nq ${model.nq} nu ${model.nu}`);
+
+// The policy: three ELU layers and a linear one. Float32 on purpose — that is what the browser would ship.
+const layers = JSON.parse(readFileSync("../weights.json", "utf8")).layers.map((l) => ({ ...l, w: Float32Array.from(l.w), b: Float32Array.from(l.b) }));
+function mlp(x) {
+  layers.forEach(({ w, b, rows, cols }, li) => {
+    const y = new Float32Array(rows);
+    for (let r = 0; r < rows; r++) {
+      let s = b[r];
+      for (let c = 0; c < cols; c++) s += w[r * cols + c] * x[c];
+      y[r] = li < 3 && s < 0 ? Math.expm1(s) : s;
+    }
+    x = y;
+  });
+  return x;
+}
+
+const ref = JSON.parse(readFileSync("../trace.json", "utf8"));
+const cmd = ref.cmd;
+let worst = 0;
+for (const { obs, action } of ref.trace) mlp(Float32Array.from(obs)).forEach((v, i) => (worst = Math.max(worst, Math.abs(v - action[i]))));
+console.log(`policy parity on ${ref.trace.length} reference observations: max |Δaction| = ${worst.toExponential(2)}`);
+
+const qpos = data.qpos, qvel = data.qvel, ctrl = data.ctrl;
+qpos.set([0, 0, 0.36, 1, 0, 0, 0, ...DEFAULT]);
+mujoco.mj_forward(model, data);
+
+let last = new Float32Array(12), target = Float64Array.from(DEFAULT), policyMs = 0, stepMs = 0, minZ = 1, obsDrift = 0;
+const steps = SECONDS / DT;
+for (let k = 0; k < steps; k++) {
+  if (k % DECIMATION === 0) {
+    const t = performance.now();
+    const [w, x, y, z] = [qpos[3], qpos[4], qpos[5], qpos[6]];
+    // third row of R, negated = Rᵀ·(0,0,−1): gravity seen from the body
+    const g = [-2 * (x * z - w * y), -2 * (y * z + w * x), -(1 - 2 * (x * x + y * y))];
+    const obs = new Float32Array(45);
+    for (let i = 0; i < 3; i++) { obs[i] = qvel[3 + i] * 0.25; obs[3 + i] = g[i]; obs[6 + i] = cmd[i]; }
+    for (let i = 0; i < 12; i++) { obs[9 + i] = qpos[7 + i] - DEFAULT[i]; obs[21 + i] = qvel[6 + i] * 0.05; obs[33 + i] = last[i]; }
+    const j = k / DECIMATION;
+    if (j < 5) ref.trace[j].obs.forEach((v, i) => (obsDrift = Math.max(obsDrift, Math.abs(v - obs[i]))));
+    last = mlp(obs);
+    for (let i = 0; i < 12; i++) target[i] = last[i] * SCALE[i] + DEFAULT[i];
+    policyMs += performance.now() - t;
+  }
+  const t = performance.now();
+  for (let i = 0; i < 12; i++) ctrl[i] = KP * (target[i] - qpos[7 + i]) - KD * qvel[6 + i];
+  mujoco.mj_step(model, data);
+  stepMs += performance.now() - t;
+  minZ = Math.min(minZ, qpos[2]);
+}
+console.log(`first 5 observations vs Python MuJoCo: max |Δ| = ${obsDrift.toExponential(2)}`);
+console.log(`cmd ${JSON.stringify(cmd)} after ${SECONDS}s: x=${qpos[0].toFixed(2)} y=${qpos[1].toFixed(2)} z=${qpos[2].toFixed(3)} min z=${minZ.toFixed(3)}  (Python: ${ref.final.map((v) => v.toFixed(2))})`);
+console.log(`physics ${(stepMs / steps * 1000).toFixed(1)} µs/step, policy ${(policyMs / (steps / DECIMATION) * 1000).toFixed(0)} µs/call → ${(SECONDS * 1000 / (stepMs + policyMs)).toFixed(1)}× real time`);
+console.log(`per 60 Hz frame (16.7 ms sim): ${((stepMs + policyMs) / (SECONDS * 60)).toFixed(2)} ms`);
+
+// A compiled binary model would replace XML + 4 STL files with one download.
+mujoco.mj_saveModel(model, "/lite3/lite3.mjb", null);
+const mjb = mujoco.FS.readFile("/lite3/lite3.mjb");
+writeFileSync("../lite3.mjb", mjb);
+console.log(`compiled .mjb: ${mjb.length} bytes`);
+data.delete(); model.delete();
