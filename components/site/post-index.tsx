@@ -27,10 +27,13 @@ interface Props {
   labels: { all: string; empty: string; interactive: string; filter: string };
   /** Hide the filter chips, e.g. on a single-tag page. */
   filterable?: boolean;
+  /** Heading level of each entry: 3 under the home page's "Notebook index" h2, 2 where the list follows the page h1. */
+  level?: 2 | 3;
 }
 
 /** The notebook's table of contents: one ruled line per entry, № and date in the margin. */
-export function PostIndex({ locale, rows, tags, labels, filterable = true }: Props) {
+export function PostIndex({ locale, rows, tags, labels, filterable = true, level = 2 }: Props) {
+  const Heading = `h${level}` as const;
   const [tag, setTag] = useState<string | null>(null);
   const visible = tag ? rows.filter((r) => r.tags.includes(tag)) : rows;
 
@@ -73,9 +76,9 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true }: Pro
                 </time>
                 <div className="min-w-0">
                   <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
-                    <h3 className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
+                    <Heading className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
                       {row.title}
-                    </h3>
+                    </Heading>
                   </ViewTransition>
                   <p className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
                     {row.description}

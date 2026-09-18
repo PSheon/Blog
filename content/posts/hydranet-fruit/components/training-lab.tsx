@@ -243,18 +243,19 @@ export function TrainingLab() {
             <p className="rounded-sm border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">{t.untrained}</p>
           )}
           {kind === "shapes" && <p className="text-xs leading-relaxed text-signal-2">{t.fallback}</p>}
+
+          <div className="grid gap-3 border-t border-border pt-5">
+            <p className="text-sm font-medium">{t.edges}</p>
+            {boxOn && prediction && scene && (
+              <EdgePlots edges={prediction.edges} predicted={[...prediction.box]} truth={[...scene.box]} names={t.edgeNames} />
+            )}
+          </div>
         </div>
       </div>
 
-      <section className="grid gap-4 border-t border-border pt-6">
-        <h3 className="text-sm font-medium">{t.edges}</h3>
-        {boxOn && prediction && scene && (
-          <EdgePlots edges={prediction.edges} predicted={[...prediction.box]} truth={[...scene.box]} names={t.edgeNames} />
-        )}
-        <p className="rounded-md border border-signal/30 bg-signal/5 px-3.5 py-3 text-sm leading-relaxed" data-testid="hy-reading">
-          {reading}
-        </p>
-      </section>
+      <p className="rounded-md border border-signal/30 bg-signal/5 px-3.5 py-3 text-sm leading-relaxed" data-testid="hy-reading">
+        {reading}
+      </p>
     </div>
   );
 }

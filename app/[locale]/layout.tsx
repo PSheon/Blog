@@ -6,7 +6,6 @@ import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { ThemeProvider } from "@/components/theme-provider";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
 import { site } from "@/lib/site";
@@ -51,7 +50,6 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
     <html lang={htmlLang[locale]} data-scroll-behavior="smooth" className={`${fontVariables} antialiased`} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <TooltipProvider>
             <a
               href="#content"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
@@ -75,7 +73,6 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
               </ViewTransition>
             </main>
             <SiteFooter locale={locale} t={t} />
-          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

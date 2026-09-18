@@ -257,7 +257,7 @@ export function TrainingLab() {
 
       {/* 3 — look inside */}
       <section className="grid gap-4 border-t border-border pt-6">
-        <h3 className="text-sm font-medium">{t.attention}</h3>
+        <p className="text-sm font-medium">{t.attention}</p>
         <div className="grid grid-cols-2 gap-4 sm:gap-8">
           {[0, 1].map((h) => (
             <AttentionMap
