@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/site/header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
+import { sharedMetadata } from "@/lib/seo";
 import { site } from "@/lib/site";
 
 export function generateStaticParams() {
@@ -32,12 +33,7 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
     title: { default: t.meta.title, template: `%s — ${site.name}` },
     description: t.meta.description,
     authors: [{ name: site.author, url: site.github }],
-    alternates: {
-      canonical: `/${locale}`,
-      languages: { "zh-Hant-TW": "/zh", en: "/en" },
-      types: { "application/rss+xml": `/${locale}/feed.xml` },
-    },
-    openGraph: { siteName: site.name, locale: locale === "zh" ? "zh_TW" : "en_US", type: "website" },
+    ...sharedMetadata(locale, ""),
   };
 }
 

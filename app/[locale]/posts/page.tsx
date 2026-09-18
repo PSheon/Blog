@@ -5,12 +5,13 @@ import { PostIndex } from "@/components/site/post-index";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
 import { toRows } from "@/lib/content/rows";
 import { getDictionary, isLocale } from "@/lib/i18n";
+import { sharedMetadata } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/posts">): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale);
-  return { title: t.posts.title, description: t.posts.lead, alternates: { canonical: `/${locale}/posts` } };
+  return { title: t.posts.title, description: t.posts.description, ...sharedMetadata(locale, "/posts") };
 }
 
 export default async function PostsPage({ params }: PageProps<"/[locale]/posts">) {

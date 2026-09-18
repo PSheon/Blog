@@ -61,8 +61,8 @@ const zh = {
     copied: "已複製",
     sidenote: "邊注",
   },
-  posts: { title: "文章", lead: "所有筆記，依時間排序。" },
-  tags: { title: "標籤", lead: "依主題瀏覽。", tagged: (tag: string) => `標籤：${tag}`, count: (n: number) => `${n} 篇` },
+  posts: { title: "文章", lead: "所有筆記，依時間排序。", description: "paul.notebook 的所有文章：可以在瀏覽器裡動手玩的電腦視覺、強化學習、Transformer 與機器人互動筆記，依時間排序。" },
+  tags: { title: "標籤", lead: "依主題瀏覽。", description: "依主題瀏覽 paul.notebook 的互動文章：電腦視覺、CNN、Transformer、強化學習、神經演化、機器人與 AI 代理。", tagged: (tag: string) => `標籤：${tag}`, taggedLead: (tag: string, n: number) => `paul.notebook 裡標記為「${tag}」的 ${n} 篇互動文章。`, count: (n: number) => `${n} 篇` },
   about: {
     strip: "這本筆記的作者",
     bio: "我是 Paul。我喜歡把整條路自己走完：邊緣裝置上的感知模型、它產生的軌跡與事件，以及決定接下來要做什麼的代理。",

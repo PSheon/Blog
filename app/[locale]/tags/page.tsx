@@ -4,12 +4,13 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/site/page-header";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, isLocale } from "@/lib/i18n";
+import { sharedMetadata } from "@/lib/seo";
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/tags">): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale);
-  return { title: t.tags.title, description: t.tags.lead, alternates: { canonical: `/${locale}/tags` } };
+  return { title: t.tags.title, description: t.tags.description, ...sharedMetadata(locale, "/tags") };
 }
 
 export default async function TagsPage({ params }: PageProps<"/[locale]/tags">) {

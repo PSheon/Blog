@@ -1,12 +1,12 @@
 import type { MetadataRoute } from "next";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
-import { htmlLang, locales } from "@/lib/i18n";
+import { locales } from "@/lib/i18n";
+import { languageAlternates } from "@/lib/seo";
 import { site } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const both = (path: string) => ({
-    languages: Object.fromEntries(locales.map((l) => [htmlLang[l], `${site.url}/${l}${path}`])),
-  });
+  const absolute = (languages: Record<string, string>) => Object.fromEntries(Object.entries(languages).map(([lang, path]) => [lang, `${site.url}${path}`]));
+  const both = (path: string) => ({ languages: absolute(languageAlternates(path)) });
   return locales.flatMap((locale) => [
     ...["", "/posts", "/tags"].map((path) => ({
       url: `${site.url}/${locale}${path}`,
@@ -17,12 +17,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       .map((p) => ({
         url: `${site.url}/${locale}/posts/${p.slug}`,
         lastModified: p.updated ?? p.date,
-        alternates: {
-          languages: Object.fromEntries(
-            p.availableLocales.map((l) => [htmlLang[l], `${site.url}/${l}/posts/${p.slug}`]),
-          ),
-        },
+        alternates: { languages: absolute(languageAlternates(`/posts/${p.slug}`, p.availableLocales)) },
       })),
-    ...getAllTags(locale).map(({ tag }) => ({ url: `${site.url}/${locale}/tags/${tag}` })),
+    ...getAllTags(locale).map(({ tag }) => ({ url: `${site.url}/${locale}/tags/${tag}` , alternates: both(`/tags/${tag}`) })),
   ]);
 }
