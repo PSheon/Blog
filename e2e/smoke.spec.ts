@@ -150,14 +150,13 @@ test("a transformer trains in the page and learns to reverse digits", async ({ p
   await expect(page.getByTestId("tf-accuracy")).toHaveText("100", { timeout: 45_000 });
   await page.getByTestId("tf-train").click(); // pause
 
-  // Every quiz problem is now answered correctly…
-  const quiz = page.getByTestId("tf-quiz");
-  await expect(quiz.getByRole("button").first()).toContainText("951413");
-  await expect(quiz.getByText("has mistakes")).toHaveCount(0);
+  // The live answer on the task card is now right, and the caption explains the map that produced it.
+  await expect(page.getByTestId("tf-output")).toHaveText("951413");
+  await expect(page.getByTestId("tf-reading")).toContainText("“9”");
 
-  // …including one the reader makes up, which also becomes the problem the maps explain.
-  await page.getByTestId("tf-own").fill("271828");
-  await expect(quiz.getByRole("button").last()).toContainText("828172");
-  await expect(page.getByTestId("tf-reading")).toContainText("“8”");
+  // A fresh random problem is answered correctly too: it learned the rule, not the example.
+  await page.getByRole("button", { name: "Another one" }).click();
+  await expect(page.getByTestId("tf-output").locator(".text-signal-2")).toHaveCount(0);
+  await expect(page.getByTestId("tf-output").locator(".text-signal")).toHaveCount(6);
   expect(errors).toEqual([]);
 });

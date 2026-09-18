@@ -15,13 +15,13 @@ We are going to teach it a very simple game: **give it six digits and ask it to 
 
 A person doesn't need to learn that, but at the start the model doesn't even know what "backwards" means. Nobody tells it the rule. It only sees problems and their correct answers, over and over, and has to work the rest out by itself.
 
-The instrument below is four steps from top to bottom: look at the task, press Train, watch the answers in the pop quiz turn from pink (wrong) to cyan (right) one by one, and finally look at the attention maps, which show where in the input the model is looking while it writes each digit.
+The instrument below is three steps from top to bottom: look at the task, press Train, watch the line “what it writes now” turn from pink (wrong) to cyan (right) digit by digit, and finally look at the attention maps, which show where in the input the model is looking while it writes each digit.
 
-<Instrument fig="01" title="transformer / train" size="wide" caption="Choose “slow” to watch the change happen, or “fast” to finish training in a second or two. The model never saw the quiz problems during training, and you can set one of your own underneath.">
+<Instrument fig="01" title="transformer / train" size="wide" caption="Choose “slow” to watch the change happen, or “fast” to finish training in a second or two. Press “Another one” for a different set of digits: training problems are generated at random every step, so the model has almost certainly never seen this one.">
   <TrainingLab />
 </Instrument>
 
-If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the whole quiz turns cyan, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured with fixed random seeds: reverse and copy first reach 100% around step 30 to 40, and a step takes about 4 ms on my laptop. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
+If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the answer it writes turns cyan from end to end, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured with fixed random seeds: reverse and copy first reach 100% around step 30 to 40, and a step takes about 4 ms on my laptop. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
 
 I didn't draw that line, and no line of code tells it to appear. It is a result of training. This article is about how it gets there.
 
