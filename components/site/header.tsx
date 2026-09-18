@@ -1,6 +1,7 @@
 import { Menu } from "lucide-react";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { Navbar, NavbarLeft, NavbarRight } from "@/components/ui/navbar";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { SearchEntry } from "@/lib/content/posts";
 import type { Dictionary, Locale } from "@/lib/i18n";
@@ -24,8 +25,10 @@ export function SiteHeader({ locale, nav, search, searchIndex, tags }: Props) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-rule bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 w-full max-w-7xl items-center gap-3 px-5 sm:px-8">
+    <header className="sticky top-0 z-40 -mb-4 pb-4">
+      <div className="fade-bottom absolute inset-0 -z-10 bg-background/70 backdrop-blur-lg" aria-hidden />
+      <Navbar className="mx-auto h-14 w-full max-w-7xl gap-3 px-5 py-0 sm:px-8">
+        <NavbarLeft className="gap-3">
         <Link href={`/${locale}`} className="mr-2 flex items-center gap-2.5" aria-label={`${site.name} — ${nav.home}`}>
           <KernelMark className="size-4" />
           <span className="font-mono text-sm font-medium tracking-tight">{site.name}</span>
@@ -39,7 +42,8 @@ export function SiteHeader({ locale, nav, search, searchIndex, tags }: Props) {
           ))}
         </nav>
 
-        <div className="ml-auto flex items-center gap-2">
+        </NavbarLeft>
+        <NavbarRight className="gap-2">
           <Search locale={locale} index={searchIndex} tags={tags} t={search} />
           <Sheet>
             <SheetTrigger
@@ -65,8 +69,8 @@ export function SiteHeader({ locale, nav, search, searchIndex, tags }: Props) {
               </nav>
             </SheetContent>
           </Sheet>
-        </div>
-      </div>
+        </NavbarRight>
+      </Navbar>
     </header>
   );
 }

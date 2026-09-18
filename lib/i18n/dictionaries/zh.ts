@@ -64,7 +64,15 @@ const zh = {
       { key: "EDGE", title: "邊緣運算", body: "RTSP、GStreamer、WebRTC；Python 太慢的地方用 Rust 與 Kotlin Multiplatform。" },
     ],
   },
-  footer: { rss: "RSS", source: "原始碼", builtWith: "用 Next.js、MDX 與一點點線性代數打造。" },
+  footer: {
+    rss: "RSS",
+    source: "本站原始碼",
+    about: "Paul 的實驗筆記。每篇文章都附上可以在瀏覽器裡直接操作的儀器。",
+    browse: "瀏覽",
+    elsewhere: "其他地方",
+    preferences: "偏好設定",
+    builtWith: "用 Next.js、MDX 與一點點線性代數打造。",
+  },
   lab: {
     play: "播放",
     pause: "暫停",

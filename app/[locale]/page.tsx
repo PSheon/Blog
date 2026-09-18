@@ -8,6 +8,7 @@ import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
 import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
+import Glow from "@/components/ui/glow";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
 import { toRows } from "@/lib/content/rows";
 import { formatDate, getDictionary, isLocale } from "@/lib/i18n";
@@ -22,7 +23,8 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const latest = posts[0];
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
+    // overflow-x-clip: the hero glow is wider than a phone; clip it without creating a scroll container.
+    <div className="mx-auto w-full max-w-7xl overflow-x-clip px-5 sm:px-8">
       {/* Hero: the thing itself first, the words beside it. */}
       <section className="grid gap-10 pt-12 pb-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-24">
         <div>
@@ -48,6 +50,8 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           </div>
         </div>
 
+        <div className="relative">
+          <Glow variant="center" className="pointer-events-none -z-10 opacity-60" />
         <Instrument
           title={t.hero.instrumentTitle}
           figureClassName="my-0"
@@ -65,6 +69,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         >
           <HeroInstrument hint={t.hero.instrumentHint} />
         </Instrument>
+        </div>
       </section>
 
       {featured && (
@@ -93,7 +98,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               </p>
             </div>
             {hasPreview(featured.slug) && (
-              <div className="rounded-md border border-border bg-panel p-2 dot-grid">
+              <div className="glass-3 rounded-lg p-2.5">
                 <PostPreview slug={featured.slug} />
               </div>
             )}

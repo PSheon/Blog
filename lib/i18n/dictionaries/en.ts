@@ -72,7 +72,15 @@ const en: Dictionary = {
       { key: "EDGE", title: "Edge", body: "RTSP, GStreamer, WebRTC; Rust and Kotlin Multiplatform where Python is too slow." },
     ],
   },
-  footer: { rss: "RSS", source: "Source", builtWith: "Built with Next.js, MDX and a little linear algebra." },
+  footer: {
+    rss: "RSS",
+    source: "Source for this site",
+    about: "Paul's lab notebook. Every article comes with instruments you can operate right in the browser.",
+    browse: "Browse",
+    elsewhere: "Elsewhere",
+    preferences: "Preferences",
+    builtWith: "Built with Next.js, MDX and a little linear algebra.",
+  },
   lab: {
     play: "Play",
     pause: "Pause",
