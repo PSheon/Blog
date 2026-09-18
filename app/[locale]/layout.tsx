@@ -48,7 +48,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
   const t = getDictionary(locale);
 
   return (
-    <html lang={htmlLang[locale]} className={`${fontVariables} antialiased`} suppressHydrationWarning>
+    <html lang={htmlLang[locale]} data-scroll-behavior="smooth" className={`${fontVariables} antialiased`} suppressHydrationWarning>
       <body className="flex min-h-dvh flex-col">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <TooltipProvider>
@@ -61,7 +61,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             <SiteHeader
               locale={locale}
               nav={t.nav}
-              labels={{ search: t.search, theme: t.theme, locale: t.locale }}
+              search={t.search}
               searchIndex={buildSearchIndex(locale)}
               tags={getAllTags(locale).map((x) => x.tag)}
             />

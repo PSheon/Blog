@@ -6,20 +6,18 @@ import type { SearchEntry } from "@/lib/content/posts";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 import { KernelMark } from "./kernel-mark";
-import { LocaleSwitch } from "./locale-switch";
 import { NavLink } from "./nav-link";
 import { Search } from "./search";
-import { ThemeToggle } from "./theme-toggle";
 
 interface Props {
   locale: Locale;
   nav: Dictionary["nav"];
-  labels: { search: Dictionary["search"]; theme: Dictionary["theme"]; locale: Dictionary["locale"] };
+  search: Dictionary["search"];
   searchIndex: SearchEntry[];
   tags: string[];
 }
 
-export function SiteHeader({ locale, nav, labels, searchIndex, tags }: Props) {
+export function SiteHeader({ locale, nav, search, searchIndex, tags }: Props) {
   const links = [
     { href: `/${locale}/posts`, label: nav.posts },
     { href: `/${locale}/tags`, label: nav.tags },
@@ -42,9 +40,7 @@ export function SiteHeader({ locale, nav, labels, searchIndex, tags }: Props) {
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
-          <Search locale={locale} index={searchIndex} tags={tags} t={labels.search} />
-          <LocaleSwitch locale={locale} label={labels.locale.switch} />
-          <ThemeToggle label={labels.theme.toggle} />
+          <Search locale={locale} index={searchIndex} tags={tags} t={search} />
           <Sheet>
             <SheetTrigger
               className={buttonVariants({ variant: "ghost", size: "icon", className: "md:hidden" })}

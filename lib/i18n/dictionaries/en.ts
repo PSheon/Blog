@@ -14,8 +14,8 @@ const en: Dictionary = {
     posts: "Posts",
     tags: "Tags",
   },
-  theme: { toggle: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
-  locale: { switch: "Switch language" },
+  theme: { label: "Theme", toggle: "Toggle theme", light: "Light", dark: "Dark", system: "System" },
+  locale: { label: "Language", switch: "Switch language" },
   hero: {
     eyebrow: "Lab notebook",
     tagline: ["See", "Think", "Act"],
