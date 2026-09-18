@@ -71,17 +71,26 @@ export class FlyNet {
     return t.addRow(t.matmul(t.scale(out, 10), this.params.readout), this.params.readoutBias);
   }
 
+  /** Add one clip's gradient, already divided by the batch it will belong to. Returns that clip's loss. */
+  accumulate(clip: Clip, batch: number): number {
+    const t = new Tape();
+    const loss = t.crossEntropy(this.logits(t, clip.frames, this.keepAlive / batch), [clip.label], 1 / batch);
+    t.backward();
+    this.seen++;
+    return loss;
+  }
+
+  /** Take the Adam step for whatever has been accumulated. */
+  apply(lr = 1e-2) {
+    this.adam.step(lr);
+    for (const p of Object.values(this.params)) p.grad.fill(0);
+  }
+
   /** One Adam step on a batch of clips; returns the mean loss. */
   step(clips: Clip[], lr = 1e-2): number {
     let loss = 0;
-    for (const clip of clips) {
-      const t = new Tape();
-      loss += t.crossEntropy(this.logits(t, clip.frames, this.keepAlive / clips.length), [clip.label], 1 / clips.length);
-      t.backward();
-    }
-    this.adam.step(lr);
-    for (const p of Object.values(this.params)) p.grad.fill(0);
-    this.seen += clips.length;
+    for (const clip of clips) loss += this.accumulate(clip, clips.length);
+    this.apply(lr);
     return loss / clips.length;
   }
 
