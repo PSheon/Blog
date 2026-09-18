@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { conv2d, tensor } from "@/lib/ml";
 import { cn } from "@/lib/utils";
-import { HeatCanvas } from "./heat-canvas";
+import { HeatCanvas } from "@/components/lab/heat-canvas";
 import { useLabels } from "./labels";
 import { useLab } from "./store";
 

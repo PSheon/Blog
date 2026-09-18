@@ -1,6 +1,6 @@
 "use client";
 
-import { HeatCanvas } from "@/content/posts/cnn-from-scratch/components/heat-canvas";
+import { HeatCanvas } from "@/components/lab/heat-canvas";
 import { useLab } from "@/content/posts/cnn-from-scratch/components/store";
 
 /** First-layer feature maps of whatever is on the hero canvas: draw above, watch these change. */

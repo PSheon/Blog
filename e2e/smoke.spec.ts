@@ -120,3 +120,18 @@ test("a trading bot can be trained, and the result survives a reload", async ({ 
   await expect(page.getByText("Loaded the result of your last training run")).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test("a transformer trains in the page and learns to reverse digits", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/en/posts/transformer-from-scratch");
+  await expect(page.getByTestId("tf-steps")).toHaveText("0");
+  await page.getByTestId("tf-train").click();
+  await expect(page.getByTestId("tf-accuracy")).toHaveText("100", { timeout: 45_000 });
+  await page.getByTestId("tf-train").click(); // pause
+  await expect(page.getByTestId("tf-output")).toHaveText("951413");
+
+  // The trained model generalises to digits the reader types in.
+  await page.getByRole("textbox").fill("271828");
+  await expect(page.getByTestId("tf-output")).toHaveText("828172");
+  expect(errors).toEqual([]);
+});
