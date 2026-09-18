@@ -1,0 +1,29 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# next
+.next/
+out/
+next-env.d.ts
+
+# build / test
+dist/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# env
+.env*
+!.env.example
+
+# python (training scripts)
+__pycache__/
+.venv/
+scripts/**/data/
+
+# misc
+.DS_Store
+.vercel
+*.log
