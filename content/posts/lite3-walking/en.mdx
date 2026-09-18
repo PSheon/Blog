@@ -1,0 +1,185 @@
+---
+title: "A robot dog in the browser: its walking policy is four matrix multiplications"
+description: "MuJoCo compiled to WebAssembly plus the walking policy Deep Robotics published make a Lite3 walk in your browser. Then you try to knock it over: blindfold its senses, shove it, detune its motors."
+date: 2026-09-18
+tags: [ai-agent, robotics, reinforcement-learning]
+no: 6
+interactive: true
+---
+
+import { GainsLab, PushLab, RemoteLab, SensesLab, WorldLab } from "./components";
+
+The models in the earlier articles were all trained in your browser. **This one was not.** The brain of the robot dog below was trained by Deep Robotics on GPUs, in a simulator, and then published on GitHub. It is the kind of policy that runs on a real Lite3.
+
+I did only two things: move the physics simulator into the browser, and plug that brain into it. Training it takes thousands of dogs falling over in parallel on a GPU for hours, which a web page cannot do. But what the trained thing actually is, and what keeps it on its feet, can be taken apart right here.
+
+The simulator and the robot's model come to about 4.5 MB, so nothing loads until you press the button.
+
+<Instrument fig="01" title="lite3 / remote" size="wide" caption="Push the stick up to go forward, sideways to turn. The dashed line is the speed you asked for, the solid line is the speed it actually has.">
+  <RemoteLab />
+</Instrument>
+
+Once it loads, the dog walks forward at about half a metre per second. Push the stick all the way and it runs at 2 m/s; pull it down and it backs up; tick the sidestep box and it walks like a crab. A later instrument lets you shove it: at 150 newtons it staggers and recovers, at 300 it ends up on its back.<Sidenote>150 N is roughly the weight of 15 kg, applied for a tenth of a second. The Lite3 itself weighs about 12 kg. What I measured: below 175 N it never falls, above 275 N it always does, and in between it depends on the moment in its stride and on which side you push from. At 250 N, 7 of 8 shoves from one side toppled it and 4 of 8 from the other.</Sidenote>
+
+Not one line of code deals with being pushed.
+
+## The brain is four matrix multiplications
+
+The published policy is a 758 KB ONNX file. Open it and there is nothing special inside:
+
+| | This dog's brain |
+| --- | --- |
+| Input | 45 numbers |
+| Hidden layers | 512 → 256 → 128, with ELU activations |
+| Output | 12 numbers, one per joint |
+| Parameters | 189,324 |
+| Memory | None. Every call starts from scratch |
+
+It is more than ten times the size of [the Transformer from the last article](/en/posts/transformer-from-scratch), and far simpler: four fully connected layers, the first three followed by an ELU. So no inference library is needed. The `dense` from [the CNN article](/en/posts/cnn-from-scratch) plus one new `elu` is all of it:
+
+```ts
+act(obs: Float32Array): Float32Array {
+  let x = tensor(obs, [1, 45]);
+  this.layers.forEach(({ w, b }, i) => {
+    x = dense(x, w, b);
+    if (i + 1 < this.layers.length) x = elu(x);
+  });
+  return x.data;
+}
+```
+
+ELU differs from ReLU only on the negative side: ReLU cuts to zero, ELU is a smooth curve that approaches −1, $\mathrm{elu}(x) = e^x - 1$.
+
+I took the actions computed from the original ONNX file as the reference and compared them with this code's output: they differ in the seventh decimal place.<Sidenote>The physics was checked too: from the same starting pose and the same command, MuJoCo as WebAssembly in the browser and MuJoCo in Python on my machine both end a ten-second walk at 4.69 m.</Sidenote>
+
+The network is called 83 times a second and each call takes under 0.2 ms. The physics is what costs time.
+
+## What it can feel
+
+Those 45 inputs are everything the dog knows about the world. No camera, no map. It does not even know where it is or how fast it is going.
+
+| How many | What | Where it comes from on the real robot |
+| --- | --- | --- |
+| 3 | How fast the body is rotating | Gyroscope |
+| 3 | The direction of gravity (which way is down, seen from the body) | IMU |
+| 3 | Your command: how fast to go forward, sideways and around | Joystick |
+| 12 | The current angle of every joint | Motor encoders |
+| 12 | How fast every joint is turning | Motor encoders |
+| 12 | The action it output last time | Remembered |
+
+With only six senses, the obvious question is which one it cannot do without. Each group of bars below is the live reading of one sense, and "Blindfold" sets it to zero.
+
+<Instrument fig="02" title="lite3 / senses" size="wide" caption="The six groups on top are the 45 numbers the network sees; at the bottom are the 12 it answers with. The command is fixed at 0.5 m/s.">
+  <SensesLab />
+</Instrument>
+
+What I measured was not what I had guessed:
+
+| Blindfolded | Result |
+| --- | --- |
+| Gyroscope | Hardly any difference; it keeps walking |
+| Gravity direction | Holds on for 0.8 s, then falls |
+| Joint angles | Down in 0.28 s |
+| Joint speeds | Stays up, but **bolts**: asked for 0.8 m/s, it reaches 2.5 |
+| Its last action | Stands perfectly well and never takes a step |
+
+The last two are the interesting ones. Joint speed is what it brakes with: if it cannot feel its legs moving, it concludes it has not pushed yet, and pushes harder and harder. And "its last action" is the only metronome this memoryless network has. Walking is periodic, and the way the network knows whose turn it is comes from looking at what it did on the previous beat. Take that away and every beat looks like the first one, so it stays in the starting pose for ever.
+
+## What it outputs is not force
+
+The 12 outputs are not "how hard each motor should push" either. They are **target angles**, given as offsets from the standing pose:
+
+$$
+\text{target angle} = \text{standing pose} + \text{output} \times \text{scale}
+$$
+
+The scale is 0.125 rad for the sideways hip joints and 0.25 rad for the rest, so an output of 1 moves a joint by about 14 degrees. The torque itself is computed by a PD controller that runs every millisecond:
+
+$$
+\tau = K_p(\text{target angle} - \text{current angle}) - K_d \cdot \text{angular velocity}
+$$
+
+$K_p$ is how stiff the spring is, $K_d$ is how thick the damping is. Torque is capped at 30 N·m, the limit of the motors.
+
+The reason for splitting the work this way is time scale. The network thinks 83 times a second; the motors need orders 1,000 times a second. For the 11 milliseconds in between, the spring is what holds the dog up.
+
+The price is that the network grew up in a body with $K_p = 30$ and $K_d = 1$, and every movement it learned quietly assumes that spring. Swap the spring and it has no way of knowing:
+
+<Instrument fig="03" title="lite3 / pd gains" size="wide" caption="The dashed line is the knee angle the network asks for, the solid line is the angle the knee really has, and below is the torque the motor produces to catch up. The command is fixed at 0.5 m/s.">
+  <GainsLab />
+</Instrument>
+
+Pull $K_p$ down to 10 and the solid line cannot keep up with the dashed one; the dog slowly sinks to the floor. Push it to 100 and the solid line hugs the dashed one, and the dog walks faster than you asked. The speeds I measured:
+
+| $K_p$ | $K_d$ | Actual speed when asked for 0.5 |
+| --- | --- | --- |
+| 10 | 1 | 0.01: legs too soft, it lies on the floor |
+| 20 | 1 | 0.24 |
+| **30** | **1** | **0.47** |
+| 60 | 1 | 0.66 |
+| 100 | 1 | 0.80 |
+| 30 | 0.2 | 0.62 |
+| 30 | 3 | 0.31 |
+
+A stiffer spring carries out the same target angles with more force, the strides get longer, and it walks faster than requested. It is not broken, only miscalibrated. On a real robot the true gain of every motor is a little off its datasheet, and this is one flavour of "fine in simulation, odd on hardware".
+
+## Shove it
+
+As the opening said, not one line of code deals with being pushed. So push it. Every shove comes from the side and lasts a tenth of a second.
+
+<Instrument fig="04" title="lite3 / push" size="wide" caption="The line is how far the torso is from level. It stays under 3 degrees in a normal walk; past 30 degrees counts as fallen.">
+  <PushLab />
+</Instrument>
+
+I swept the force from 100 N to 400 N, and at each force shoved it once from each side at 8 different moments of its stride:
+
+| Force | Pushed away: falls out of 8 | Pushed towards you |
+| --- | --- | --- |
+| 175 N and below | 0 | 0 |
+| 200 N | 1 | 0 |
+| 225 N | 4 | 0 |
+| 250 N | 7 | 4 |
+| 275 N and above | 8 | 8 |
+
+There is no clean threshold in the middle. At the same 225 N in the same direction, moving the shove by 60 ms turns a recovery into a fall. The two sides are not symmetric either. Try one force several times in the instrument and you will get different outcomes. In the 175 N run the torso tipped by at most 6 degrees before coming back.
+
+## The real world is not this clean
+
+In the simulator the sensors have no noise, signals have no delay, and the floor's friction coefficient is exactly 1. None of that holds on hardware, so I made them dirty one at a time.
+
+<Instrument fig="05" title="lite3 / real world" size="wide" caption="The three sliders can be combined. The friction slider is logarithmic: rubber floor on the far left, ten times slipperier than ice on the far right.">
+  <WorldLab />
+</Instrument>
+
+**Latency.** The network always sees the world as it was a few beats ago:
+
+| Latency | Actual speed (asked for 0.5) |
+| --- | --- |
+| 0 ms | 0.47 |
+| 24 ms | 0.42 |
+| 48 ms | 0.34 |
+| 72 ms | 0.26 |
+
+It never fell, up to 72 ms, but it walks slower and slower.
+
+**Noise.** Random error added to the sensor readings: below ±0.2 you cannot tell; at ±0.3 it stays up but slows to between 0.2 and 0.35 m/s; ±0.4 is the edge, where over 10 random seeds of 10 seconds each it fell 4 times and crawled at 0.1 to 0.25 m/s the other 6; at ±0.5 it fell all 10 times; at ±0.8 it is down within half a second.
+
+**Friction.** This one surprised me the most. Change the floor from rubber (μ = 1) to something slipperier than ice (μ = 0.05) and the speed only drops from 0.47 to 0.44. The feet really do slip: the average sliding speed of the feet on the ground rises from 0.12 to 0.27 m/s. It walks anyway. Only at μ = 0.01 does it visibly struggle.
+
+Taken together, these three results say the same thing. When a policy like this is trained, the simulator deliberately scrambles the friction, shoves the robot and adds noise to the sensors. It is called domain randomization, and the point is to stop the policy from trusting the simulator too much.<Sidenote>I have not looked up the training configuration of this particular policy, so "friction was randomized during training" is a guess inferred from its behaviour, not a fact.</Sidenote> The ways you fail to knock it over here are mostly ways somebody already tried on your behalf during training; the ways you succeed (blindfolding the joint angles, softening the spring) are ones nobody thought to defend against.
+
+## What is not here
+
+This article only runs the policy; it never learns anything. Where that 758 KB file came from has not been touched at all:
+
+- **The reward function.** Nobody taught it how to walk. Training had only a score: points for matching the commanded speed, penalties for falling, shaking, wasting energy and dragging feet. The gait is what that score squeezed out.
+- **Thousands of dogs.** Training used PPO with thousands of dogs simulated at once on a GPU, each one falling over on different terrain and different friction.
+- **Flat ground only.** The official deployment code includes stair terrain. It is not included here.
+
+Reproducing the training in a browser would take several orders of magnitude more compute. That is another article, and it needs a GPU.
+
+## Licences and sources
+
+- Walking policy: [DeepRoboticsLab/Lite3_rl_deploy](https://github.com/DeepRoboticsLab/Lite3_rl_deploy), BSD-3-Clause.
+- Robot model and meshes: [DeepRoboticsLab/deep_robotics_model](https://github.com/DeepRoboticsLab/deep_robotics_model), BSD-3-Clause. The collision meshes were replaced by convex hulls and the display meshes were decimated.
+- Physics engine: the official WebAssembly build of [MuJoCo](https://github.com/google-deepmind/mujoco), Apache-2.0.

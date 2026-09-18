@@ -206,8 +206,7 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   const response = await page.goto("/zh/posts/lite3-walking");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "lite3-walking is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(120_000);
   const errors = watchErrors(page);
 
