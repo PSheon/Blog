@@ -6,6 +6,7 @@ import { HeroInstrument } from "@/components/site/hero-instrument";
 import { PostIndex } from "@/components/site/post-index";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
+import { TriadRail } from "@/components/site/triad-rail";
 import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
@@ -24,7 +25,8 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   return (
     <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
       {/* Hero: the thing itself first, the words beside it. */}
-      <section className="grid gap-10 pt-12 pb-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-24">
+      <section className="relative grid gap-10 pt-12 pb-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-14">
+        <div className="hero-grid" aria-hidden />
         <div>
           <h1 className="triad-text w-fit font-heading text-[clamp(2.75rem,7vw,5.25rem)] leading-[1.08] font-semibold tracking-tight">
             {t.hero.tagline.map((word) => (
@@ -69,6 +71,16 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         </Instrument>
         </div>
       </section>
+
+      <TriadRail
+        locale={locale}
+        label={t.home.topics}
+        stops={[
+          { word: t.hero.tagline[0], tag: "computer-vision", color: "var(--signal)" },
+          { word: t.hero.tagline[1], tag: "llm", color: "var(--signal-3)" },
+          { word: t.hero.tagline[2], tag: "ai-agent", color: "var(--signal-2)" },
+        ].map((s) => ({ ...s, count: posts.filter((p) => p.tags.includes(s.tag)).length }))}
+      />
 
       {featured && (
         <section aria-labelledby="featured" className="border-t border-rule py-12">

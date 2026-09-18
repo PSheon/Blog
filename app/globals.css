@@ -233,6 +233,21 @@
     opacity: 0.55;
   }
 
+  /* The banner's measurement grid behind the hero, dissolving before it reaches the content below. */
+  .hero-grid {
+    position: absolute;
+    inset: -3rem -50vw 0;
+    z-index: -2;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: center top;
+    mask-image: radial-gradient(ellipse 70% 85% at 50% 0%, #000 20%, transparent 100%);
+    opacity: 0.7;
+  }
+
   .triad-text {
     background-image: linear-gradient(160deg, var(--signal) 8%, var(--signal-3) 52%, var(--signal-2) 94%);
     -webkit-background-clip: text;

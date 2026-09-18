@@ -37,6 +37,7 @@ const en: Dictionary = {
   },
   home: {
     featured: "Featured",
+    topics: "Browse by theme: see, think, act",
     index: "Notebook index",
     indexLead: "Newest first.",
     all: "All",
