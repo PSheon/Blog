@@ -13,6 +13,9 @@ import { toRows } from "@/lib/content/rows";
 import { formatDate, getDictionary, isLocale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 
+/** See / Think / Act, in the colours the profile banner gives them. */
+const triad = ["text-signal", "text-signal-3", "text-signal-2"];
+
 export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -27,10 +30,10 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
       <section className="grid gap-10 pt-12 pb-16 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-24">
         <div>
           <h1 className="font-heading text-[clamp(2.75rem,7vw,5.25rem)] leading-[1.04] font-semibold tracking-tight">
-            {t.hero.tagline.map((word) => (
-              <span key={word} className="block">
+            {t.hero.tagline.map((word, i) => (
+              <span key={word} className={`block ${triad[i]}`}>
                 {word}
-                {locale === "en" && <span className="text-signal">.</span>}
+                {locale === "en" && "."}
               </span>
             ))}
           </h1>
@@ -129,9 +132,6 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </h2>
             <p className="mt-4 font-serif text-lg leading-relaxed text-muted-foreground">{t.about.bio}</p>
             <p className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              <Link href={`/${locale}/about`} className="text-signal underline-offset-4 hover:underline">
-                {t.about.more}
-              </Link>
               <a href={site.github} target="_blank" rel="me noreferrer" className="text-signal underline-offset-4 hover:underline">
                 GitHub
               </a>

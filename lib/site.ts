@@ -4,7 +4,6 @@ export const site = {
   url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://blog.psheon.dev",
   github: "https://github.com/PSheon",
   repo: "https://github.com/PSheon/Blog",
-  company: { name: "Syncrobotic", url: "https://syncrobotic.ai/" },
 } as const;
 
 export function editUrl(slug: string, locale: string): string {

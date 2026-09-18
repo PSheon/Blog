@@ -110,7 +110,7 @@ export function OcclusionMap() {
       <div className="mt-5 grid gap-4 border-t border-border pt-4 sm:grid-cols-[auto_auto_auto_1fr] sm:items-end sm:gap-8">
         <Readout label={t.prediction} value={prediction ?? "–"} />
         <Readout label={t.baseline} value={base === null ? "–" : (base * 100).toFixed(1)} unit="%" tone="plain" />
-        <Readout label={t.lowest} value={current?.lowest != null ? (current.lowest * 100).toFixed(1) : "–"} unit="%" tone="amber" />
+        <Readout label={t.lowest} value={current?.lowest != null ? (current.lowest * 100).toFixed(1) : "–"} unit="%" tone="alt" />
         <SamplePicker t={t} digits={[1, 4, 7, 9]} />
       </div>
     </ModelGate>

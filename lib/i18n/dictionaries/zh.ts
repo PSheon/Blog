@@ -3,7 +3,7 @@ const zh = {
     title: "paul.notebook — 看得見的機器，會行動的代理",
     description: "Paul 的實驗筆記：用可以動手玩的互動文章，拆解電腦視覺、LLM 與多代理系統。",
   },
-  nav: { posts: "文章", tags: "標籤", about: "關於", menu: "選單", home: "首頁" },
+  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁" },
   search: {
     open: "搜尋",
     placeholder: "搜尋文章、標籤、章節…",
@@ -55,20 +55,14 @@ const zh = {
   posts: { title: "文章", lead: "所有筆記，依時間排序。" },
   tags: { title: "標籤", lead: "依主題瀏覽。", tagged: (tag: string) => `標籤：${tag}`, count: (n: number) => `${n} 篇` },
   about: {
-    title: "關於",
     strip: "這本筆記的作者",
-    bio: "我是 Paul，在高雄，任職於 Syncrobotic。我喜歡把整條路自己走完：邊緣裝置上的感知模型、它產生的軌跡與事件，以及決定接下來要做什麼的代理。",
+    bio: "我是 Paul。我喜歡把整條路自己走完：邊緣裝置上的感知模型、它產生的軌跡與事件，以及決定接下來要做什麼的代理。",
     focus: [
       { key: "CV", title: "電腦視覺", body: "多任務感知網路、teacher / student 蒸餾、Jetson 上的 ONNX / TensorRT。" },
       { key: "MA", title: "多代理系統", body: "orchestrator / worker 架構、MCP 工具契約、邊緣與雲端的分工。" },
       { key: "LLM", title: "LLM", body: "多模態文件理解、結構化輸出、只在事件觸發時才呼叫的 VLM。" },
       { key: "EDGE", title: "邊緣運算", body: "RTSP、GStreamer、WebRTC；Python 太慢的地方用 Rust 與 Kotlin Multiplatform。" },
     ],
-    more: "更多關於我",
-    whyTitle: "為什麼寫互動文章",
-    why: "公式告訴你模型「是什麼」，但只有親手拖動一個 kernel、看 feature map 跟著變，才會知道它「為什麼」這樣運作。這裡的每個互動元件都是用 TypeScript 從零實作的前向傳播，沒有黑盒子，原始碼就在文章旁邊。",
-    colophonTitle: "版本資訊",
-    colophon: "以 Next.js、MDX 與 shadcn/ui 建置，部署於 Vercel。內文使用 Source Serif 4 與 Noto Serif TC，標籤使用 JetBrains Mono。",
   },
   footer: { rss: "RSS", source: "原始碼", builtWith: "用 Next.js、MDX 與一點點線性代數打造。" },
   lab: {

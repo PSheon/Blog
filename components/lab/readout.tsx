@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-const tones = { signal: "text-signal", amber: "text-signal-2", muted: "text-muted-foreground", plain: "text-foreground" };
+const tones = { signal: "text-signal", alt: "text-signal-2", muted: "text-muted-foreground", plain: "text-foreground" };
 
 interface Props {
   label: string;

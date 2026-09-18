@@ -10,11 +10,11 @@ function parse(color: string): Rgb {
 export function palette(el: Element) {
   const css = getComputedStyle(el);
   const read = (name: string) => parse(css.getPropertyValue(name));
-  return { bg: read("--panel"), signal: read("--signal"), amber: read("--signal-2"), fg: read("--foreground") };
+  return { bg: read("--panel"), signal: read("--signal"), alt: read("--signal-2"), fg: read("--foreground") };
 }
 
 interface Options {
-  /** "seq": 0..max → bg..signal. "div": −max..max → amber..bg..signal. */
+  /** "seq": 0..max → bg..signal. "div": −max..max → alt..bg..signal. */
   mode?: "seq" | "div";
   /** Fixed scale; defaults to the data's own max |value|. */
   max?: number;
@@ -42,7 +42,7 @@ export function drawHeatmap(
   const image = ctx.createImageData(w, h);
   for (let i = 0; i < w * h; i++) {
     const v = Math.max(-1, Math.min(1, data[i] / scale));
-    const to = v >= 0 || mode === "seq" ? pos : p.amber;
+    const to = v >= 0 || mode === "seq" ? pos : p.alt;
     const t = mode === "seq" ? Math.max(0, v) : Math.abs(v);
     image.data[i * 4] = p.bg[0] + (to[0] - p.bg[0]) * t;
     image.data[i * 4 + 1] = p.bg[1] + (to[1] - p.bg[1]) * t;

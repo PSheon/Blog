@@ -43,8 +43,7 @@ draft: true                    # optional — visible in `pnpm dev` only
 ```
 
 `Figure`, `Instrument`, `Sidenote` and `Callout` are available in every article without an
-import. See `content/posts/hello-notebook` for all of them, and
-`content/posts/cnn-from-scratch` for a full interactive article.
+import. See `content/posts/cnn-from-scratch` for a full interactive article that uses them.
 
 ## Layout
 

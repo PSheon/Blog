@@ -19,7 +19,6 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
           <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="Footer">
             <Link href={`/${locale}/posts`} className="hover:text-signal">{t.nav.posts}</Link>
             <Link href={`/${locale}/tags`} className="hover:text-signal">{t.nav.tags}</Link>
-            <Link href={`/${locale}/about`} className="hover:text-signal">{t.nav.about}</Link>
             <a href={`/${locale}/feed.xml`} className="hover:text-signal">{t.footer.rss}</a>
             <a href={site.github} rel="me noreferrer" target="_blank" className="hover:text-signal">GitHub</a>
             <a href={site.repo} rel="noreferrer" target="_blank" className="hover:text-signal">{t.footer.source}</a>

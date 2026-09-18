@@ -30,7 +30,7 @@ export function ReadingProgress() {
 
   return (
     <div className="pointer-events-none fixed inset-x-0 top-14 z-30 h-0.5" aria-hidden>
-      <div ref={bar} className="h-full origin-left scale-x-0 bg-signal" />
+      <div ref={bar} className="triad-gradient h-full origin-left scale-x-0" />
     </div>
   );
 }

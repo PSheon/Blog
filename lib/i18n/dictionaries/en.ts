@@ -6,7 +6,7 @@ const en: Dictionary = {
     description:
       "Paul's lab notebook: interactive, hands-on articles that take apart computer vision, LLMs and multi-agent systems.",
   },
-  nav: { posts: "Posts", tags: "Tags", about: "About", menu: "Menu", home: "Home" },
+  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home" },
   search: {
     open: "Search",
     placeholder: "Search posts, tags, sections…",
@@ -63,20 +63,14 @@ const en: Dictionary = {
     count: (n: number) => `${n} ${n === 1 ? "post" : "posts"}`,
   },
   about: {
-    title: "About",
     strip: "Who writes this",
-    bio: "I'm Paul, based in Kaohsiung, building at Syncrobotic. I like to own the whole path: the perception model on the edge device, the tracks and events it produces, and the agents that decide what to do with them.",
+    bio: "I'm Paul. I like to own the whole path: the perception model on the edge device, the tracks and events it produces, and the agents that decide what to do with them.",
     focus: [
       { key: "CV", title: "Computer vision", body: "Multi-task perception networks, teacher / student distillation, ONNX / TensorRT on Jetson." },
       { key: "MA", title: "Multi-agent systems", body: "Orchestrator / worker designs, MCP tool contracts, the edge-and-cloud split." },
       { key: "LLM", title: "LLM", body: "Multimodal document understanding, structured output, VLMs on trigger rather than on every frame." },
       { key: "EDGE", title: "Edge", body: "RTSP, GStreamer, WebRTC; Rust and Kotlin Multiplatform where Python is too slow." },
     ],
-    more: "More about me",
-    whyTitle: "Why interactive articles",
-    why: "An equation tells you what a model is. Dragging a kernel and watching the feature map change tells you why it works. Every instrument here is a forward pass implemented from scratch in TypeScript — no black boxes, and the source sits next to the article.",
-    colophonTitle: "Colophon",
-    colophon: "Built with Next.js, MDX and shadcn/ui, deployed on Vercel. Set in Source Serif 4 and Noto Serif TC, with labels in JetBrains Mono.",
   },
   footer: { rss: "RSS", source: "Source", builtWith: "Built with Next.js, MDX and a little linear algebra." },
   lab: {

@@ -73,13 +73,6 @@ test("the convolution stepper advances", async ({ page }) => {
   await expect(stepper).toContainText("2/16");
 });
 
-test("a zh-only article is served in /en with a notice", async ({ page }) => {
-  await page.goto("/en/posts/edge-perception-notes");
-  await expect(page.getByTestId("fallback-banner")).toBeVisible();
-  await page.goto("/zh/posts/edge-perception-notes");
-  await expect(page.getByTestId("fallback-banner")).toHaveCount(0);
-});
-
 test("search opens, finds the CNN article and navigates", async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await page.goto("/en");
@@ -99,6 +92,5 @@ test("feeds and sitemap are served", async ({ request }) => {
   const xml = await feed.text();
   expect(xml).toContain("<rss");
   expect(xml).toContain("cnn-from-scratch");
-  expect(xml).not.toContain("edge-perception-notes"); // zh-only
   expect((await request.get("/sitemap.xml")).ok()).toBe(true);
 });

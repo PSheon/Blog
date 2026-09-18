@@ -23,7 +23,6 @@ export function SiteHeader({ locale, nav, labels, searchIndex, tags }: Props) {
   const links = [
     { href: `/${locale}/posts`, label: nav.posts },
     { href: `/${locale}/tags`, label: nav.tags },
-    { href: `/${locale}/about`, label: nav.about },
   ];
 
   return (

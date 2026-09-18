@@ -13,6 +13,7 @@
   --font-heading: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
   --color-signal: var(--signal);
   --color-signal-2: var(--signal-2);
+  --color-signal-3: var(--signal-3);
   --color-panel: var(--panel);
   --color-rule: var(--rule);
   --color-grid: var(--grid);
@@ -58,7 +59,9 @@
 /*
  * Lab Notebook palette.
  * Light is cool paper with navy ink; dark is the navy of the bench at night.
- * --signal is the trace colour of every instrument, --signal-2 the second channel.
+ * The three signals are the See / Think / Act triad of the GitHub profile banner:
+ * --signal cyan (the trace colour of every instrument), --signal-3 violet, --signal-2 pink
+ * (the second channel: negative values, warnings). Light values are darkened to hold AA on paper.
  */
 :root {
   --background: #f5f6fa;
@@ -67,7 +70,7 @@
   --card-foreground: #0d1030;
   --popover: #fcfcfe;
   --popover-foreground: #0d1030;
-  --primary: #0a5f86;
+  --primary: #086c99;
   --primary-foreground: #f5f6fa;
   --secondary: #e8eaf3;
   --secondary-foreground: #0d1030;
@@ -78,17 +81,18 @@
   --destructive: #b3261e;
   --border: #0d10301f;
   --input: #0d103033;
-  --ring: #0a5f86;
-  --signal: #0a5f86;
-  --signal-2: #9a5200;
+  --ring: #086c99;
+  --signal: #086c99;
+  --signal-2: #c2255c;
+  --signal-3: #6347d9;
   --panel: #eef0f7;
   --rule: #0d103026;
   --grid: #0d103014;
-  --chart-1: #0a5f86;
-  --chart-2: #9a5200;
-  --chart-3: #4b5072;
-  --chart-4: #2f7d6b;
-  --chart-5: #7a3e8e;
+  --chart-1: #086c99;
+  --chart-2: #c2255c;
+  --chart-3: #6347d9;
+  --chart-4: #4b5072;
+  --chart-5: #2f7d6b;
   --radius: 0.375rem;
   --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
@@ -112,23 +116,24 @@
   --secondary: #181a45;
   --secondary-foreground: #e6e9f5;
   --muted: #14163c;
-  --muted-foreground: #9aa0c4;
+  --muted-foreground: #9aa0c2;
   --accent: #1b1e4d;
   --accent-foreground: #e6e9f5;
-  --destructive: #ff8a80;
+  --destructive: #ff6e96;
   --border: #e6e9f51f;
   --input: #e6e9f533;
   --ring: #79dafa;
   --signal: #79dafa;
-  --signal-2: #f5b453;
+  --signal-2: #ff6e96;
+  --signal-3: #b9a5ff;
   --panel: #0d0e2c;
   --rule: #e6e9f526;
   --grid: #e6e9f512;
   --chart-1: #79dafa;
-  --chart-2: #f5b453;
-  --chart-3: #9aa0c4;
-  --chart-4: #6fd6b5;
-  --chart-5: #c79bf0;
+  --chart-2: #ff6e96;
+  --chart-3: #b9a5ff;
+  --chart-4: #9aa0c2;
+  --chart-5: #6fd6b5;
 }
 
 @layer base {
@@ -181,6 +186,11 @@
     letter-spacing: 0.01em;
     color: var(--muted-foreground);
     font-variant-numeric: tabular-nums;
+  }
+
+  /* The profile banner's See → Think → Act sweep. */
+  .triad-gradient {
+    background-image: linear-gradient(90deg, var(--signal), var(--signal-3), var(--signal-2));
   }
 
   .tabular {
