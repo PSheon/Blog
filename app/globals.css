@@ -8,10 +8,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-ui), var(--font-ui-tc), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
-  --font-mono: var(--font-code), var(--font-ui-tc), ui-monospace, monospace;
-  --font-heading: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
+  /* Latin from web fonts; Chinese from whatever the system ships (Apple → Android/Linux → Windows). */
+  --font-sans: var(--font-ui), "PingFang TC", "Noto Sans CJK TC", "Noto Sans TC", "Microsoft JhengHei", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-body), "Songti TC", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "PMingLiU", ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", ui-monospace, monospace;
+  --font-heading: var(--font-body), "Songti TC", "Noto Serif CJK TC", "Noto Serif TC", "Source Han Serif TC", "PMingLiU", ui-serif, Georgia, serif;
   --color-signal: var(--signal);
   --color-signal-2: var(--signal-2);
   --color-signal-3: var(--signal-3);
@@ -428,6 +429,15 @@
   .dark .prose-notebook code[data-theme] span {
     color: var(--shiki-dark);
   }
+  /*
+   * Shiki colours tokens through inline custom properties, so a theme's comment grey can only be
+   * replaced by matching it. Both GitHub themes fall short of WCAG AA for comments on our panels;
+   * use the secondary text colour, whose contrast is already verified in both themes.
+   */
+  .prose-notebook code[data-theme] span[style*="--shiki-dark:#6A737D"] {
+    --shiki-dark: var(--muted-foreground) !important;
+    --shiki-light: var(--muted-foreground) !important;
+  }
 
   /* Math */
   .prose-notebook .katex-display {
@@ -456,5 +466,65 @@
     margin-right: 0.5em;
     vertical-align: super;
     line-height: 0;
+  }
+}
+
+/*
+ * Page transitions (React <ViewTransition> → the browser's View Transitions API).
+ * The routed content fades and rises a few pixels; header and footer are not part of it.
+ * Short on purpose: a transition that makes people wait is worse than none.
+ */
+/* Header and footer are identical before and after: swap the document snapshot instantly instead of cross-fading it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+  }
+}
+::view-transition-old(.page-swap) {
+  animation: page-out 120ms ease-in both;
+}
+::view-transition-new(.page-swap) {
+  animation: page-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms both;
+}
+/* Old and new pages differ in height; don't stretch one into the other while they swap. */
+::view-transition-group(.page-swap) {
+  animation: none;
+}
+::view-transition-old(.page-swap),
+::view-transition-new(.page-swap) {
+  height: auto;
+  width: 100%;
+  object-fit: none;
+  object-position: top;
+}
+/* A post title travelling from the index into the article headline. */
+::view-transition-group(.title-morph) {
+  animation-duration: 340ms;
+  animation-timing-function: cubic-bezier(0.3, 0.7, 0.1, 1);
+}
+::view-transition-old(.title-morph),
+::view-transition-new(.title-morph) {
+  /* Two line-wraps of different size: keep each at its own aspect ratio while they cross-fade. */
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

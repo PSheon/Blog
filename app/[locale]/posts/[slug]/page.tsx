@@ -1,10 +1,13 @@
+// Maths styles are only needed where maths is rendered: keep them off the home and listing pages.
+import "katex/dist/katex.min.css";
 import { Languages } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ComponentType } from "react";
+import { type ComponentType, ViewTransition } from "react";
 import { PostFooter } from "@/components/article/post-footer";
 import { ReadingProgress } from "@/components/article/progress";
+import { ScrollableMath } from "@/components/article/scrollable-math";
 import { Toc, TocDisclosure } from "@/components/article/toc";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { getAdjacentPosts, getAllPosts, getPostMeta, getRelatedPosts, getToc } from "@/lib/content/posts";
@@ -70,6 +73,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
   return (
     <>
       <ReadingProgress />
+      <ScrollableMath label={locale === "zh" ? "數學式，可左右捲動" : "Equation, scrolls sideways"} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
@@ -88,9 +92,12 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
               <EntryNo no={post.no} className="text-signal" />
               {post.interactive && <InteractiveBadge label={t.post.interactive} />}
             </p>
-            <h1 className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance">
-              {post.title}
-            </h1>
+            {/* Same name as the title in the post index: the browser morphs one into the other. */}
+            <ViewTransition name={`post-title-${slug}`} share="title-morph" default="none">
+              <h1 className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+                {post.title}
+              </h1>
+            </ViewTransition>
             <p className="mt-5 font-serif text-xl leading-relaxed text-muted-foreground">{post.description}</p>
             <dl className="mt-7 flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs">
               <div>
