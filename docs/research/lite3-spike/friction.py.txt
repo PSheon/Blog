@@ -1,0 +1,35 @@
+import numpy as np, onnx, mujoco
+from onnx import numpy_helper
+w = {t.name: numpy_helper.to_array(t).astype(np.float64) for t in onnx.load("repo/policy/ppo/policy.onnx").graph.initializer}
+L = [(w[f"mlp.{i}.weight"], w[f"mlp.{i}.bias"]) for i in (0, 2, 4, 6)]
+def mlp(x):
+    for i, (W, b) in enumerate(L):
+        x = W @ x + b
+        if i < 3: x = np.where(x > 0, x, np.expm1(x))
+    return x
+DEF = np.array([0, -0.65, 1.3] * 4); SC = np.array([0.125, 0.25, 0.25] * 4)
+def run(mu, cmd=(0.5, 0, 0), push=0.0, seconds=10):
+    m = mujoco.MjModel.from_xml_path("model/Lite3/Lite3_mjcf/mjcf/Lite3.xml"); m.opt.timestep = 0.001
+    m.geom_friction[:, 0] = mu
+    d = mujoco.MjData(m); d.qpos[:] = [0, 0, 0.36, 1, 0, 0, 0, *DEF]; mujoco.mj_forward(m, d)
+    last, tgt, fell, mus, slip, n = np.zeros(12), DEF.copy(), None, set(), 0.0, 0
+    feet = [m.body(f"{s}_FOOT").id for s in ("FL", "FR", "HL", "HR")]
+    for k in range(seconds * 1000):
+        if k % 12 == 0:
+            R = np.zeros(9); mujoco.mju_quat2Mat(R, d.qpos[3:7]); R = R.reshape(3, 3)
+            obs = np.concatenate([d.qvel[3:6] * .25, R.T @ [0, 0, -1.], cmd, d.qpos[7:] - DEF, d.qvel[6:] * .05, last])
+            last = mlp(obs); tgt = last * SC + DEF
+            if fell is None and (R[2, 2] < 0.5 or d.qpos[2] < 0.15): fell = k / 1000
+        d.xfrc_applied[1, 1] = push if 5000 <= k < 5100 else 0
+        d.ctrl[:] = np.clip(30 * (tgt - d.qpos[7:]) - d.qvel[6:], -30, 30)
+        mujoco.mj_step(m, d)
+        if k % 50 == 0:
+            for c in d.contact[: d.ncon]: mus.add(round(float(c.friction[0]), 3))
+            for f in feet:  # horizontal speed of feet that are on the ground = slipping
+                if d.xpos[f][2] < 0.03:
+                    v = np.zeros(6); mujoco.mj_objectVelocity(m, d, mujoco.mjtObj.mjOBJ_BODY, f, v, 0)
+                    slip += np.hypot(v[3], v[4]); n += 1
+    return dict(mu=mu, push=push, vx=round(d.qpos[0] / seconds, 2), fell=fell, contact_mu=sorted(mus), foot_slip_m_s=round(slip / max(n, 1), 3))
+for mu in (1, 0.3, 0.1, 0.05, 0.01): print(run(mu))
+for mu in (1, 0.3, 0.1): print(run(mu, push=100))
+for mu in (1, 0.1): print("accelerate to 1.5:", run(mu, cmd=(1.5, 0, 0)))
