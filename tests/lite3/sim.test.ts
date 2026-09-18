@@ -37,6 +37,12 @@ describe("Lite3 simulator", () => {
     expect(walk(sim, { friction: 0.01 })).toEqual({ vx: expect.closeTo(0.24, 2), fellAt: null });
   });
 
+  it("slips more on a slippery floor", () => {
+    const slip = (friction: number) => (walk(sim, { friction }), sim.footSlip);
+    // Python MuJoCo on the original meshes gave 0.12, 0.27 and 0.47 m/s.
+    expect([1, 0.05, 0.01].map(slip)).toEqual([expect.closeTo(0.12, 2), expect.closeTo(0.26, 2), expect.closeTo(0.44, 2)]);
+  });
+
   it("shrugs off ±0.2 of sensor noise and goes down at once under ±0.8", () => {
     expect(walk(sim, { noise: 0.2 })).toEqual({ vx: expect.closeTo(0.42, 2), fellAt: null });
     expect(walk(sim, { noise: 0.8 }, 2).fellAt).toBeLessThan(0.6);
