@@ -404,6 +404,86 @@ export class Tape {
     return total / count;
   }
 
+  /** Stack feature maps along the channel axis (what a U-Net skip connection does). */
+  concatRows(parts: Mat[]): Mat {
+    const cols = parts[0].cols;
+    if (parts.some((p) => p.cols !== cols)) {
+      throw new Error(`concatRows: all parts need the same number of columns, got ${parts.map((p) => p.cols).join(", ")}`);
+    }
+    const out = new Mat(parts.reduce((n, p) => n + p.rows, 0), cols);
+    let offset = 0;
+    const offsets = parts.map((p) => {
+      out.data.set(p.data, offset);
+      const at = offset;
+      offset += p.data.length;
+      return at;
+    });
+    this.record(() => {
+      parts.forEach((p, k) => {
+        for (let i = 0; i < p.grad.length; i++) p.grad[i] += out.grad[offsets[k] + i];
+      });
+    });
+    return out;
+  }
+
+  /** Take `count` channels starting at `start`. */
+  sliceRows(a: Mat, start: number, count: number): Mat {
+    const out = new Mat(count, a.cols, a.data.slice(start * a.cols, (start + count) * a.cols));
+    this.record(() => {
+      for (let i = 0; i < out.grad.length; i++) a.grad[start * a.cols + i] += out.grad[i];
+    });
+    return out;
+  }
+
+  /**
+   * Collapse each h×w map to a 1-D profile by averaging across the other axis:
+   * axis "x" → one value per column ([C, w]); axis "y" → one value per row ([C, h]).
+   */
+  marginal(x: Mat, { h, w, axis }: { h: number; w: number; axis: "x" | "y" }): Mat {
+    const n = axis === "x" ? w : h, other = axis === "x" ? h : w;
+    const out = new Mat(x.rows, n);
+    const visit = (fn: (src: number, dst: number) => void) => {
+      for (let c = 0; c < x.rows; c++)
+        for (let y = 0; y < h; y++)
+          for (let xx = 0; xx < w; xx++) fn(c * h * w + y * w + xx, c * n + (axis === "x" ? xx : y));
+    };
+    visit((src, dst) => (out.data[dst] += x.data[src] / other));
+    this.record(() => visit((src, dst) => (x.grad[src] += out.grad[dst] / other)));
+    return out;
+  }
+
+  /** Row-wise softmax with no mask. */
+  softmax(z: Mat): Mat {
+    const { rows, cols } = z;
+    const out = new Mat(rows, cols);
+    for (let r = 0; r < rows; r++) {
+      let max = -Infinity;
+      for (let j = 0; j < cols; j++) max = Math.max(max, z.data[r * cols + j]);
+      let sum = 0;
+      for (let j = 0; j < cols; j++) sum += out.data[r * cols + j] = Math.exp(z.data[r * cols + j] - max);
+      for (let j = 0; j < cols; j++) out.data[r * cols + j] /= sum;
+    }
+    this.record(() => {
+      for (let r = 0; r < rows; r++) {
+        let dot = 0;
+        for (let j = 0; j < cols; j++) dot += out.grad[r * cols + j] * out.data[r * cols + j];
+        for (let j = 0; j < cols; j++) z.grad[r * cols + j] += out.data[r * cols + j] * (out.grad[r * cols + j] - dot);
+      }
+    });
+    return out;
+  }
+
+  /** Mean absolute error. `scale` multiplies the gradient only, like the other losses. */
+  l1(pred: Mat, targets: ArrayLike<number>, scale = 1): number {
+    const n = pred.data.length;
+    let total = 0;
+    for (let i = 0; i < n; i++) total += Math.abs(pred.data[i] - targets[i]);
+    this.record(() => {
+      for (let i = 0; i < n; i++) pred.grad[i] += (scale * Math.sign(pred.data[i] - targets[i])) / n;
+    });
+    return total / n;
+  }
+
   /** Σ aᵢ·wᵢ with constant w — a scalar probe, used to test gradients. */
   sumProduct(a: Mat, w: Mat): number {
     let s = 0;
