@@ -5,7 +5,7 @@ import { site } from "@/lib/site";
 import { KernelMark } from "./kernel-mark";
 import { MobileNav } from "./mobile-nav";
 import { NavLink } from "./nav-link";
-import { Search } from "./search";
+import { Search, SearchIconButton } from "./search";
 
 interface Props {
   locale: Locale;
@@ -29,11 +29,11 @@ export function SiteHeader({ locale, t, tags }: Props) {
     <header className="sticky top-0 z-40 -mb-4 pb-4">
       <div className="fade-bottom absolute inset-0 -z-10 bg-background/70 backdrop-blur-lg" aria-hidden />
 
-      {/* Phone: menu on the left, the mark centred. The empty third column keeps it optically centred. */}
+      {/* Phone: menu on the left, the mark centred, search on the right. Equal side columns keep the mark centred. */}
       <div className="grid h-14 grid-cols-[2.5rem_1fr_2.5rem] items-center px-3 md:hidden">
         <MobileNav locale={locale} links={links} t={t} />
         <div className="justify-self-center">{logo}</div>
-        <span aria-hidden />
+        <SearchIconButton label={t.search.open} />
       </div>
 
       <Navbar aria-label={t.nav.menu} className="mx-auto hidden h-14 w-full max-w-7xl gap-3 px-5 py-0 sm:px-8 md:flex">
@@ -51,7 +51,7 @@ export function SiteHeader({ locale, t, tags }: Props) {
         <NavbarRight className="gap-2">
           {/*
             Mounted once for both layouts. On a phone this navbar is display:none, but the palette's
-            dialog is portalled to <body>, so the drawer's search button can still open it.
+            dialog is portalled to <body>, so the phone header's search button can still open it.
           */}
           <Search locale={locale} tags={tags} t={t.search} />
         </NavbarRight>

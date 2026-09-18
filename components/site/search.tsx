@@ -17,9 +17,23 @@ interface Props {
 
 const OPEN_EVENT = "notebook:open-search";
 
-/** Open the search palette from anywhere (the phone's drawer has its own search button). */
+/** Open the search palette from anywhere (the phone header has its own search button). */
 export function openSearch() {
   window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
+/** The phone header's search button. The palette itself is mounted once, in the desktop navbar. */
+export function SearchIconButton({ label }: { label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={openSearch}
+      aria-label={label}
+      className="grid size-8 cursor-pointer place-items-center justify-self-end rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      <SearchIcon className="size-[1.125rem]" aria-hidden />
+    </button>
+  );
 }
 
 /** Render a snippet with its matched ranges wrapped in <mark>. */

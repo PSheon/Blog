@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, Search as SearchIcon } from "lucide-react";
+import { Menu } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
@@ -11,16 +11,15 @@ import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { KernelMark } from "./kernel-mark";
 import { LocaleSwitch } from "./locale-switch";
-import { openSearch } from "./search";
 import { ThemeToggle } from "./theme-toggle";
 
 interface Props {
   locale: Locale;
   links: { href: string; label: string }[];
-  t: Pick<Dictionary, "nav" | "search" | "locale" | "theme" | "footer">;
+  t: Pick<Dictionary, "nav" | "locale" | "theme" | "footer">;
 }
 
-/** The phone's navigation drawer: search, the site's sections, and the reader's preferences. */
+/** The phone's navigation drawer: the site's sections and the reader's preferences. */
 export function MobileNav({ locale, links, t }: Props) {
   const [open, setOpen] = useState(false);
   // Land focus on the title, not the first control: the focus ring on the search button on every open is noise.
@@ -45,20 +44,6 @@ export function MobileNav({ locale, links, t }: Props) {
           </SheetTitle>
           <SheetDescription className="sr-only">{t.nav.menu}</SheetDescription>
         </SheetHeader>
-
-        <div className="px-4 pt-4">
-          <button
-            type="button"
-            onClick={() => {
-              setOpen(false);
-              openSearch();
-            }}
-            className="glass-2 flex h-10 w-full cursor-pointer items-center gap-2.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <SearchIcon className="size-4" aria-hidden />
-            {t.search.open}
-          </button>
-        </div>
 
         <nav className="flex flex-col gap-0.5 px-2 py-4" aria-label={t.nav.menu}>
           {all.map((l) => {
