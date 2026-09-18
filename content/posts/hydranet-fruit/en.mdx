@@ -1,0 +1,158 @@
+---
+title: "One body, two heads: training a HydraNet that draws boxes and masks, in the browser"
+description: Emoji fruit as training data, and a small network with one shared trunk and two output heads, trained from scratch in your browser. It finds the fruit within ten seconds. Then we measure honestly what multi-task learning bought us and what it cost.
+date: 2026-09-18
+tags: [computer-vision, multi-task, from-scratch]
+no: 5
+interactive: true
+---
+
+import { HeadsRace, LabelsFigure, TrainingLab } from "./components";
+
+The network below can't do anything yet. Its job is to find one piece of fruit in a tiny 32×32 image and to answer in two ways: draw a **box** around it, and draw a **mask** marking which pixels belong to it.
+
+Press Train. In about ten seconds the box will snap onto the fruit.
+
+<Instrument fig="01" title="hydranet / train" size="wide" caption="On the left is a test image the network never trains on. The solid cyan line is the model's box, the dashed pink line is the right answer, and the bright area is what the model thinks is fruit. Click a thumbnail to switch image.">
+  <TrainingLab />
+</Instrument>
+
+On my machine (Chrome, macOS, Apple's emoji) the scores go like this:<Sidenote>IoU is intersection over union: 1 when two regions coincide exactly, 0 when they don't overlap at all. A box IoU of about 0.8 looks like a well-placed box to the eye.</Sidenote>
+
+| Training time | Images seen | Box IoU | Mask IoU |
+| --- | --- | --- | --- |
+| 0 s | 0 | 0.00 | 0.13 |
+| 10 s | 4,000 | 0.80 | 0.77 |
+| 40 s | 16,000 | 0.86 | 0.85 |
+| 80 s | 32,000 | 0.88 | 0.89 |
+
+Your numbers will differ, for an interesting reason that comes up below.
+
+## The data is free
+
+The expensive part of training an object detector was never the compute. It is the labelling: someone has to drag every box and trace every outline. Here nobody does, because we draw the pictures ourselves.
+
+We draw an emoji on a transparent canvas at a random size, position and angle, then paste it over a noisy background. Once it is drawn, the canvas's **alpha channel** already records exactly which pixels are fruit. The mask is the alpha, and the box is the rectangle around the mask:
+
+<Instrument fig="02" title="free labels" caption="One image and its two labels. Nobody annotated anything: the mask comes from the emoji's transparency and the box is the outline of the mask.">
+  <LabelsFigure />
+</Instrument>
+
+```ts title="content/posts/hydranet-fruit/components/scene.ts"
+// One threshold decides both the box and the mask, so the two labels can never disagree
+if (alpha[y * SIZE + x] < 0.5) continue;
+if (x < x0) x0 = x;
+if (x > x1) x1 = x;
+```
+
+There is a side effect. Every operating system ships different emoji artwork: Apple, Google and Microsoft each draw their own apple.<Sidenote>If your system has no colour emoji font (some Linux setups), the instrument switches to coloured shapes and tells you so.</Sidenote> So what you trained a moment ago is a detector for *your system's* fruit. Take weights trained on an iPhone to an Android phone and the score will drop. Machine learning calls that **domain shift**, and you happen to be holding a live example.
+
+## One body, two heads
+
+Drawing a box and drawing a mask look like two jobs, but they need almost the same low-level features: where the edges are, where the colour changes, which blob differs from the background. So the sensible design computes those features once and lets two very small heads read from them.
+
+| Part | What it does | Parameters |
+| --- | --- | --- |
+| Trunk | Three convolutions, from a 32×32 image to 8×8 features | 3,712 |
+| Neck | Brings the 8×8 features back to 16×16 and joins them with shallow ones | 1,296 |
+| Mask head | One 1×1 convolution | 9 |
+| Box head | One 1×1 convolution | 36 |
+| Total | | 5,053 |
+
+Look at the last two rows: **the two heads together have 45 parameters**, under 1% of the network. All of the effort goes into the shared part. This structure is called a HydraNet, after the many-headed Hydra: one body, many heads. Andrej Karpathy used the word in 2019 when describing Tesla's perception stack: many heads on one shared trunk, handling lane lines, traffic lights, pedestrians and other tasks at once. The reason is practical. The compute in a car is fixed, and sharing the trunk is how everything fits.
+
+The neck deserves one more sentence. To see widely, the trunk reduces resolution all the way to 8×8, but a mask needs detail. So after enlarging the deep features, the neck **joins them back** with the shallow features that still have that detail. This is U-Net's skip connection.
+
+## Why boxes are hard
+
+A mask is every pixel answering yes or no, which comes naturally to a convolutional network. A box is different. It asks for four **continuous numbers**, and a convolutional network is naturally good at "which cell", not "how much".
+
+My first version took the obvious route: cut the image into an 8×8 grid, let the network choose the cell holding the fruit's centre, and regress the distance from that cell to each of the four edges. Box IoU came out at only 0.56, with each edge off by 2.2 pixels on average.<Sidenote>The numbers in this section were measured offline: geometric shapes as data, three random seeds per setup, 16,000 images each. Their absolute values can't be compared with the emoji scores above; what matters is the gaps within this one table.</Sidenote>
+
+| How the box is produced | Box IoU | Error per edge |
+| --- | --- | --- |
+| Choose a cell, then regress four distances | 0.56 | 2.2 px |
+| Same, with a finer 16×16 grid | 0.57 | 2.1 px |
+| Same, with a different loss | 0.60 | 2.0 px |
+| No box head: take the outline of the predicted mask | 0.63 | – |
+| **Turn each edge into a distribution (next section)** | **0.74** | **1.1 px** |
+
+The fourth row stings: a carefully trained box head lost to one line of code that takes the minimum and maximum of the mask. A finer grid and a different loss were only patches. The problem wasn't a detail; it was the output format itself. Choose the wrong cell and the regression that follows is wasted, and gradients flow back only through the one cell that was chosen.
+
+The small line "box taken from the mask" in the instrument above is that baseline running live in your browser, for comparison with the box head's IoU.
+
+## Turning an edge into a distribution
+
+What works is asking a different question. Don't ask "where is the left edge?". Ask "how likely is the left edge to be **at each position**?"
+
+The box head outputs four 16×16 maps, one per edge. Take the left edge: average its map along the vertical direction to get 16 numbers, apply a softmax to make them a probability distribution, and compute the **expected value** of that distribution:
+
+$$
+\hat{x}_{\text{left}} = \sum_{i=0}^{15} p_i \cdot x_i
+\qquad\text{where}\quad p = \mathrm{softmax}\big(\operatorname{mean}_y(\text{map}_{\text{left}})\big)
+$$
+
+$x_i$ is the centre of bin $i$. This is called integral regression, or soft-argmax. It has three advantages:
+
+- **It is differentiable end to end.** There is no non-differentiable "choose a cell" step, so gradients reach every bin.
+- **The answer can fall between two bins.** Half the probability on each of two neighbours puts the expected value midway, so there is no quantisation error.
+- **It can be drawn directly.** The four small plots at the lower right of the instrument are these four distributions. Violet bars are probabilities, the solid cyan line is the expected value, and the dashed pink line is the right answer.
+
+```ts title="content/posts/hydranet-fruit/components/model.ts"
+const maps = t.conv2d(d, P.boxK, P.boxB, { h: HALF, w: HALF, k: 1 });
+const lr = t.softmax(t.marginal(t.sliceRows(maps, 0, 2), { h: HALF, w: HALF, axis: "x" }));
+const tb = t.softmax(t.marginal(t.sliceRows(maps, 2, 2), { h: HALF, w: HALF, axis: "y" }));
+box = t.matmul(t.concatRows([lr, tb]), this.positions); // an expected value is a dot product with positions
+```
+
+Go back up and train again, this time watching the four small plots. At first all four distributions are flat, the expected values sit in the middle, and the box collapses to a small patch in the centre. Then each distribution grows a peak, the peak sharpens, and it slides to the edge of the fruit. No line of code tells it to do that. The loss pushes it there.
+
+<Callout type="warn" title="This only works for one object per image">
+Each edge has a single distribution, so the head can describe only one box. I expected that with two pieces of fruit the box would land between them. When I measured it, that turned out to be wrong: it almost always **boxes one of them and ignores the other** (details under "Where it fails"). Either way it isn't the right answer. Real detectors handle any number of objects, so they go back to predicting at every position, as CenterNet and FCOS do.
+</Callout>
+
+## Sharing has a price
+
+The usual story about multi-task learning is that the tasks help each other: learning masks forces the trunk to learn better edge features, and boxes improve as a result. It is an appealing story. I measured it, and at this scale I **didn't see it**.
+
+The offline controls (same architecture, same three seeds):
+
+| | Trained alone | Trained with the other head |
+| --- | --- | --- |
+| Mask IoU | 0.825 | 0.812 |
+| Box IoU | 0.794 | 0.735 |
+
+Both tasks do better alone. Trained together they compete for the capacity of one trunk, and this trunk has fewer than four thousand parameters.<Sidenote>This conclusion has three limits: I didn't tune the weights of the two losses, there are only three seeds, and the data is geometric shapes instead of emoji. The careful way to put it is "no positive transfer observed", not "transfer is negative".</Sidenote>
+
+So why share at all? Because of how the bill adds up. In this model the two heads have 45 parameters, and nearly all the computation is in the trunk and neck. A box-only network is therefore no faster than the two-headed one, and getting a box and a mask separately means computing the whole trunk twice. **Sharing the trunk saves nearly half the compute**, at the price of a little accuracy in each task.<Sidenote>How much you save depends on how heavy the heads are. The offline experiment used an older architecture with heavier heads and measured 1.7×; the lighter the heads, the closer it gets to 2×.</Sidenote> On a device with fixed compute that is usually a good trade, and it gets better with more heads, because the trunk's cost is spread over more of them.
+
+Now measure it yourself. Three networks start from the same random weights and see the same images:
+
+<Instrument fig="03" title="heads race" caption="The last row adds up the training time of the two single-head networks, to compare with the time in the “both” row. Each network trains on only 6,000 images, so scores are lower than above; what matters is the gap between rows.">
+  <HeadsRace />
+</Instrument>
+
+The time column is steady: the two single-head networks together take about twice as long as the two-headed one. The accuracy columns are another matter. On my first run boxes were better when trained jointly (0.810 against 0.781) and masks were better alone (0.807 against 0.778), which agrees with only half of the offline result above. Press the button a few more times and you'll see the gaps grow, shrink and sometimes flip. That is the point: **one experiment cannot support a claim like "multi-task learning helps"; supporting it takes many runs.** The literature has results in both directions. Standley and colleagues measured systematically in 2020 which vision tasks are worth learning together, and the answer was that it depends on the combination: some pairs help each other, some hurt.
+
+## Where it fails
+
+The numbers in this section were measured offline with geometric shapes: one model trained on 12,000 images, then tested on situations it never saw. Under normal conditions it scores 0.82 on boxes and 0.75 on masks.
+
+- **Two objects.** Against the correct answer, a box around both, IoU is only 0.32. But the box doesn't land between them: its centre falls in the gap between the two in just 12% of scenes. Nearly always it picks one of them, and its IoU with that one is 0.65. A softmax distribution likes to keep a single peak, and the winner takes all. The mask head has no such problem: mask IoU with two objects is 0.74, almost the same as with one, and the outline of that mask scores 0.85.
+- **Foreground close to the background colour.** The model relies mainly on colour contrast. When the object is only 0.3 brighter than the background (colours run from 0 to 1), the mask falls to 0.56; at 0.15 brighter, the mask is down to 0.16 and the box to 0.46. Interestingly the box holds up better than the mask: a box only needs to know roughly where the object is, while a mask has to decide cell by cell.
+- **Emoji it has never seen.** Training uses only ten kinds of fruit. My guess is that it would mostly find unseen fruit too, because the previous point suggests it has learned "a blob that differs from the background" more than "fruit". But I haven't measured that, so it is only a guess.
+- **A different operating system.** The domain shift mentioned earlier. I haven't measured this across devices yet either.
+
+## How this differs from a real system
+
+- **Number of objects.** Real scenes contain any number of objects, so the box head has to become one that predicts at every position.
+- **Loss weights.** Here the two losses are simply added. With many heads, how to weight them becomes a real problem. Kendall and colleagues proposed in 2018 letting the network learn each task's uncertainty and using that to set the weights.
+- **Who does the labelling.** Here labels are free. Real systems often use large, slow foundation models offline to produce the labels, then train a small, fast multi-headed network on them so that an edge device runs a single forward pass per frame. That is what I do at work.
+- **Scale.** Five thousand parameters against millions. The principle is the same.
+
+## References
+
+- Nibali et al., 2018, [Numerical Coordinate Regression with Convolutional Neural Networks](https://arxiv.org/abs/1801.07372) (DSNT: coordinates as the expected value of a distribution)
+- Zhou et al., 2019, [Objects as Points](https://arxiv.org/abs/1904.07850) (CenterNet)
+- Standley et al., 2020, [Which Tasks Should Be Learned Together in Multi-task Learning?](https://arxiv.org/abs/1905.07553)
+- Kendall, Gal, Cipolla, 2018, [Multi-Task Learning Using Uncertainty to Weigh Losses](https://arxiv.org/abs/1705.07115)

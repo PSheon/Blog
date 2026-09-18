@@ -1,0 +1,93 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+
+const zh = {
+  image: "訓練圖（32×32）",
+  maskLabel: "遮罩標註（16×16）",
+  boxLabel: "框標註",
+  reroll: "換一張",
+  fallback: "你的系統沒有彩色 emoji 字型，所以這裡改用彩色幾何圖形。文章裡的數字是用 emoji 量的，你看到的會略有不同。",
+  train: "開始訓練",
+  resume: "繼續",
+  pause: "暫停",
+  reset: "重置權重",
+  heads: "要訓練哪些頭",
+  headNames: { both: "兩個一起", box: "只有框", mask: "只有遮罩" },
+  seen: "看過的圖",
+  boxIou: "框 IoU",
+  maskIou: "遮罩 IoU",
+  fromMask: "由遮罩取外框",
+  speed: "速度",
+  perSec: "張／秒",
+  testSet: "測試圖（訓練時沒看過）",
+  legendPred: "模型畫的框",
+  legendTruth: "正確的框",
+  legendMask: "模型認為是水果的地方",
+  curve: "測試集上的 IoU",
+  untrained: "還沒開始訓練。權重是隨機的，所以框縮在中間、遮罩是雜訊。",
+  edges: "四條邊的分佈",
+  edgeNames: ["左", "右", "上", "下"],
+  edgesOff: "框的頭沒有開，所以沒有分佈可以看。",
+  readingFlat: "還沒學會：四條分佈都還是平的。每個位置的機率差不多，取期望值就會落在正中間，所以框縮成中央的一小塊。",
+  readingSharp: (edge: string, px: string, truth: string) =>
+    `怎麼讀：看「${edge}」那一條。機率集中在一個峰上，期望值落在 ${px} px，正確答案是 ${truth} px。模型不是「選了某一格」，而是把每一格的位置依機率加權平均，所以答案可以落在兩格之間。`,
+  readingLearning: (pct: number) => `正在學：最尖的一條分佈，峰值佔了 ${pct}%。繼續訓練，看它變尖、滑向水果的邊緣。`,
+  race: "開始比賽",
+  racing: (name: string, pct: number) => `正在訓練「${name}」… ${pct}%`,
+  raceAgain: "再比一次",
+  raceIntro: "三個網路從同一組隨機權重出發、看同一批圖，各訓練 6,000 張。每按一次會換一組隨機種子，多比幾次，看差距會不會反過來。",
+  raceSeed: (n: number) => `第 ${n} 次比賽`,
+  raceCols: { config: "設定", box: "框 IoU", mask: "遮罩 IoU", speed: "張／秒", time: "訓練時間" },
+  raceTwo: "兩個單頭網路合計",
+  seconds: (s: number) => `${s.toFixed(1)} 秒`,
+  notRun: "尚未執行",
+};
+
+const en: typeof zh = {
+  image: "training image (32×32)",
+  maskLabel: "mask label (16×16)",
+  boxLabel: "box label",
+  reroll: "Another one",
+  fallback: "Your system has no colour emoji font, so coloured shapes are used here instead. The numbers in the article were measured with emoji; yours will differ a little.",
+  train: "Train",
+  resume: "Resume",
+  pause: "Pause",
+  reset: "Reset weights",
+  heads: "Heads to train",
+  headNames: { both: "both", box: "box only", mask: "mask only" },
+  seen: "images seen",
+  boxIou: "box IoU",
+  maskIou: "mask IoU",
+  fromMask: "box taken from the mask",
+  speed: "speed",
+  perSec: "images/s",
+  testSet: "Test images (never seen in training)",
+  legendPred: "the model's box",
+  legendTruth: "the correct box",
+  legendMask: "where the model thinks the fruit is",
+  curve: "IoU on the test set",
+  untrained: "Not trained yet. The weights are random, so the box huddles in the middle and the mask is noise.",
+  edges: "The four edge distributions",
+  edgeNames: ["left", "right", "top", "bottom"],
+  edgesOff: "The box head is switched off, so there are no distributions to show.",
+  readingFlat: "Not learned yet: all four distributions are still flat. Every position is about equally likely, so the expected value lands in the centre and the box collapses to a small patch in the middle.",
+  readingSharp: (edge, px, truth) =>
+    `How to read this: look at “${edge}”. The probability sits on one peak and its expected value is ${px} px; the right answer is ${truth} px. The model doesn't pick a cell. It averages every cell's position weighted by probability, so the answer can fall between two cells.`,
+  readingLearning: (pct) => `Learning: the sharpest distribution has ${pct}% of its mass on its peak. Keep training and watch it sharpen and slide towards the edge of the fruit.`,
+  race: "Start the race",
+  racing: (name, pct) => `Training “${name}”… ${pct}%`,
+  raceAgain: "Race again",
+  raceIntro: "Three networks start from the same random weights and see the same images, 6,000 each. Every race uses a new random seed: run it a few times and see whether the gap flips.",
+  raceSeed: (n) => `race ${n}`,
+  raceCols: { config: "setup", box: "box IoU", mask: "mask IoU", speed: "images/s", time: "training time" },
+  raceTwo: "two single-head networks combined",
+  seconds: (s) => `${s.toFixed(1)} s`,
+  notRun: "not run yet",
+};
+
+export type Labels = typeof zh;
+
+export function useLabels(): Labels {
+  return usePathname().startsWith("/en") ? en : zh;
+}

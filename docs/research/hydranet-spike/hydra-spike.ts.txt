@@ -1,0 +1,296 @@
+// Throwaway spike: which box-head design fixes the weak box IoU? Reads lib/ml only, writes nothing in the repo.
+// usage: node --experimental-transform-types hydra-spike.ts <config> <seed> [samples]
+import { Mat, Tape } from "../../../lib/ml/autograd.ts";
+
+type Cfg = {
+  res: 8 | 16; // resolution of the heat/box heads
+  loss: "mse" | "l1" | "giou";
+  skip: boolean; // U-Net skip from the 16×16 trunk features into the decoder
+  coord: boolean; // CoordConv: x,y channels on the input
+  integral: boolean; // box edges as expectations of 1-D softmaxes (no heat head)
+  tasks: "both" | "box" | "mask";
+};
+const base: Cfg = { res: 8, loss: "mse", skip: false, coord: false, integral: false, tasks: "both" };
+const CONFIGS: Record<string, Cfg> = {
+  base,
+  "box-only": { ...base, tasks: "box" },
+  "mask-only": { ...base, tasks: "mask" },
+  l1: { ...base, loss: "l1" },
+  giou: { ...base, loss: "giou" },
+  coord: { ...base, coord: true },
+  res16: { ...base, res: 16 },
+  "res16-skip": { ...base, res: 16, skip: true },
+  "res16-skip-giou": { ...base, res: 16, skip: true, loss: "giou" },
+  integral: { ...base, res: 16, skip: true, integral: true, loss: "l1" },
+  "integral-only": { ...base, res: 16, skip: true, integral: true, loss: "l1", tasks: "box" },
+  "mask-only-skip": { ...base, res: 16, skip: true, tasks: "mask" },
+  "res16-skip-giou-only": { ...base, res: 16, skip: true, loss: "giou", tasks: "box" },
+};
+
+const [cfgName = "base", seedArg = "1", samplesArg = "16000"] = process.argv.slice(2);
+const cfg = CONFIGS[cfgName];
+if (!cfg) throw new Error(`unknown config ${cfgName}`);
+const SEED = Number(seedArg), SAMPLES = Number(samplesArg), BATCH = 8, LR = 3e-3, S = 32;
+
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// ---------------------------------------------------------------- data
+type Sample = { img: Float64Array; mask16: Float64Array; box: number[] };
+function makeSample(rng: () => number): Sample {
+  const chans = cfg.coord ? 5 : 3;
+  const img = new Float64Array(chans * S * S);
+  const c0 = [rng(), rng(), rng()], c1 = [rng(), rng(), rng()], fg = [rng(), rng(), rng()];
+  const ang = rng() * Math.PI * 2, gx = Math.cos(ang), gy = Math.sin(ang);
+  const r = 4 + rng() * 6, cx = r + rng() * (S - 2 * r), cy = r + rng() * (S - 2 * r);
+  const shape = Math.floor(rng() * 3);
+  const mask32 = new Uint8Array(S * S);
+  let x0 = S, y0 = S, x1 = 0, y1 = 0;
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const px = x + 0.5 - cx, py = y + 0.5 - cy;
+      let inside: boolean;
+      if (shape === 0) inside = px * px + py * py <= r * r;
+      else if (shape === 1) inside = Math.abs(px) <= r && Math.abs(py) <= r;
+      else inside = py >= -r && py <= r && Math.abs(px) <= ((py + r) / (2 * r)) * r;
+      const tgrad = ((x / S - 0.5) * gx + (y / S - 0.5) * gy) * 0.7 + 0.5;
+      for (let c = 0; c < 3; c++) {
+        const bg = c0[c] * (1 - tgrad) + c1[c] * tgrad;
+        img[c * S * S + y * S + x] = (inside ? fg[c] : bg) + (rng() - 0.5) * 0.16;
+      }
+      if (cfg.coord) {
+        img[3 * S * S + y * S + x] = (x / (S - 1)) * 2 - 1;
+        img[4 * S * S + y * S + x] = (y / (S - 1)) * 2 - 1;
+      }
+      if (inside) {
+        mask32[y * S + x] = 1;
+        x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1);
+      }
+    }
+  const mask16 = new Float64Array(256);
+  for (let y = 0; y < 16; y++)
+    for (let x = 0; x < 16; x++) {
+      const s = mask32[2 * y * S + 2 * x] + mask32[2 * y * S + 2 * x + 1] + mask32[(2 * y + 1) * S + 2 * x] + mask32[(2 * y + 1) * S + 2 * x + 1];
+      mask16[y * 16 + x] = s >= 2 ? 1 : 0;
+    }
+  return { img, mask16, box: [x0, y0, x1, y1] };
+}
+
+// ---------------------------------------------------------------- model
+const initRng = mulberry32(SEED * 7919 + 13);
+const he = (rows: number, cols: number) => {
+  const lim = Math.sqrt(6 / cols);
+  return new Mat(rows, cols, Float64Array.from({ length: rows * cols }, () => (initRng() * 2 - 1) * lim));
+};
+const cin = cfg.coord ? 5 : 3;
+const featC = cfg.res === 16 ? 8 : 16; // channels feeding the heat/box heads
+const P: Record<string, Mat> = {
+  c1: he(8, cin * 9), b1: new Mat(1, 8),
+  c2: he(16, 8 * 9), b2: new Mat(1, 16),
+  c3: he(16, 16 * 9), b3: new Mat(1, 16),
+  d1: he(8, (cfg.skip ? 32 : 16) * 9), db1: new Mat(1, 8),
+  m: he(1, 8), mb: new Mat(1, 1),
+  heat: he(1, featC), heatb: new Mat(1, 1),
+  box: he(4, featC), boxb: new Mat(1, 4),
+};
+const record = (t: Tape, fn: () => void) => (t as unknown as { record(f: () => void): void }).record(fn);
+
+function concatRows(t: Tape, a: Mat, b: Mat): Mat {
+  const out = new Mat(a.rows + b.rows, a.cols);
+  out.data.set(a.data); out.data.set(b.data, a.data.length);
+  record(t, () => {
+    for (let i = 0; i < a.grad.length; i++) a.grad[i] += out.grad[i];
+    for (let i = 0; i < b.grad.length; i++) b.grad[i] += out.grad[a.grad.length + i];
+  });
+  return out;
+}
+
+function forward(t: Tape, s: Sample) {
+  const x = new Mat(cin, S * S, s.img);
+  const f32 = t.relu(t.conv2d(x, P.c1, P.b1, { h: 32, w: 32, k: 3 }));
+  const f16 = t.relu(t.conv2d(t.maxPool2(f32, { h: 32, w: 32 }), P.c2, P.b2, { h: 16, w: 16, k: 3 }));
+  const f8 = t.relu(t.conv2d(t.maxPool2(f16, { h: 16, w: 16 }), P.c3, P.b3, { h: 8, w: 8, k: 3 }));
+  const needDec = cfg.tasks !== "box" || cfg.res === 16;
+  let dec: Mat | undefined, mask: Mat | undefined;
+  if (needDec) {
+    let up = t.upsample2(f8, { h: 8, w: 8 });
+    if (cfg.skip) up = concatRows(t, up, f16);
+    dec = t.relu(t.conv2d(up, P.d1, P.db1, { h: 16, w: 16, k: 3 }));
+    if (cfg.tasks !== "box") mask = t.conv2d(dec, P.m, P.mb, { h: 16, w: 16, k: 1 });
+  }
+  let heat: Mat | undefined, box: Mat | undefined;
+  if (cfg.tasks !== "mask") {
+    const feat = cfg.res === 16 ? dec! : f8, R = cfg.res;
+    if (!cfg.integral) heat = t.conv2d(feat, P.heat, P.heatb, { h: R, w: R, k: 1 });
+    box = t.conv2d(feat, P.box, P.boxb, { h: R, w: R, k: 1 });
+  }
+  return { mask, heat, box };
+}
+
+// ---------------------------------------------------------------- box decoding and losses
+const iou = (a: number[], b: number[]) => {
+  const aw = Math.max(0, a[2] - a[0]), ah = Math.max(0, a[3] - a[1]);
+  const iw = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), ih = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = iw * ih, union = aw * ah + (b[2] - b[0]) * (b[3] - b[1]) - inter;
+  return union > 0 ? inter / union : 0;
+};
+const giou = (a: number[], b: number[]) => {
+  const aw = Math.max(0, a[2] - a[0]), ah = Math.max(0, a[3] - a[1]);
+  const iw = Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])), ih = Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+  const inter = iw * ih, union = aw * ah + (b[2] - b[0]) * (b[3] - b[1]) - inter;
+  const cw = Math.max(a[2], b[2]) - Math.min(a[0], b[0]), ch = Math.max(a[3], b[3]) - Math.min(a[1], b[1]);
+  const hull = Math.max(cw * ch, 1e-9);
+  return (union > 0 ? inter / union : 0) - (hull - union) / hull;
+};
+function lossOf(pred: number[], gt: number[]): number {
+  const l1 = pred.reduce((s, p, i) => s + Math.abs(p - gt[i]), 0) / (4 * S);
+  if (cfg.loss === "l1") return l1;
+  if (cfg.loss === "mse") return (5 * pred.reduce((s, p, i) => s + ((p - gt[i]) / S) ** 2, 0)) / 4;
+  return 1 - giou(pred, gt) + l1; // DETR-style mix
+}
+/** dLoss/dBox by central differences — fine for a spike, four numbers. */
+function lossGrad(pred: number[], gt: number[]): number[] {
+  return pred.map((_, k) => {
+    const up = pred.slice(), dn = pred.slice();
+    up[k] += 1e-4; dn[k] -= 1e-4;
+    return (lossOf(up, gt) - lossOf(dn, gt)) / 2e-4;
+  });
+}
+
+const cellOf = (gt: number[], R: number) => {
+  const cs = S / R;
+  const cxi = Math.min(R - 1, Math.floor((gt[0] + gt[2]) / 2 / cs)), cyi = Math.min(R - 1, Math.floor((gt[1] + gt[3]) / 2 / cs));
+  return { cell: cyi * R + cxi, px: (cxi + 0.5) * cs, py: (cyi + 0.5) * cs };
+};
+/** ltrb head: outputs are distances from the cell centre in units of the image side. */
+const decodeLtrb = (box: Mat, cell: number, R: number) => {
+  const cs = S / R, n = R * R, px = ((cell % R) + 0.5) * cs, py = (Math.floor(cell / R) + 0.5) * cs;
+  const o = [0, 1, 2, 3].map((k) => box.data[k * n + cell] * S);
+  return [px - o[0], py - o[1], px + o[2], py + o[3]];
+};
+function ltrbLoss(t: Tape, box: Mat, gt: number[], R: number): number {
+  const { cell } = cellOf(gt, R), n = R * R;
+  const pred = decodeLtrb(box, cell, R);
+  record(t, () => {
+    const g = lossGrad(pred, gt), sign = [-1, -1, 1, 1];
+    for (let k = 0; k < 4; k++) box.grad[k * n + cell] += g[k] * sign[k] * S;
+  });
+  return lossOf(pred, gt);
+}
+/** Integral head: each edge is the expectation of a softmax over R positions spanning 0..S. */
+function integralDecode(box: Mat, R: number) {
+  const probs: Float64Array[] = [], coords: number[] = [];
+  for (let k = 0; k < 4; k++) {
+    const alongX = k % 2 === 0, z = new Float64Array(R);
+    for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) z[alongX ? x : y] += box.data[k * R * R + y * R + x] / R;
+    const max = Math.max(...z);
+    let sum = 0;
+    const p = z.map((v) => Math.exp(v - max));
+    p.forEach((v) => (sum += v));
+    let e = 0;
+    for (let i = 0; i < R; i++) { p[i] /= sum; e += (p[i] * i * S) / (R - 1); }
+    probs.push(p); coords.push(e);
+  }
+  return { probs, coords };
+}
+function integralLoss(t: Tape, box: Mat, gt: number[], R: number): number {
+  const { probs, coords } = integralDecode(box, R);
+  record(t, () => {
+    const g = lossGrad(coords, gt);
+    for (let k = 0; k < 4; k++) {
+      const alongX = k % 2 === 0;
+      for (let y = 0; y < R; y++) for (let x = 0; x < R; x++) {
+        const i = alongX ? x : y;
+        box.grad[k * R * R + y * R + x] += (g[k] * probs[k][i] * ((i * S) / (R - 1) - coords[k])) / R;
+      }
+    }
+  });
+  return lossOf(coords, gt);
+}
+
+function predictBox(out: ReturnType<typeof forward>): number[] {
+  const R = cfg.res;
+  if (cfg.integral) return integralDecode(out.box!, R).coords;
+  let best = 0;
+  for (let i = 1; i < R * R; i++) if (out.heat!.data[i] > out.heat!.data[best]) best = i;
+  return decodeLtrb(out.box!, best, R);
+}
+function boxFromMask(mask: Mat): number[] {
+  let x0 = 16, y0 = 16, x1 = 0, y1 = 0;
+  for (let i = 0; i < 256; i++) if (mask.data[i] > 0) {
+    const x = i % 16, y = i >> 4;
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1);
+  }
+  return x1 > x0 ? [x0 * 2, y0 * 2, x1 * 2, y1 * 2] : [0, 0, 0, 0];
+}
+
+// ---------------------------------------------------------------- Adam (copied from lib/ml/transformer.ts)
+const names = Object.keys(P), am = names.map((n) => new Float64Array(P[n].data.length)), av = names.map((n) => new Float64Array(P[n].data.length));
+let step = 0;
+function adam() {
+  step++;
+  const c1 = 1 - 0.9 ** step, c2 = 1 - 0.999 ** step;
+  names.forEach((n, j) => {
+    const p = P[n];
+    for (let i = 0; i < p.data.length; i++) {
+      const g = p.grad[i] / BATCH;
+      am[j][i] = 0.9 * am[j][i] + 0.1 * g;
+      av[j][i] = 0.999 * av[j][i] + 0.001 * g * g;
+      p.data[i] -= (LR * (am[j][i] / c1)) / (Math.sqrt(av[j][i] / c2) + 1e-8);
+    }
+    p.grad.fill(0);
+  });
+}
+
+// ---------------------------------------------------------------- train + eval
+const testRng = mulberry32(999), test = Array.from({ length: 500 }, () => makeSample(testRng));
+const trainRng = mulberry32(SEED);
+function evaluate() {
+  let bIou = 0, mIou = 0, mbIou = 0, side = 0;
+  for (const s of test) {
+    const out = forward(new Tape(), s);
+    if (out.box) {
+      const p = predictBox(out);
+      bIou += iou(p, s.box);
+      side += p.reduce((a, v, i) => a + Math.abs(v - s.box[i]), 0) / 4;
+    }
+    if (out.mask) {
+      let inter = 0, uni = 0;
+      for (let i = 0; i < 256; i++) { const on = out.mask.data[i] > 0; if (on && s.mask16[i]) inter++; if (on || s.mask16[i]) uni++; }
+      mIou += uni ? inter / uni : 0;
+      mbIou += iou(boxFromMask(out.mask), s.box);
+    }
+  }
+  const n = test.length;
+  return { boxIoU: bIou / n, sideErrPx: side / n, maskIoU: mIou / n, boxFromMaskIoU: mbIou / n };
+}
+
+let trainMs = 0;
+const curve: Record<string, number>[] = [];
+for (let seen = 0; seen < SAMPLES; ) {
+  const tb = performance.now();
+  for (let b = 0; b < BATCH; b++, seen++) {
+    const s = makeSample(trainRng), t = new Tape(), out = forward(t, s);
+    if (out.mask) t.bceWithLogits(out.mask, s.mask16);
+    if (out.heat) {
+      const R = cfg.res, { cell } = cellOf(s.box, R), tgt = new Float64Array(R * R), w = new Float64Array(R * R).fill(1);
+      tgt[cell] = 1; w[cell] = R === 8 ? 20 : 80;
+      t.bceWithLogits(out.heat, tgt, w);
+    }
+    if (out.box) (cfg.integral ? integralLoss : ltrbLoss)(t, out.box, s.box, cfg.res);
+    t.backward();
+  }
+  adam();
+  trainMs += performance.now() - tb;
+  if (seen % 4000 === 0) curve.push({ seen, ...evaluate() });
+}
+const gtBaseline = test.reduce((a, s) => a + iou(boxFromMask(new Mat(1, 256, s.mask16.map((v) => v - 0.5))), s.box), 0) / test.length;
+console.log(JSON.stringify({ cfg: cfgName, seed: SEED, samples: SAMPLES, perSec: Math.round(SAMPLES / (trainMs / 1000)), params: names.reduce((a, n) => a + P[n].data.length, 0), ...evaluate(), gtMask16BoxIoU: gtBaseline, curve }));

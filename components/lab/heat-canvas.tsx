@@ -25,11 +25,12 @@ export function HeatCanvas({ data, w, h, mode, max, positive, label, className }
     if (ref.current) drawHeatmap(ref.current, data ?? new Float32Array(w * h), w, h, { mode, max, positive });
   }, [data, w, h, mode, max, positive, resolvedTheme]);
 
+  // An empty label means a parent already describes it: the canvas is then decorative.
+  const a11y = label ? { role: "img", "aria-label": label } : { "aria-hidden": true };
   return (
     <canvas
       ref={ref}
-      role="img"
-      aria-label={label}
+      {...a11y}
       className={cn("block aspect-square w-full border border-border [image-rendering:pixelated]", className)}
     />
   );
