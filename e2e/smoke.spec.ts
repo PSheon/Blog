@@ -227,5 +227,16 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
   await expect(page.getByTestId("lite3-stage")).toHaveCount(1);
   await page.getByRole("button", { name: /蒙住: 關節角度/ }).click();
   await expect(senses).toContainText("倒了", { timeout: 15_000 });
+
+  // A 400 N shove always topples it (measured: everything from 275 N up does).
+  const push = page.locator('[data-stage="push"]');
+  await push.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await expect(push).toHaveAttribute("data-here", "true");
+  await page.locator('[data-instrument="lite3 / push"]').getByRole("slider").focus();
+  await page.keyboard.press("End");
+  await page.getByTestId("lite3-push-away").click();
+  await expect(page.getByTestId("lite3-push-log")).toContainText("400 N", { timeout: 5_000 });
+  await expect(page.getByTestId("lite3-push-log")).toContainText("倒了", { timeout: 15_000 });
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
   expect(errors).toEqual([]);
 });

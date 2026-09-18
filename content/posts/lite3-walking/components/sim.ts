@@ -4,6 +4,8 @@ const ASSETS = "/lite3";
 const MESHES = ["hip", "thigh", "shank", "torso"];
 /** cos 30°. A healthy gait never tips the torso past 9°, even when shoved or on ice; at 30° it is not coming back. */
 const FALLEN_TILT = Math.cos(Math.PI / 6);
+/** Body ids of the four feet, and how low one has to be to count as on the ground (m). */
+const FEET = [5, 9, 13, 17], ON_GROUND = 0.03;
 
 export interface Knobs {
   /** Forward, sideways (m/s) and turning (rad/s) speed asked of the robot. */
@@ -44,6 +46,8 @@ export class Lite3Sim {
   private seed = 1;
   private friction = 1;
   private fell: number | null = null;
+  private readonly feet = new Float64Array(FEET.length * 2);
+  private slipping = 0;
   private readonly target = Float64Array.from(DEFAULT_POSE);
   private tick = 0;
   private pushSteps = 0;
@@ -90,6 +94,7 @@ export class Lite3Sim {
     this.queue = [];
     this.seed = seed;
     this.fell = null;
+    this.slipping = 0;
     this.tick = 0;
     this.pushSteps = 0;
   }
@@ -136,7 +141,31 @@ export class Lite3Sim {
       }
       xfrc_applied[6 + 1] = this.pushSteps-- > 0 ? this.pushForce : 0; // body 1 = torso, component 1 = y
       this.mujoco.mj_step(this.model, this.data);
+      this.trackFeet();
     }
+  }
+
+  /** Horizontal speed of the feet that are on the ground, averaged over about a second: how much it is slipping. */
+  private trackFeet() {
+    const xpos = this.data.xpos;
+    FEET.forEach((body, f) => {
+      const x = xpos[body * 3], y = xpos[body * 3 + 1];
+      if (xpos[body * 3 + 2] < ON_GROUND && this.tick > 0) {
+        const speed = Math.hypot(x - this.feet[f * 2], y - this.feet[f * 2 + 1]) / 0.001;
+        this.slipping += (speed - this.slipping) / 2000; // four feet, half of them down: ~1 s
+      }
+      this.feet[f * 2] = x;
+      this.feet[f * 2 + 1] = y;
+    });
+  }
+
+  get footSlip() {
+    return this.slipping;
+  }
+  /** How far the torso is from level (rad). */
+  get tilt() {
+    const [w, x, y, z] = this.data.qpos.subarray(3, 7);
+    return Math.acos(Math.max(-1, Math.min(1, -gravityInBody(w, x, y, z)[2])));
   }
 
   get time() {

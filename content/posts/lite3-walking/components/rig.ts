@@ -164,8 +164,10 @@ export function resetRobot() {
   if (sim && state.paused) view?.render(sim);
 }
 
-export function pushRobot(newtons: number) {
+/** Shove it sideways (+ is towards its left); returns the simulated time of the shove. */
+export function pushRobot(newtons: number): number | null {
   sim?.push(newtons);
+  return sim?.time ?? null;
 }
 
 function subscribe(listener: () => void) {
