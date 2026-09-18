@@ -31,7 +31,7 @@ export class Lite3Sim {
     // The bindings' types are enormous and `any`-heavy; the handful of members used here are listed.
     private readonly mujoco: { mj_step(m: unknown, d: unknown): void; mj_forward(m: unknown, d: unknown): void; mj_resetData(m: unknown, d: unknown): void },
     private readonly model: { nbody: number; delete(): void },
-    private readonly data: { qpos: Float64Array; qvel: Float64Array; ctrl: Float64Array; xpos: Float64Array; xfrc_applied: Float64Array; time: number; delete(): void },
+    private readonly data: { qpos: Float64Array; qvel: Float64Array; ctrl: Float64Array; xpos: Float64Array; xquat: Float64Array; xfrc_applied: Float64Array; time: number; delete(): void },
     private readonly policy: Policy,
     readonly timings: LoadTimings,
   ) {
@@ -103,6 +103,10 @@ export class Lite3Sim {
   /** World positions of every body, 3 numbers each: world, torso, then hip/thigh/shank/foot per leg. */
   get bodies(): Float64Array {
     return this.data.xpos;
+  }
+  /** World orientations of every body as (w, x, y, z), in the same order as `bodies`. */
+  get orientations(): Float64Array {
+    return this.data.xquat;
   }
   get fallen() {
     return this.data.qpos[2] < 0.15;

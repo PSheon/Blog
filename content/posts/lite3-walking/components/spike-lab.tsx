@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { type Sense } from "./policy";
 import { Lite3Sim } from "./sim";
+import { Lite3View } from "./view3d";
 
 const W = 640, H = 300, SCALE = 320; // px per metre
 const LEGS = [2, 6, 10, 14]; // first body of each leg; a leg is hip → thigh → shank → foot
@@ -13,6 +14,8 @@ const BLIND: (Sense | null)[] = [null, "gyro", "gravity", "jointPos", "jointVel"
 export function SpikeLab() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const sim = useRef<Lite3Sim | null>(null);
+  const stage = useRef<HTMLCanvasElement>(null);
+  const view = useRef<Lite3View | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [stats, setStats] = useState({ simMs: 0, fps: 0, x: 0, speed: 0, fallen: false, load: "" });
   const [speed, setSpeed] = useState(0.5);
@@ -35,6 +38,7 @@ export function SpikeLab() {
   useEffect(() => {
     if (status !== "ready" || !sim.current) return;
     const s = sim.current;
+    let viewLoading = false;
     let frame = 0, prev = performance.now(), simMs = 0, frames = 0, since = prev, lastX = 0, lastT = 0;
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
@@ -45,6 +49,11 @@ export function SpikeLab() {
       simMs += performance.now() - t0;
       frames++;
       draw(canvas.current, s);
+      if (!view.current && stage.current && !viewLoading) {
+        viewLoading = true;
+        void Lite3View.create(stage.current).then((v) => (view.current = v), (e) => console.error("[lite3] 3D view failed", e));
+      }
+      view.current?.render(s);
       if (now - since > 500) {
         const b = s.bodies;
         // Read everything now: the updater below runs later, after the counters have been reset.
@@ -57,7 +66,7 @@ export function SpikeLab() {
     return () => cancelAnimationFrame(frame);
   }, [status]);
 
-  useEffect(() => () => sim.current?.dispose(), []);
+  useEffect(() => () => { view.current?.dispose(); sim.current?.dispose(); }, []);
   useEffect(() => {
     if (sim.current) sim.current.knobs.command = [speed, 0, 0];
   }, [speed]);
@@ -69,7 +78,7 @@ export function SpikeLab() {
     return (
       <div className="grid place-items-center gap-3 py-10 text-sm text-muted-foreground">
         <Button onClick={() => void load()} disabled={status === "loading"}>
-          {status === "loading" ? "Loading…" : "Load the simulator (about 3.5 MB)"}
+          {status === "loading" ? "Loading…" : "Load the simulator (about 4 MB)"}
         </Button>
         {status === "error" && <p role="alert">Failed to load; see the console.</p>}
       </div>
@@ -77,6 +86,7 @@ export function SpikeLab() {
   }
   return (
     <div className="grid gap-3 text-sm">
+      <canvas ref={stage} className="aspect-[2/1] w-full rounded-md border border-border" data-testid="lite3-stage" />
       <canvas ref={canvas} width={W} height={H} className="w-full rounded-md border border-border" />
       <div className="flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2">
