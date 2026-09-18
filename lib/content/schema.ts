@@ -9,6 +9,9 @@ const isoDate = z.preprocess(
 export const frontmatterSchema = z.object({
   title: z.string().min(1),
   description: z.string().min(1),
+  /** Shorter versions for the <title> tag (about 45 characters; the site name is appended) and the meta description (about 155). */
+  seoTitle: z.string().min(1).optional(),
+  seoDescription: z.string().min(1).optional(),
   date: isoDate,
   updated: isoDate.optional(),
   tags: z.array(z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "lowercase kebab-case")).default([]),

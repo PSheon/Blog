@@ -115,6 +115,31 @@ test("feeds and sitemap are served", async ({ request }) => {
   expect((await request.get("/sitemap.xml")).ok()).toBe(true);
 });
 
+// Next replaces `alternates` and `openGraph` wholesale when a page sets them, which once cost article
+// pages their RSS link and list pages their hreflang. Every kind of page has to carry the full set.
+for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/posts/lite3-walking"]) {
+  test(`search engines get canonical, hreflang, feed and Open Graph on ${path}`, async ({ page }) => {
+    await page.goto(path);
+    const href = (selector: string) => page.locator(selector).getAttribute("href");
+    const other = path.startsWith("/zh") ? path.replace("/zh", "/en") : path.replace("/en", "/zh");
+    expect(new URL((await href('link[rel="canonical"]'))!).pathname).toBe(path);
+    expect(new URL((await href(`link[rel="alternate"][hreflang="${path.startsWith("/zh") ? "en" : "zh-Hant-TW"}"]`))!).pathname).toBe(other);
+    expect(new URL((await href('link[rel="alternate"][hreflang="x-default"]'))!).pathname).toBe(path.replace(/^\/(zh|en)/, "/zh"));
+    expect(await href('link[rel="alternate"][type="application/rss+xml"]')).toContain(`${path.slice(0, 3)}/feed.xml`);
+    expect(new URL((await page.locator('meta[property="og:url"]').getAttribute("content"))!).pathname).toBe(path);
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute("content", "paul.notebook");
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.{20,}/);
+    await expect(page.locator("h1")).toHaveCount(1);
+  });
+}
+
+test("an article describes itself to search engines as a BlogPosting with an image", async ({ page }) => {
+  await page.goto("/en/posts/lite3-walking");
+  const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent())!);
+  expect(ld).toMatchObject({ "@type": "BlogPosting", inLanguage: "en", keywords: expect.stringContaining("robotics") });
+  expect((await page.request.get(ld.image)).headers()["content-type"]).toBe("image/png");
+});
+
 test("flappy birds evolve past the first generation", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/en/posts/ai-flappy-bird");
