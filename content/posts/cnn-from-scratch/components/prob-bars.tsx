@@ -16,7 +16,7 @@ export function ProbBars({ probs, prediction, compact }: Props) {
         return (
           <li key={d} className="grid grid-cols-[1ch_1fr_4ch] items-center gap-2.5 font-mono text-xs tabular">
             <span className={win ? "text-signal" : "text-muted-foreground"}>{d}</span>
-            <span className="h-2.5 overflow-hidden rounded-[1px] bg-muted">
+            <span className="h-2.5 overflow-hidden rounded-[1px] bg-foreground/10">
               <span
                 className={cn("block h-full origin-left transition-transform duration-150", win ? "bg-signal" : "bg-muted-foreground/50")}
                 style={{ transform: `scaleX(${p})` }}

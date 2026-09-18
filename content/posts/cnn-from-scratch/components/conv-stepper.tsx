@@ -108,9 +108,9 @@ export function ConvStepper() {
         </div>
       </div>
 
-      <p className="overflow-x-auto whitespace-nowrap rounded-sm border border-border bg-background px-3 py-2.5 font-mono text-xs tabular sm:text-sm" aria-live="off">
+      <p className="rounded-sm border border-border bg-background px-3 py-2.5 font-mono text-xs leading-relaxed tabular sm:text-[0.8125rem]" aria-live="off">
         {values.map((v, k) => (
-          <span key={k} className={KERNEL[k] === 0 ? "text-muted-foreground/60" : undefined}>
+          <span key={k} className={cn("whitespace-nowrap", KERNEL[k] === 0 && "text-muted-foreground/60")}>
             {k > 0 && <span className="text-muted-foreground"> + </span>}
             {v}·<span className={cn(KERNEL[k] > 0 && "text-signal", KERNEL[k] < 0 && "text-signal-2")}>({KERNEL[k]})</span>
           </span>

@@ -83,6 +83,8 @@ test("a zh-only article is served in /en with a notice", async ({ page }) => {
 test("search opens, finds the CNN article and navigates", async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await page.goto("/en");
+  // The ⌘K listener attaches on hydration; the hero prediction only appears after it.
+  await expect(page.getByTestId("hero-prediction")).toHaveText("7");
   if (isMobile) await page.getByRole("button", { name: "Search" }).click();
   else await page.keyboard.press("ControlOrMeta+k");
   await page.getByPlaceholder(/Search posts/).fill("convolution");

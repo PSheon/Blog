@@ -187,7 +187,9 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ---------- Long-form prose ---------- */
+  /* ---------- Long-form prose ----------
+   * Figures and instruments opt out with .not-prose, so list and link rules stop at their border.
+   */
   .prose-notebook {
     font-family: var(--font-serif);
     font-size: 1.125rem;
@@ -244,29 +246,29 @@
   .prose-notebook a.heading-anchor:focus-visible::after {
     opacity: 1;
   }
-  .prose-notebook a:not(.heading-anchor) {
+  .prose-notebook a:not(.heading-anchor):not(:where(.not-prose *)) {
     color: var(--signal);
     text-decoration: underline;
     text-decoration-thickness: 1px;
     text-underline-offset: 0.2em;
     text-decoration-color: color-mix(in oklab, var(--signal) 45%, transparent);
   }
-  .prose-notebook a:not(.heading-anchor):hover {
+  .prose-notebook a:not(.heading-anchor):not(:where(.not-prose *)):hover {
     text-decoration-color: currentColor;
   }
   .prose-notebook strong {
     font-weight: 650;
   }
-  .prose-notebook :where(ul, ol) {
+  .prose-notebook :where(ul, ol):not(:where(.not-prose *)) {
     padding-left: 1.4em;
   }
-  .prose-notebook ul {
+  .prose-notebook ul:not(:where(.not-prose *)) {
     list-style: none;
   }
-  .prose-notebook ul > li {
+  .prose-notebook ul:not(:where(.not-prose *)) > li {
     position: relative;
   }
-  .prose-notebook ul > li::before {
+  .prose-notebook ul:not(:where(.not-prose *)) > li::before {
     content: "";
     position: absolute;
     left: -1.05em;
@@ -275,15 +277,15 @@
     height: 0.4em;
     background: var(--signal);
   }
-  .prose-notebook ol {
+  .prose-notebook ol:not(:where(.not-prose *)) {
     list-style: decimal;
   }
-  .prose-notebook ol > li::marker {
+  .prose-notebook ol:not(:where(.not-prose *)) > li::marker {
     font-family: var(--font-mono);
     font-size: 0.85em;
     color: var(--muted-foreground);
   }
-  .prose-notebook li + li {
+  .prose-notebook li:not(:where(.not-prose *)) + li {
     margin-top: 0.5rem;
   }
   .prose-notebook blockquote {

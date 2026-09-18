@@ -31,7 +31,7 @@ export function DrawPredict() {
             <Readout
               label={t.prediction}
               value={<span data-testid="prediction">{lab.prediction ?? "–"}</span>}
-              className="[&>div:last-child]:text-3xl"
+              large
             />
             <Readout label={t.confidence} value={confidence === null ? "–" : (confidence * 100).toFixed(1)} unit="%" tone="plain" />
             <Readout label={t.latency} value={lab.probs ? lab.ms.toFixed(1) : "–"} unit="ms" tone="plain" />
