@@ -63,11 +63,13 @@ const en: Dictionary = {
     copied: "Copied",
     sidenote: "Sidenote",
   },
-  posts: { title: "Posts", lead: "Every entry, newest first." },
+  posts: { title: "Posts", lead: "Every entry, newest first.", description: "Every article on paul.notebook, newest first: hands-on notes on computer vision, reinforcement learning, Transformers and robots that run in your browser." },
   tags: {
     title: "Tags",
     lead: "Browse by topic.",
+    description: "Browse paul.notebook's interactive articles by topic: computer vision, CNNs, Transformers, reinforcement learning, neuroevolution, robotics and AI agents.",
     tagged: (tag: string) => `Tagged: ${tag}`,
+    taggedLead: (tag: string, n: number) => `The ${n} interactive ${n === 1 ? "article" : "articles"} on paul.notebook tagged “${tag}”.`,
     count: (n: number) => `${n} ${n === 1 ? "post" : "posts"}`,
   },
   about: {

@@ -6,6 +6,7 @@ import { PostIndex } from "@/components/site/post-index";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
 import { toRows } from "@/lib/content/rows";
 import { getDictionary, isLocale, locales } from "@/lib/i18n";
+import { sharedMetadata } from "@/lib/seo";
 
 export const dynamicParams = false;
 
@@ -16,7 +17,8 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: PageProps<"/[locale]/tags/[tag]">): Promise<Metadata> {
   const { locale, tag } = await params;
   if (!isLocale(locale)) return {};
-  return { title: getDictionary(locale).tags.tagged(tag), alternates: { canonical: `/${locale}/tags/${tag}` } };
+  const t = getDictionary(locale), posts = getAllPosts(locale).filter((p) => p.tags.includes(tag));
+  return { title: t.tags.tagged(tag), description: t.tags.taggedLead(tag, posts.length), ...sharedMetadata(locale, `/tags/${tag}`) };
 }
 
 export default async function TagPage({ params }: PageProps<"/[locale]/tags/[tag]">) {
