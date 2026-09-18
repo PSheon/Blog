@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { ViewTransition, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { EntryNo, InteractiveBadge } from "./post-meta";
@@ -72,9 +72,11 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true }: Pro
                   {row.dateLabel}
                 </time>
                 <div className="min-w-0">
-                  <h3 className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
-                    {row.title}
-                  </h3>
+                  <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
+                    <h3 className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
+                      {row.title}
+                    </h3>
+                  </ViewTransition>
                   <p className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
                     {row.description}
                   </p>

@@ -11,7 +11,12 @@ export function ModelGate({ children }: { children: ReactNode }) {
   const t = useLabels();
 
   useEffect(() => {
-    void loadModel();
+    // Not during hydration: parsing the weights and the first forward pass are a few hundred ms
+    // on a slow phone, and nobody can draw in that time anyway. Wait for the browser to be idle.
+    const idle = window.requestIdleCallback
+      ? window.requestIdleCallback(() => void loadModel(), { timeout: 2000 })
+      : window.setTimeout(() => void loadModel(), 200);
+    return () => (window.cancelIdleCallback ? window.cancelIdleCallback(idle) : window.clearTimeout(idle));
   }, []);
 
   if (status === "error") {

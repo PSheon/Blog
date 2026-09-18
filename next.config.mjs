@@ -20,7 +20,8 @@ const withMDX = createMDX({
       [
         "rehype-pretty-code",
         {
-          theme: { dark: "github-dark-dimmed", light: "github-light" },
+          // Chosen for contrast on our panel colours: the dimmed/default GitHub themes fail WCAG AA for comments and keywords.
+          theme: { dark: "github-dark", light: "github-light-high-contrast" },
           keepBackground: false,
           defaultLang: "plaintext",
         },

@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import "katex/dist/katex.min.css";
+import { ViewTransition } from "react";
 import "../globals.css";
 import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
@@ -66,7 +66,13 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             {/* Decorative glows may be wider than the viewport. Clip them at the full-width level, never at the
                 content container (that cuts them off mid-fade). `clip`, unlike `hidden`, keeps sticky children working. */}
             <main id="content" className="flex-1 overflow-x-clip">
-              {children}
+              {/*
+                This boundary lives in the layout and never remounts, so a navigation is an *update* of its
+                content (enter/exit would only fire if the boundary itself appeared or disappeared).
+              */}
+              <ViewTransition update="page-swap" default="none">
+                {children}
+              </ViewTransition>
             </main>
             <SiteFooter locale={locale} t={t} />
           </TooltipProvider>
