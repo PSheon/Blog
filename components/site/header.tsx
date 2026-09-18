@@ -3,7 +3,6 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { Navbar, NavbarLeft, NavbarRight } from "@/components/ui/navbar";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import type { SearchEntry } from "@/lib/content/posts";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 import { KernelMark } from "./kernel-mark";
@@ -14,11 +13,10 @@ interface Props {
   locale: Locale;
   nav: Dictionary["nav"];
   search: Dictionary["search"];
-  searchIndex: SearchEntry[];
   tags: string[];
 }
 
-export function SiteHeader({ locale, nav, search, searchIndex, tags }: Props) {
+export function SiteHeader({ locale, nav, search, tags }: Props) {
   const links = [
     { href: `/${locale}/posts`, label: nav.posts },
     { href: `/${locale}/tags`, label: nav.tags },
@@ -44,7 +42,7 @@ export function SiteHeader({ locale, nav, search, searchIndex, tags }: Props) {
 
         </NavbarLeft>
         <NavbarRight className="gap-2">
-          <Search locale={locale} index={searchIndex} tags={tags} t={search} />
+          <Search locale={locale} tags={tags} t={search} />
           <Sheet>
             <SheetTrigger
               className={buttonVariants({ variant: "ghost", size: "icon", className: "md:hidden" })}

@@ -73,17 +73,37 @@ test("the convolution stepper advances", async ({ page }) => {
   await expect(stepper).toContainText("2/16");
 });
 
-test("search opens, finds the CNN article and navigates", async ({ page, isMobile }) => {
+test("search is full-text, highlights the match and jumps to the section", async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await page.goto("/en");
-  // The ⌘K listener attaches on hydration; the hero prediction only appears after it.
+  // The shortcut listener attaches on hydration; the hero prediction only appears after it.
   await expect(page.getByTestId("hero-prediction")).toHaveText("7");
   if (isMobile) await page.getByRole("button", { name: "Search" }).click();
   else await page.keyboard.press("ControlOrMeta+k");
-  await page.getByPlaceholder(/Search posts/).fill("convolution");
-  await page.getByRole("option").first().click();
-  await expect(page).toHaveURL(/\/en\/posts\/cnn-from-scratch$/);
+
+  const input = page.getByPlaceholder(/Search the full text/);
+  // Before typing: every post is listed.
+  await expect(page.getByRole("option", { name: /CNN from scratch/ })).toBeVisible();
+
+  // "occlusion" appears only in body text and a heading of the CNN article — never in a title.
+  await input.fill("occlusion");
+  const first = page.getByRole("option").first();
+  await expect(first.locator("mark").first()).toHaveText(/occlusion/i);
+  await first.click();
+  await expect(page).toHaveURL(/\/en\/posts\/cnn-from-scratch#/);
   expect(errors).toEqual([]);
+});
+
+test("search says so when nothing matches, and finds Chinese by substring", async ({ page, isMobile }) => {
+  await page.goto("/zh");
+  await expect(page.getByTestId("hero-prediction")).toHaveText("7");
+  if (isMobile) await page.getByRole("button", { name: "搜尋" }).click();
+  else await page.keyboard.press("/");
+  const input = page.getByPlaceholder(/搜尋全文/);
+  await input.fill("qzxv");
+  await expect(page.getByText("找不到「qzxv」")).toBeVisible();
+  await input.fill("池化");
+  await expect(page.getByRole("option").first()).toContainText("ReLU 與池化");
 });
 
 test("feeds and sitemap are served", async ({ request }) => {
