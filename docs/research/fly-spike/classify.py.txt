@@ -1,0 +1,91 @@
+"""Can a network wired like a fly's optic lobe classify pictures? usage: classify.py <mnist|catdog> <model> [epochs]
+models: fly (gains+readout learned) | fly-frozen (readout only) | shuffled | pixels (logistic regression on what the eye sees) | cnn"""
+import json, math, sys, time
+import numpy as np, torch, torch.nn.functional as F, torchvision
+task, model_kind, EPOCHS = sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 5
+torch.manual_seed(0); np.random.seed(0)
+dev = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+G, R, DT, T, POOL = 32, 4, 0.02, 12, 4
+
+# ---- the eye: hex columns inside a square field of view, in a 32×32 axial grid
+u, v = np.meshgrid(np.arange(G), np.arange(G), indexing="ij")
+X, Y = (u - v) * math.sqrt(3) / 2, (u + v) / 2 - (G - 1) / 2
+HALF = 11.5
+eye = (np.abs(X) <= HALF) & (np.abs(Y) <= HALF)
+print("ommatidia:", int(eye.sum()))
+grid = torch.tensor(np.stack([X / HALF, -Y / HALF], -1), dtype=torch.float32)[None]   # grid_sample wants (x, y) in −1…1
+eye_t = torch.tensor(eye, dtype=torch.float32)
+# pooling regions for the readout: POOL×POOL squares of the visual field
+region = (np.clip(((X + HALF) / (2 * HALF) * POOL).astype(int), 0, POOL - 1) * POOL + np.clip(((Y + HALF) / (2 * HALF) * POOL).astype(int), 0, POOL - 1))
+pool = torch.zeros(POOL * POOL, G * G)
+for i in range(G * G):
+    if eye.flat[i]: pool[region.flat[i], i] = 1
+pool = (pool / pool.sum(1, keepdim=True)).to(dev)
+
+def see(img):  # [B,1,H,W] in 0..1 → luminance at each ommatidium [B,G,G]
+    return F.grid_sample(img, grid.expand(len(img), -1, -1, -1).to(img.device), align_corners=False)[:, 0] * eye_t.to(img.device)
+
+# ---- data
+tf = torchvision.transforms.ToTensor()
+if task == "mnist":
+    tr, te = torchvision.datasets.MNIST("data", True, download=True), torchvision.datasets.MNIST("data", False, download=True)
+    xtr, ytr, xte, yte = tr.data[:12000, None].float() / 255, tr.targets[:12000], te.data[:2000, None].float() / 255, te.targets[:2000]; CLASSES = 10
+else:
+    tr, te = torchvision.datasets.CIFAR10("data", True, download=True), torchvision.datasets.CIFAR10("data", False, download=True)
+    def pick(ds):
+        x, y = torch.tensor(ds.data).float().mean(-1)[:, None] / 255, torch.tensor(ds.targets)
+        keep = (y == 3) | (y == 5); return x[keep], (y[keep] == 5).long()
+    (xtr, ytr), (xte, yte) = pick(tr), pick(te); CLASSES = 2
+print(task, "train", len(xtr), "test", len(xte))
+etr, ete = see(xtr), see(xte)     # what the eye sees, computed once
+
+# ---- models
+K = json.load(open("optic-kernels.json")); TYPES = K["types"]; idx = {t: i for i, t in enumerate(TYPES)}; C = len(TYPES)
+class Fly(torch.nn.Module):
+    def __init__(self, shuffled=False, frozen=False):
+        super().__init__()
+        N = torch.zeros(C, C, 2 * R + 1, 2 * R + 1)
+        for pair, taps in K["kernels"].items():
+            a, b = pair.split(">")
+            for du, dv, n in taps: N[idx[b], idx[a], R + du, R + dv] = n
+        if shuffled:   # same synapse counts, but who-talks-to-whom and where is scrambled
+            flat = N.flatten(); nz = flat.nonzero()[:, 0]; flat[nz] = flat[nz[torch.randperm(len(nz))]]
+            N = flat.view_as(N)[torch.randperm(C)][:, torch.randperm(C)]
+        N = N / N.sum(dim=(1, 2, 3), keepdim=True).clamp(min=1)
+        sign = torch.tensor([float(K["sign"][t]) for t in TYPES]).view(1, -1, 1, 1)
+        self.register_buffer("W0", N * sign); self.register_buffer("mask", (N.sum(dim=(2, 3)) > 0).float())
+        self.log_gain = torch.nn.Parameter(torch.zeros(C, C), requires_grad=not frozen)
+        self.log_tau = torch.nn.Parameter(torch.full((C,), math.log(0.05)), requires_grad=not frozen)
+        self.rest = torch.nn.Parameter(torch.full((C,), 0.3), requires_grad=not frozen)
+        self.inputs = [idx[t] for t in ("L1", "L2", "L3")]
+        self.readout = torch.nn.Linear(C * POOL * POOL, CLASSES)
+    def features(self, lum):
+        B = len(lum); V = torch.zeros(B, C, G, G, device=lum.device)
+        W = self.W0 * (self.log_gain.exp() * self.mask)[:, :, None, None]
+        k = DT / self.log_tau.exp().clamp(min=DT).view(1, -1, 1, 1)
+        stim = torch.zeros(B, C, G, G, device=lum.device); stim[:, self.inputs] = (-2 * (lum - 0.5) * eye_t.to(lum.device))[:, None]
+        for _ in range(T): V = V + k * (F.conv2d(F.relu(V), W, padding=R) + self.rest.view(1, -1, 1, 1) + stim - V)
+        return (F.relu(V).flatten(2) @ pool.T).flatten(1)          # [B, C·POOL²]
+    def forward(self, lum): return self.readout(self.features(lum) * 5)
+class Pixels(torch.nn.Module):
+    def __init__(self): super().__init__(); self.lin = torch.nn.Linear(G * G, CLASSES)
+    def forward(self, lum): return self.lin(lum.flatten(1) - 0.5)
+class CNN(torch.nn.Module):   # a small conventional net on the same eye image, for scale
+    def __init__(self):
+        super().__init__(); self.c1 = torch.nn.Conv2d(1, 16, 3, padding=1); self.c2 = torch.nn.Conv2d(16, 32, 3, padding=1); self.lin = torch.nn.Linear(32 * 8 * 8, CLASSES)
+    def forward(self, lum):
+        x = F.max_pool2d(F.relu(self.c1(lum[:, None] - 0.5)), 2); x = F.max_pool2d(F.relu(self.c2(x)), 2); return self.lin(x.flatten(1))
+net = {"fly": lambda: Fly(), "fly-frozen": lambda: Fly(frozen=True), "shuffled": lambda: Fly(shuffled=True), "pixels": Pixels, "cnn": CNN}[model_kind]().to(dev)
+params = [p for p in net.parameters() if p.requires_grad]
+print(model_kind, "learned parameters:", sum(p.numel() for p in params), "| of which wiring-side:", sum(p.numel() for n, p in net.named_parameters() if p.requires_grad and "readout" not in n and "lin" not in n and not n.startswith("c")))
+opt = torch.optim.Adam(params, lr=3e-3)
+
+def accuracy(x, y):
+    with torch.no_grad(): return sum((net(x[i:i + 500].to(dev)).argmax(1).cpu() == y[i:i + 500]).sum().item() for i in range(0, len(x), 500)) / len(x)
+t0 = time.perf_counter()
+for ep in range(1, EPOCHS + 1):
+    perm = torch.randperm(len(etr))
+    for i in range(0, len(perm), 64):
+        b = perm[i:i + 64]; loss = F.cross_entropy(net(etr[b].to(dev)), ytr[b].to(dev)); opt.zero_grad(); loss.backward(); opt.step()
+    print(f"epoch {ep}  loss {loss.item():.3f}  train {accuracy(etr[:2000], ytr[:2000]):.3f}  test {accuracy(ete, yte):.3f}  {time.perf_counter() - t0:.0f}s", flush=True)
+print(json.dumps(dict(task=task, model=model_kind, test=round(accuracy(ete, yte), 4), seconds=round(time.perf_counter() - t0))))
