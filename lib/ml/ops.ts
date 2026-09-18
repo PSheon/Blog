@@ -88,6 +88,16 @@ export function relu(x: Tensor): Tensor {
   return out;
 }
 
+/** Exponential linear unit: x for x > 0, α(eˣ − 1) otherwise. Smooth through zero, unlike ReLU. */
+export function elu(x: Tensor, alpha = 1): Tensor {
+  const out = zeros(x.shape);
+  for (let i = 0; i < x.data.length; i++) {
+    const v = x.data[i];
+    out.data[i] = v > 0 ? v : alpha * Math.expm1(v);
+  }
+  return out;
+}
+
 /** [N, ...rest] → [N, prod(rest)]. Shares the underlying buffer. */
 export function flatten(x: Tensor): Tensor {
   const n = x.shape[0];

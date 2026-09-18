@@ -17,6 +17,9 @@ importers:
       '@mdx-js/react':
         specifier: ^3.1.1
         version: 3.1.1(@types/react@19.3.0)(react@19.2.8)
+      '@mujoco/mujoco':
+        specifier: 3.13.0
+        version: 3.13.0
       '@next/mdx':
         specifier: ^16.3.5
         version: 16.3.5(@mdx-js/loader@3.1.1)(@mdx-js/react@3.1.1(@types/react@19.3.0)(react@19.2.8))
@@ -590,6 +593,9 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@mujoco/mujoco@3.13.0':
+    resolution: {integrity: sha512-9OAp3i2pR9U8SnJfr+/UcmxpbIOcUUSBjNGY79XS4NYcyYjztqHmx1kl/83yoEpxDd40WBcDOKZqNhEmhN1+Sg==}
 
   '@napi-rs/wasm-runtime@1.2.4':
     resolution: {integrity: sha512-AJxoUD2/15ESHbvpcyjU274nsAPLuOtPHCk0vKJM5pj//Fg/B1FXNWjPnXTT9PymCYYiHo4zPj0ZomXBKhoy7g==}
@@ -4740,6 +4746,8 @@ snapshots:
       zod-to-json-schema: 3.25.2(zod@3.25.76)
     transitivePeerDependencies:
       - supports-color
+
+  '@mujoco/mujoco@3.13.0': {}
 
   '@napi-rs/wasm-runtime@1.2.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:

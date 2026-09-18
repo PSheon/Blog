@@ -16,6 +16,7 @@
     "@base-ui/react": "^1.8.0",
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
+    "@mujoco/mujoco": "3.13.0",
     "@next/mdx": "^16.3.5",
     "@types/mdx": "^2.0.14",
     "class-variance-authority": "^0.7.1",
