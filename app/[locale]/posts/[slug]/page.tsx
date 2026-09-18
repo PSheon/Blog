@@ -27,9 +27,11 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/posts/[s
   const post = getPostMeta(slug, locale);
   if (!post) return {};
   const shared = sharedMetadata(locale, `/posts/${slug}`, { available: post.availableLocales, canonicalLocale: post.locale });
+  const description = post.seoDescription ?? post.description;
   return {
-    title: post.title,
-    description: post.description,
+    // The headline on the page can be as long as it likes; search results cut titles at about 60 characters.
+    title: post.seoTitle ?? post.title,
+    description,
     keywords: post.tags,
     // A fallback page is a copy of the zh article; point search engines at the original.
     alternates: shared.alternates,
@@ -37,7 +39,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/posts/[s
       ...shared.openGraph,
       type: "article",
       title: post.title,
-      description: post.description,
+      description,
       publishedTime: post.date,
       modifiedTime: post.updated ?? post.date,
       authors: [site.author],

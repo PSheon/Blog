@@ -33,6 +33,8 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
     title: { default: t.meta.title, template: `%s — ${site.name}` },
     description: t.meta.description,
     authors: [{ name: site.author, url: site.github }],
+    // Search Console / Bing ownership tokens; unset locally and until Paul registers the site.
+    verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION, other: process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION ? { "msvalidate.01": process.env.NEXT_PUBLIC_BING_SITE_VERIFICATION } : undefined },
     ...sharedMetadata(locale, ""),
   };
 }
