@@ -12,6 +12,7 @@ import { Toc, TocDisclosure } from "@/components/article/toc";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { getAdjacentPosts, getAllPosts, getPostMeta, getRelatedPosts, getToc } from "@/lib/content/posts";
 import { formatDate, getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
+import { sharedMetadata } from "@/lib/seo";
 import { site } from "@/lib/site";
 
 export const dynamicParams = false;
@@ -22,20 +23,23 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: PageProps<"/[locale]/posts/[slug]">): Promise<Metadata> {
   const { locale, slug } = await params;
-  const post = isLocale(locale) ? getPostMeta(slug, locale) : null;
+  if (!isLocale(locale)) return {};
+  const post = getPostMeta(slug, locale);
   if (!post) return {};
+  const shared = sharedMetadata(locale, `/posts/${slug}`, { available: post.availableLocales, canonicalLocale: post.locale });
+  const description = post.seoDescription ?? post.description;
   return {
-    title: post.title,
-    description: post.description,
-    alternates: {
-      // A fallback page is a copy of the zh article; point search engines at the original.
-      canonical: `/${post.locale}/posts/${slug}`,
-      languages: Object.fromEntries(post.availableLocales.map((l) => [htmlLang[l], `/${l}/posts/${slug}`])),
-    },
+    // The headline on the page can be as long as it likes; search results cut titles at about 60 characters.
+    title: post.seoTitle ?? post.title,
+    description,
+    keywords: post.tags,
+    // A fallback page is a copy of the zh article; point search engines at the original.
+    alternates: shared.alternates,
     openGraph: {
+      ...shared.openGraph,
       type: "article",
       title: post.title,
-      description: post.description,
+      description,
       publishedTime: post.date,
       modifiedTime: post.updated ?? post.date,
       authors: [site.author],
@@ -67,7 +71,12 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
     dateModified: post.updated ?? post.date,
     inLanguage: htmlLang[post.locale],
     author: { "@type": "Person", name: site.author, url: site.github },
-    mainEntityOfPage: `${site.url}/${locale}/posts/${slug}`,
+    publisher: { "@type": "Person", name: site.author, url: site.github },
+    image: `${site.url}/${post.locale}/posts/${slug}/opengraph-image`,
+    keywords: post.tags.join(", "),
+    url: `${site.url}/${post.locale}/posts/${slug}`,
+    mainEntityOfPage: `${site.url}/${post.locale}/posts/${slug}`,
+    isPartOf: { "@type": "Blog", name: site.name, url: `${site.url}/${post.locale}` },
   };
 
   return (
