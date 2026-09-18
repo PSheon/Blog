@@ -1,0 +1,178 @@
+---
+title: "Training a Transformer from scratch in the browser: watching attention grow"
+description: No PyTorch and no libraries. A tiny autodiff engine and a Transformer of about fourteen thousand parameters, written in TypeScript. Press a button and it learns to reverse a string of digits within seconds.
+date: 2026-09-18
+tags: [llm, transformer, from-scratch]
+no: 4
+interactive: true
+---
+
+import { TrainingLab } from "./components";
+
+The weights in [the CNN article](/en/posts/cnn-from-scratch) were trained in PyTorch and carried into the browser afterwards. This one is different: **the training itself happens in your browser**. The model below has completely random weights right now. It can't do anything.
+
+Press Train, and keep your eyes on the two attention maps at the bottom right.
+
+<Instrument fig="01" title="transformer / train" size="wide" caption="The task is to write six digits backwards. After reading “3 1 4 1 5 9 →” the model has to produce “9 5 1 4 1 3” by itself, one token at a time. Cyan digits are right, pink ones are wrong.">
+  <TrainingLab />
+</Instrument>
+
+If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the share of correct answers jumps to 100%, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured with fixed random seeds: reverse and copy first reach 100% around step 30 to 40, and a step takes about 4 ms on my laptop. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
+
+I didn't draw that line, and no line of code tells it to appear. It is a result of training. This article is about how it gets there.
+
+## Why not train a model that talks?
+
+Transformer tutorials usually train on Shakespeare for tens of minutes and end up with gibberish that looks a bit like English. That has two problems: it is too slow for a browser, and it is hard to tell what the model actually learned.
+
+So here is a toy task instead: six digits in, some rearrangement of them out. Its advantages:
+
+- **Right and wrong are obvious.** The answer isn't "does it look plausible"; each digit is correct or it isn't.
+- **It trains in seconds.** The model needs only about fourteen thousand parameters.
+- **The attention maps can be read directly.** To write the first digit of the answer, the model must read the sixth digit of the input, and that shows up in the attention matrix exactly as it is.
+
+Nothing about the model is a shortcut. It is a standard decoder-only Transformer, the same structure as GPT, only very small.
+
+| | The model in this article |
+| --- | --- |
+| Vocabulary | 11 tokens: the digits 0–9 and a "→" |
+| Sequence length | 12 |
+| Width `d` | 32 |
+| Attention heads | 2 |
+| Layers | 1 |
+| Parameters | 13,728 |
+
+## Turning the problem into next-token prediction
+
+A language model does one thing: it looks at the tokens so far and guesses the next one. So we write each problem as a sequence:
+
+```text
+3 1 4 1 5 9 → 9 5 1 4 1 3
+```
+
+and ask the model to predict the next token at every position. The first half is random digits that nobody could guess, so only the second half, the answer, is scored:
+
+```ts title="content/posts/transformer-from-scratch/components/task.ts"
+export function example(digits: number[], task: TaskName) {
+  const full = [...digits, SEP, ...TASKS[task](digits)];
+  const ids = full.slice(0, -1);
+  // −1 means "don't score this position"
+  const targets = full.slice(1).map((t, i) => (i < digits.length ? -1 : t));
+  return { ids, targets };
+}
+```
+
+That is also why the top half of each attention map is veiled: those rows don't affect the loss, so what they look like doesn't matter.
+
+## Attention: every position decides whom to read
+
+The core of a Transformer is a simple idea. Every position produces three vectors:
+
+- a **query**: what am I looking for?
+- a **key**: what do I have here?
+- a **value**: if you pick me, this is the information you get.
+
+Position $i$ takes the dot product of its query with the key of every position $j$ to get a score. Softmax turns the scores into weights, and the weights average the values:
+
+$$
+\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}} + M\right) V
+$$
+
+$M$ is the **causal mask**: positions with $j > i$ get $-\infty$, so their weight after softmax is zero. While writing the second digit of the answer, the model can't peek at the third. That is why the upper-right triangle of every attention map stays dark.
+
+The two maps in the instrument are the output of $\mathrm{softmax}(\cdot)$ itself: how bright row $i$, column $j$ is tells you how much position $i$ read from position $j$.
+
+```ts title="lib/ml/transformer.ts"
+const scores = tape.scale(tape.matmul(qh, tape.transpose(kh)), 1 / Math.sqrt(dh));
+const weights = tape.causalSoftmax(scores); // this is the picture you see
+mixed.push(tape.matmul(weights, vh));
+```
+
+### Why a diagonal appears
+
+Think about what reversing requires. To write the first digit of the answer, the model is standing on the "→" and needs the last digit of the input. For the second it needs the one before that. In other words:
+
+> Position $6 + i$ should read position $5 - i$.
+
+That rule depends purely on **position**, not on what the digits are. At first the model knows nothing of it. But every wrong answer sends a gradient that pushes the queries and keys a little towards giving the correct cell a higher score. After a few dozen pushes, the diagonal is there.
+
+<Callout type="insight" title="Change the task and watch the picture change">
+Switch the task to Copy and train again. This time the diagonal runs the other way, from upper left to lower right, because digit $i$ of the answer is digit $i$ of the input. Same model, same code; a different task grows different attention.
+</Callout>
+
+Sort doesn't give such a clean picture. What sorting needs isn't "read position such-and-such" but "find the smallest digit not used yet", which depends on content instead of position. It takes roughly 600 to 800 steps to reach 100%, and the attention is much more diffuse. A model with one layer and two heads can learn it, but the solution it finds isn't one a person can read at a glance.
+
+## The rest of the model
+
+Attention moves information between positions. Every other part works on each position separately:
+
+1. **Embedding.** Each token looks up a 32-dimensional vector, and a vector meaning "I am at position n" is added to it. Without position vectors the model couldn't tell the first digit from the sixth, and reversing would be impossible to learn.
+2. **LayerNorm.** Rescales each position's vector to mean 0 and variance 1, which keeps training stable.
+3. **MLP.** Two fully connected layers that widen to four times the width and come back. Attention fetches information; the MLP processes it.
+4. **Residual connections.** Each sub-layer's output is added to the stream instead of replacing it.
+5. **Unembedding.** Finally the 32-dimensional vector is projected to a score for each of the 11 tokens.
+
+```ts title="lib/ml/transformer.ts"
+// Self-attention: every position gathers information from earlier ones
+x = tape.add(x, tape.matmul(tape.concatCols(mixed), P[p + "wo"]));
+
+// MLP: each position digests what it gathered, on its own
+const m = tape.layerNorm(x, P[p + "ln2.g"], P[p + "ln2.b"]);
+const hidden = tape.relu(tape.addRow(tape.matmul(m, P[p + "w1"]), P[p + "b1"]));
+x = tape.add(x, tape.addRow(tape.matmul(hidden, P[p + "w2"]), P[p + "b2"]));
+```
+
+## Training: where gradients come from
+
+The forward pass is only a chain of matrix operations. Training needs the other direction: **the partial derivative of the loss with respect to every parameter**. With 13,728 parameters, that is 13,728 numbers.
+
+Doing that by hand is out of the question, so I wrote a very small automatic-differentiation engine. The idea: whenever you perform an operation, also note down "if someone tells me the gradient of my output, this is how I pass it back to my inputs". For a matrix product $C = AB$ the backward rules are $\partial A = \partial C \, B^{\top}$ and $\partial B = A^{\top} \partial C$:
+
+```ts title="lib/ml/autograd.ts" {7-8}
+matmul(a: Mat, b: Mat): Mat {
+  const out = /* … forward: compute a·b as usual … */;
+  this.record(() => {
+    for (let i = 0; i < n; i++)
+      for (let j = 0; j < m; j++)
+        for (let p = 0; p < k; p++) {
+          a.grad[i * k + p] += out.grad[i * m + j] * b.data[p * m + j]; // dA = dC · Bᵀ
+          b.grad[p * m + j] += out.grad[i * m + j] * a.data[i * k + p]; // dB = Aᵀ · dC
+        }
+  });
+  return out;
+}
+```
+
+The whole engine has twelve operations: matrix product, add, add bias, scale, transpose, ReLU, LayerNorm, causal softmax, splitting and re-joining attention heads, embedding lookup, and the cross-entropy loss at the end. After the forward pass, run the recorded functions **in reverse** and every parameter has its gradient. That is backpropagation.
+
+<Callout type="warn" title="A wrong gradient doesn't raise an error">
+The frightening thing about backpropagation is that a wrong formula still runs; the model simply, mysteriously, learns badly. So every operation in this engine has a unit test that compares its analytic gradient with a numerical one, $\frac{f(x + \varepsilon) - f(x - \varepsilon)}{2\varepsilon}$, to within $10^{-5}$, and the whole Transformer is spot-checked the same way in every parameter matrix.
+</Callout>
+
+With gradients in hand, all that remains is updating the parameters. This uses Adam, which keeps a running average of each parameter's gradient and of its square, and uses them to give every parameter its own step size.
+
+```ts title="content/posts/transformer-from-scratch/components/task.ts"
+step(batch = 16, lr = 3e-3): number {
+  this.model.zeroGrad();
+  for (let b = 0; b < batch; b++) {
+    const { ids, targets } = example(randomDigits(this.rng), this.task);
+    const tape = new Tape();
+    tape.crossEntropy(this.model.forward(tape, ids).logits, targets, 1 / batch);
+    tape.backward(); // gradients of the 16 examples add up
+  }
+  this.adam.step(lr);
+}
+```
+
+Every step uses 16 brand-new random problems. There are a million possible six-digit strings; in a hundred steps the model has seen 1,600 of them, yet it answers ones it has never seen. It hasn't memorised answers. It has learned the rule.
+
+## How this differs from a real large language model
+
+Structurally, hardly at all. The difference is scale and everything that comes with it:
+
+- **Parameters.** Fourteen thousand here; hundreds of billions in today's large models.
+- **Layers.** One here. The sort task above already hints at what depth is for: one layer can do one lookup, and composing several steps takes more layers.
+- **Data.** Here the data is unlimited, noise-free, and every problem has exactly one right answer. Real text is none of those.
+- **Position encoding.** This model uses learned absolute position vectors and its position table has only 12 slots, so it handles exactly six digits. A seven-digit input doesn't even fit.
+
+The core is the same, though: predict the next token, compute the loss, send the gradient back, and nudge every parameter slightly in the right direction. Those few seconds you watched in your browser were the whole of it.

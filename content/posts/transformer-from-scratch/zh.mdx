@@ -1,0 +1,178 @@
+---
+title: 在瀏覽器裡從零訓練一個 Transformer：看注意力自己長出來
+description: 不用 PyTorch，也不用任何函式庫。用 TypeScript 寫一個會自動微分的小引擎、一個一萬多個參數的 Transformer，然後按下按鈕，看它在幾秒內學會把一串數字反過來。
+date: 2026-09-18
+tags: [llm, transformer, from-scratch]
+no: 4
+interactive: true
+---
+
+import { TrainingLab } from "./components";
+
+[CNN 那篇](/zh/posts/cnn-from-scratch)的權重是先在 PyTorch 裡訓練好、再搬進瀏覽器的。這一篇不一樣：**訓練本身就發生在你的瀏覽器裡**。下面這個模型現在的權重完全是隨機的，它什麼都不會。
+
+按「開始訓練」，然後盯著右下角的兩張注意力圖。
+
+<Instrument fig="01" title="transformer / train" size="wide" caption="任務是把六個數字反過來寫。模型讀到「3 1 4 1 5 9 →」之後，要自己一個字一個字寫出「9 5 1 4 1 3」。青色的數字是答對的，粉紅色是答錯的。">
+  <TrainingLab />
+</Instrument>
+
+如果一切順利，你會在一百步之內看到三件事同時發生：損失掉到接近零、答對率衝到 100%，以及其中一張注意力圖的下半部長出一條**從右上到左下的斜線**。<Sidenote>我用固定的隨機種子實測：反轉和複製大約在第 30 到 40 步就第一次達到 100%，每一步在我的筆電上約 4 毫秒。哪一個頭負責長出斜線，每次訓練都不一定。</Sidenote>
+
+那條斜線不是我畫上去的，也沒有任何一行程式碼叫它長成那樣。它是訓練的結果。這篇文章要講的就是：它是怎麼長出來的。
+
+## 為什麼不訓練一個會說話的模型
+
+Transformer 的教學通常拿莎士比亞當訓練資料，訓練個幾十分鐘，得到一段看起來像英文的亂碼。這有兩個問題：在瀏覽器裡太慢，而且你很難判斷模型到底學會了什麼。
+
+所以這裡換一個玩具任務：輸入六個數字，輸出它們的某種重新排列。它的好處是：
+
+- **對錯一目了然**。答案不是「看起來像不像」，而是每一位數都對或不對。
+- **幾秒鐘就練得起來**。模型只需要一萬多個參數。
+- **注意力圖可以直接讀**。要寫出答案的第 1 位，模型必須去讀輸入的第 6 位；這件事會原封不動地出現在注意力矩陣上。
+
+模型本身沒有任何偷工減料：它是一個標準的 decoder-only Transformer，和 GPT 同一種結構，只是很小。
+
+| | 這篇的模型 |
+| --- | --- |
+| 詞彙表 | 11 個 token：數字 0–9，加上一個「→」 |
+| 序列長度 | 12 |
+| 寬度 `d` | 32 |
+| 注意力頭 | 2 |
+| 層數 | 1 |
+| 參數總數 | 13,728 |
+
+## 把問題變成「預測下一個 token」
+
+語言模型只會做一件事：看著前面的 token，猜下一個。所以我們把一題寫成一條序列：
+
+```text
+3 1 4 1 5 9 → 9 5 1 4 1 3
+```
+
+然後要求模型在每個位置預測下一個 token。不過前半段是隨機的數字，沒有人猜得中，所以只有後半段（答案）會被計分：
+
+```ts title="content/posts/transformer-from-scratch/components/task.ts"
+export function example(digits: number[], task: TaskName) {
+  const full = [...digits, SEP, ...TASKS[task](digits)];
+  const ids = full.slice(0, -1);
+  // −1 表示「這個位置不計分」
+  const targets = full.slice(1).map((t, i) => (i < digits.length ? -1 : t));
+  return { ids, targets };
+}
+```
+
+這也是為什麼注意力圖的上半部被蓋上一層灰：那幾列不影響損失，它們長什麼樣子都無所謂。
+
+## 注意力：每個位置自己決定要讀誰
+
+Transformer 的核心是一個很簡單的想法。每個位置會產生三個向量：
+
+- **query**：我在找什麼？
+- **key**：我這裡有什麼？
+- **value**：如果你選了我，我給你這些資訊。
+
+位置 $i$ 拿自己的 query 去和每個位置 $j$ 的 key 做內積，得到一個分數；分數經過 softmax 變成權重，再用這些權重把 value 加權平均：
+
+$$
+\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\!\left(\frac{QK^{\top}}{\sqrt{d_k}} + M\right) V
+$$
+
+$M$ 是**因果遮罩**：$j > i$ 的位置填上 $-\infty$，softmax 之後權重就是零。模型在寫答案的第 2 位時，不能偷看第 3 位。上面注意力圖的右上三角永遠是暗的，就是這個原因。
+
+儀器裡畫的那兩張圖，就是 $\mathrm{softmax}(\cdot)$ 的結果本身：第 $i$ 列第 $j$ 行有多亮，代表位置 $i$ 從位置 $j$ 讀了多少。
+
+```ts title="lib/ml/transformer.ts"
+const scores = tape.scale(tape.matmul(qh, tape.transpose(kh)), 1 / Math.sqrt(dh));
+const weights = tape.causalSoftmax(scores); // 這就是畫出來的那張圖
+mixed.push(tape.matmul(weights, vh));
+```
+
+### 為什麼會長出斜線
+
+想一下反轉任務需要什麼。寫答案的第 1 位時，模型站在「→」的位置，需要的是輸入的最後一位；寫第 2 位時，需要倒數第二位。也就是說：
+
+> 第 $6 + i$ 個位置，應該去讀第 $5 - i$ 個位置。
+
+這是一條純粹由**位置**決定的規則，和數字是多少無關。模型一開始完全不知道這件事。但每一次答錯，梯度都會把 query 和 key 往「讓正確的那一格分數變高」的方向推一點。推個幾十次之後，那條斜線就出現了。
+
+<Callout type="insight" title="換個任務，看圖怎麼變">
+把任務切到「複製」再訓練一次：這次斜線的方向會反過來，變成從左上到右下，因為答案的第 $i$ 位就是輸入的第 $i$ 位。同一個模型、同一份程式碼，不同的任務會長出不同的注意力。
+</Callout>
+
+「排序」就沒有這麼乾淨的圖了。排序需要的不是「去讀第幾個位置」，而是「去找還沒用過的最小數字」，這取決於內容而不是位置。它大約要 600 到 800 步才會練到 100%，注意力也散得多。一層、兩個頭的模型可以學會它，但學到的解法不是人類一眼看得懂的那種。
+
+## 模型的其餘部分
+
+注意力負責在位置之間搬運資訊，其他零件都是逐位置運作的：
+
+1. **Embedding**：每個 token 查表得到一個 32 維向量，再加上一個代表「我在第幾個位置」的向量。沒有位置向量，模型根本分不出第 1 位和第 6 位，反轉任務就不可能學會。
+2. **LayerNorm**：把每個位置的向量調整成平均 0、變異數 1，讓訓練穩定。
+3. **MLP**：兩層全連接，中間放大成 4 倍寬再縮回來。注意力把資訊搬過來，MLP 負責處理它。
+4. **殘差連接**：每個子層的輸出是「加回去」而不是「取代」。
+5. **Unembedding**：最後把 32 維向量投影回 11 個 token 的分數。
+
+```ts title="lib/ml/transformer.ts"
+// 自注意力：每個位置從前面的位置收集資訊
+x = tape.add(x, tape.matmul(tape.concatCols(mixed), P[p + "wo"]));
+
+// MLP：每個位置自己消化收集到的東西
+const m = tape.layerNorm(x, P[p + "ln2.g"], P[p + "ln2.b"]);
+const hidden = tape.relu(tape.addRow(tape.matmul(m, P[p + "w1"]), P[p + "b1"]));
+x = tape.add(x, tape.addRow(tape.matmul(hidden, P[p + "w2"]), P[p + "b2"]));
+```
+
+## 訓練：梯度從哪裡來
+
+前向傳播只是一連串的矩陣運算。訓練需要的是另一個方向：**損失對每一個參數的偏導數**。13,728 個參數，就要 13,728 個數字。
+
+手算當然不可能，所以我寫了一個很小的自動微分引擎。想法是：每做一個運算，就順手記下「如果有人告訴我輸出的梯度，我該怎麼把它傳回輸入」。以矩陣乘法 $C = AB$ 為例，反向的規則是 $\partial A = \partial C \, B^{\top}$ 和 $\partial B = A^{\top} \partial C$：
+
+```ts title="lib/ml/autograd.ts" {7-8}
+matmul(a: Mat, b: Mat): Mat {
+  const out = /* … 前向：照常計算 a·b … */;
+  this.record(() => {
+    for (let i = 0; i < n; i++)
+      for (let j = 0; j < m; j++)
+        for (let p = 0; p < k; p++) {
+          a.grad[i * k + p] += out.grad[i * m + j] * b.data[p * m + j]; // dA = dC · Bᵀ
+          b.grad[p * m + j] += out.grad[i * m + j] * a.data[i * k + p]; // dB = Aᵀ · dC
+        }
+  });
+  return out;
+}
+```
+
+整個引擎只有十二種運算：矩陣乘法、加法、加偏置、縮放、轉置、ReLU、LayerNorm、因果 softmax、切開和接回注意力頭、embedding 查表，以及最後的交叉熵損失。前向跑完之後，把記下來的函式**倒著**執行一遍，每個參數的梯度就都算好了。這就是反向傳播。
+
+<Callout type="warn" title="梯度寫錯的時候，模型不會報錯">
+反向傳播最可怕的地方是：公式寫錯了，程式還是跑得動，模型只是莫名其妙學不好。所以這個引擎的每一種運算都有單元測試，用數值微分 $\frac{f(x + \varepsilon) - f(x - \varepsilon)}{2\varepsilon}$ 去對照解析梯度，誤差要在 $10^{-5}$ 以內；整個 Transformer 也用同樣的方法抽查了每一個參數矩陣。
+</Callout>
+
+有了梯度，剩下的就是更新參數。這裡用的是 Adam：它替每個參數各自記錄梯度的移動平均和平方的移動平均，藉此決定每個參數自己的步長。
+
+```ts title="content/posts/transformer-from-scratch/components/task.ts"
+step(batch = 16, lr = 3e-3): number {
+  this.model.zeroGrad();
+  for (let b = 0; b < batch; b++) {
+    const { ids, targets } = example(randomDigits(this.rng), this.task);
+    const tape = new Tape();
+    tape.crossEntropy(this.model.forward(tape, ids).logits, targets, 1 / batch);
+    tape.backward(); // 16 題的梯度加在一起
+  }
+  this.adam.step(lr);
+}
+```
+
+每一步都是 16 題全新的隨機題目。六位數總共有一百萬種組合，模型在一百步裡只看過其中 1,600 種，卻能答對沒看過的題目。它不是把答案背起來，而是學到了規則。
+
+## 這和真正的大型語言模型差在哪裡
+
+結構上幾乎沒有差別。差別在規模，以及規模帶來的一切：
+
+- **參數**：這裡是 1.4 萬個，現在的大模型是幾千億個。
+- **層數**：這裡是 1 層。上面的排序任務已經暗示了深度的用處：一層只能做「一次查找」，要組合多個步驟就需要更多層。
+- **資料**：這裡的資料是無限的、沒有雜訊的，而且任務有唯一正確答案。真實的文字三者皆非。
+- **位置編碼**：這裡用的是學出來的絕對位置向量，而且位置表只有 12 格，所以它只會處理剛好六位數，七位數連放都放不進去。
+
+不過核心是一樣的：預測下一個 token、算出損失、把梯度傳回去、把每個參數往對的方向推一點點。你剛才在瀏覽器裡看到的那幾秒鐘，就是這件事的全部。

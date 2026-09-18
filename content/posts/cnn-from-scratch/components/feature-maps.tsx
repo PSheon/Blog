@@ -1,7 +1,7 @@
 "use client";
 
 import { DigitCanvas } from "./digit-canvas";
-import { HeatCanvas } from "./heat-canvas";
+import { HeatCanvas } from "@/components/lab/heat-canvas";
 import { useLabels } from "./labels";
 import { ModelGate } from "./model-gate";
 import { SamplePicker } from "./sample-picker";
