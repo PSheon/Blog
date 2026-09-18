@@ -201,3 +201,31 @@ test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page 
   expect(Number(await page.getByTestId("hy-mask").textContent())).toBeGreaterThan(0.4);
   expect(errors).toEqual([]);
 });
+
+test("the Lite3 walks in the page and falls over when its joint angles are blindfolded", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (r) => requests.push(r.url()));
+  const response = await page.goto("/zh/posts/lite3-walking");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "lite3-walking is still a draft");
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  // About 4.5 MB of simulator: none of it may load before the reader asks.
+  await page.waitForLoadState("networkidle");
+  expect(requests.filter((url) => /lite3\/|mujoco/.test(url))).toEqual([]);
+
+  await page.getByRole("button", { name: /載入模擬器/ }).first().click();
+  const remote = page.locator('[data-stage="remote"]'), senses = page.locator('[data-stage="senses"]');
+  await expect(remote).toHaveAttribute("data-here", "true", { timeout: 60_000 });
+  await expect(page.getByTestId("lite3-forward")).toContainText(/→ 0\.[45]\d/, { timeout: 30_000 });
+
+  // One robot, one canvas: it moves to whichever instrument is on screen.
+  await senses.scrollIntoViewIfNeeded();
+  await senses.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await expect(senses).toHaveAttribute("data-here", "true");
+  await expect(page.getByTestId("lite3-stage")).toHaveCount(1);
+  await page.getByRole("button", { name: /蒙住: 關節角度/ }).click();
+  await expect(senses).toContainText("倒了", { timeout: 15_000 });
+  expect(errors).toEqual([]);
+});

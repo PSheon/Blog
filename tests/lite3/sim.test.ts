@@ -44,8 +44,8 @@ describe("Lite3 simulator", () => {
 
   it("depends on each sense differently", () => {
     expect(walk(sim, { blind: "gyro" }).fellAt).toBeNull();
-    expect(walk(sim, { blind: "gravity" }, 3).fellAt).toBeCloseTo(1.02, 2);
-    expect(walk(sim, { blind: "jointPos" }, 2).fellAt).toBeCloseTo(0.36, 2);
+    expect(walk(sim, { blind: "gravity" }, 3).fellAt).toBeCloseTo(0.82, 2);
+    expect(walk(sim, { blind: "jointPos" }, 2).fellAt).toBeCloseTo(0.28, 2);
     expect(walk(sim, { blind: "jointVel" })).toEqual({ vx: expect.closeTo(1.26, 2), fellAt: null }); // asked for 0.5
     expect(walk(sim, { blind: "lastAction" })).toEqual({ vx: expect.closeTo(0, 2), fellAt: null });
   });

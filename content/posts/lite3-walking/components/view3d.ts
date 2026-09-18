@@ -22,7 +22,22 @@ export class Lite3View {
     private readonly parts: (import("three").Object3D | null)[],
     private readonly grid: import("three").Object3D,
     private readonly shadow: import("three").Object3D,
+    private readonly cell: HTMLCanvasElement,
+    private readonly tiles: import("three").CanvasTexture,
   ) {}
+
+  /** Read the page's colours so the floor belongs to the current theme; fog hides the grid's far edge. */
+  retheme() {
+    const css = getComputedStyle(this.renderer.domElement), ink = new this.three.Color(css.color);
+    const paper = css.backgroundColor === "rgba(0, 0, 0, 0)" ? getComputedStyle(document.body).backgroundColor : css.backgroundColor;
+    this.scene.fog = new this.three.Fog(new this.three.Color(paper), 3, 9);
+    const pen = this.cell.getContext("2d")!;
+    pen.clearRect(0, 0, 128, 128);
+    pen.strokeStyle = `#${ink.getHexString()}`;
+    pen.lineWidth = 3;
+    pen.strokeRect(0, 0, 128, 128);
+    this.tiles.needsUpdate = true;
+  }
 
   static async create(canvas: HTMLCanvasElement): Promise<Lite3View> {
     const [three, { STLLoader }] = await Promise.all([import("three"), import("three/examples/jsm/loaders/STLLoader.js")]);
@@ -58,16 +73,9 @@ export class Lite3View {
       return holder;
     });
 
-    // Read the page's colours so the floor belongs to the current theme; fog hides the grid's far edge.
-    const css = getComputedStyle(canvas), ink = new three.Color(css.color);
-    scene.fog = new three.Fog(new three.Color(css.backgroundColor === "rgba(0, 0, 0, 0)" ? getComputedStyle(document.body).backgroundColor : css.backgroundColor), 3, 9);
     // WebGL lines are one pixel wide whatever you ask for, so the floor grid is a tiled texture instead.
     const cell = document.createElement("canvas");
     cell.width = cell.height = 128;
-    const pen = cell.getContext("2d")!;
-    pen.strokeStyle = `#${ink.getHexString()}`;
-    pen.lineWidth = 3;
-    pen.strokeRect(0, 0, 128, 128);
     const tiles = new three.CanvasTexture(cell);
     tiles.wrapS = tiles.wrapT = three.RepeatWrapping;
     tiles.repeat.set(48, 48); // 24 m across → half-metre cells
@@ -78,7 +86,9 @@ export class Lite3View {
     shadow.scale.set(1, 0.55, 1);
     shadow.position.z = 0.002;
     scene.add(shadow);
-    return new Lite3View(three, renderer, scene, camera, parts, grid, shadow);
+    const view = new Lite3View(three, renderer, scene, camera, parts, grid, shadow, cell, tiles);
+    view.retheme();
+    return view;
   }
 
   render({ bodies, orientations }: Pose) {
