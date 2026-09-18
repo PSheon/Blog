@@ -9,6 +9,8 @@ const pages = [
   "/en/posts/ai-flappy-bird",
   "/zh/posts/trading-agent",
   "/en/posts/transformer-from-scratch",
+  "/zh/posts/hydranet-fruit",
+  "/en/posts/lite3-walking",
 ];
 
 for (const theme of ["dark", "light"] as const) {
