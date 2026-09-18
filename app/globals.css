@@ -7,9 +7,15 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-ui), var(--font-ui-tc), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
+  --font-mono: var(--font-code), var(--font-ui-tc), ui-monospace, monospace;
+  --font-heading: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
+  --color-signal: var(--signal);
+  --color-signal-2: var(--signal-2);
+  --color-panel: var(--panel);
+  --color-rule: var(--rule);
+  --color-grid: var(--grid);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,83 +54,346 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+
+/*
+ * Lab Notebook palette.
+ * Light is cool paper with navy ink; dark is the navy of the bench at night.
+ * --signal is the trace colour of every instrument, --signal-2 the second channel.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #f5f6fa;
+  --foreground: #0d1030;
+  --card: #fcfcfe;
+  --card-foreground: #0d1030;
+  --popover: #fcfcfe;
+  --popover-foreground: #0d1030;
+  --primary: #0a5f86;
+  --primary-foreground: #f5f6fa;
+  --secondary: #e8eaf3;
+  --secondary-foreground: #0d1030;
+  --muted: #eceef5;
+  --muted-foreground: #4b5072;
+  --accent: #e2e6f2;
+  --accent-foreground: #0d1030;
+  --destructive: #b3261e;
+  --border: #0d10301f;
+  --input: #0d103033;
+  --ring: #0a5f86;
+  --signal: #0a5f86;
+  --signal-2: #9a5200;
+  --panel: #eef0f7;
+  --rule: #0d103026;
+  --grid: #0d103014;
+  --chart-1: #0a5f86;
+  --chart-2: #9a5200;
+  --chart-3: #4b5072;
+  --chart-4: #2f7d6b;
+  --chart-5: #7a3e8e;
+  --radius: 0.375rem;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--accent);
+  --sidebar-accent-foreground: var(--accent-foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0a0a23;
+  --foreground: #e6e9f5;
+  --card: #0f1030;
+  --card-foreground: #e6e9f5;
+  --popover: #12133a;
+  --popover-foreground: #e6e9f5;
+  --primary: #79dafa;
+  --primary-foreground: #06071a;
+  --secondary: #181a45;
+  --secondary-foreground: #e6e9f5;
+  --muted: #14163c;
+  --muted-foreground: #9aa0c4;
+  --accent: #1b1e4d;
+  --accent-foreground: #e6e9f5;
+  --destructive: #ff8a80;
+  --border: #e6e9f51f;
+  --input: #e6e9f533;
+  --ring: #79dafa;
+  --signal: #79dafa;
+  --signal-2: #f5b453;
+  --panel: #0d0e2c;
+  --rule: #e6e9f526;
+  --grid: #e6e9f512;
+  --chart-1: #79dafa;
+  --chart-2: #f5b453;
+  --chart-3: #9aa0c4;
+  --chart-4: #6fd6b5;
+  --chart-5: #c79bf0;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+    scroll-behavior: smooth;
+    scroll-padding-top: 5rem;
+    text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "kern", "liga", "calt";
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--signal) 35%, transparent);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* The dot grid every instrument sits on. */
+  .dot-grid {
+    background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+    background-size: 12px 12px;
+  }
+
+  /* Small instrument lettering: lowercase mono, never shouted. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1rem;
+    letter-spacing: 0.01em;
+    color: var(--muted-foreground);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- Long-form prose ---------- */
+  .prose-notebook {
+    font-family: var(--font-serif);
+    font-size: 1.125rem;
+    line-height: 1.8;
+    counter-reset: sidenote;
+  }
+  :lang(en) .prose-notebook {
+    font-size: 1.1875rem;
+    line-height: 1.7;
+  }
+  .prose-notebook > * + * {
+    margin-top: 1.5rem;
+  }
+  .prose-notebook :where(h2, h3, h4) {
+    font-family: var(--font-heading);
+    line-height: 1.3;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .prose-notebook h2 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--rule);
+  }
+  .prose-notebook h3 {
+    font-size: 1.3125rem;
+    font-weight: 600;
+    margin-top: 2.75rem;
+  }
+  .prose-notebook h4 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-top: 2rem;
+  }
+  .prose-notebook :where(h2, h3, h4) + * {
+    margin-top: 1rem;
+  }
+  .prose-notebook :where(h2, h3, h4) a.heading-anchor {
+    color: inherit;
+    text-decoration: none;
+  }
+  .prose-notebook :where(h2, h3, h4) a.heading-anchor::after {
+    content: "#";
+    margin-left: 0.4em;
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    color: var(--signal);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .prose-notebook :where(h2, h3, h4):hover a.heading-anchor::after,
+  .prose-notebook a.heading-anchor:focus-visible::after {
+    opacity: 1;
+  }
+  .prose-notebook a:not(.heading-anchor) {
+    color: var(--signal);
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    text-decoration-color: color-mix(in oklab, var(--signal) 45%, transparent);
+  }
+  .prose-notebook a:not(.heading-anchor):hover {
+    text-decoration-color: currentColor;
+  }
+  .prose-notebook strong {
+    font-weight: 650;
+  }
+  .prose-notebook :where(ul, ol) {
+    padding-left: 1.4em;
+  }
+  .prose-notebook ul {
+    list-style: none;
+  }
+  .prose-notebook ul > li {
+    position: relative;
+  }
+  .prose-notebook ul > li::before {
+    content: "";
+    position: absolute;
+    left: -1.05em;
+    top: 0.78em;
+    width: 0.4em;
+    height: 0.4em;
+    background: var(--signal);
+  }
+  .prose-notebook ol {
+    list-style: decimal;
+  }
+  .prose-notebook ol > li::marker {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    color: var(--muted-foreground);
+  }
+  .prose-notebook li + li {
+    margin-top: 0.5rem;
+  }
+  .prose-notebook blockquote {
+    border-left: 2px solid var(--signal);
+    padding-left: 1.25rem;
+    color: var(--muted-foreground);
+    font-style: italic;
+  }
+  .prose-notebook hr {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin-block: 3rem;
+  }
+  .prose-notebook :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    padding: 0.12em 0.36em;
+    border-radius: 0.25rem;
+    background: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .prose-notebook .table-scroll {
+    overflow-x: auto;
+  }
+  .prose-notebook table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    line-height: 1.5;
+  }
+  .prose-notebook th {
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid var(--foreground);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+  }
+  .prose-notebook td {
+    border-bottom: 1px solid var(--rule);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Code blocks (rehype-pretty-code) */
+  .prose-notebook figure[data-rehype-pretty-code-figure] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--panel);
+    overflow: hidden;
+  }
+  .prose-notebook [data-rehype-pretty-code-title] {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .prose-notebook pre {
+    overflow-x: auto;
+    padding-block: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    tab-size: 2;
+  }
+  .prose-notebook pre > code {
+    display: grid;
+    min-width: max-content;
+  }
+  .prose-notebook pre [data-line] {
+    padding-inline: 1rem;
+    border-left: 2px solid transparent;
+  }
+  .prose-notebook pre [data-highlighted-line] {
+    background: color-mix(in oklab, var(--signal) 12%, transparent);
+    border-left-color: var(--signal);
+  }
+  .prose-notebook code[data-theme] span {
+    color: var(--shiki-light);
+  }
+  .dark .prose-notebook code[data-theme] span {
+    color: var(--shiki-dark);
+  }
+
+  /* Math */
+  .prose-notebook .katex-display {
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-block: 0.5rem;
+  }
+  .prose-notebook .katex {
+    font-size: 1.05em;
+  }
+}
+
+@layer components {
+  /* Sidenote numbering: the reference increments, both ends print the same number. */
+  .sidenote-ref {
+    counter-increment: sidenote;
+  }
+  .sidenote-ref::after {
+    content: counter(sidenote);
+  }
+  .sidenote::before {
+    content: counter(sidenote);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--signal);
+    margin-right: 0.5em;
+    vertical-align: super;
+    line-height: 0;
   }
 }

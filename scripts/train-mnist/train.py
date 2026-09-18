@@ -27,7 +27,7 @@ DATA = Path(__file__).resolve().parent / "data"
 WEIGHTS_OUT = ROOT / "content/posts/cnn-from-scratch/weights.json"
 GOLDEN_OUT = ROOT / "tests/fixtures/mnist-golden.json"
 
-EPOCHS = 6
+EPOCHS = 15
 DECIMALS = 4
 
 
@@ -66,8 +66,8 @@ def main():
     test_loader = DataLoader(test, batch_size=1000)
 
     model = Net()
-    opt = torch.optim.Adam(model.parameters(), lr=1e-3)
-    sched = torch.optim.lr_scheduler.StepLR(opt, step_size=2, gamma=0.5)
+    opt = torch.optim.Adam(model.parameters(), lr=2e-3)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=EPOCHS)
 
     for epoch in range(EPOCHS):
         model.train()
