@@ -15,6 +15,13 @@ interface Props {
   t: Dictionary["search"];
 }
 
+const OPEN_EVENT = "notebook:open-search";
+
+/** Open the search palette from anywhere (the phone's drawer has its own search button). */
+export function openSearch() {
+  window.dispatchEvent(new Event(OPEN_EVENT));
+}
+
 /** Render a snippet with its matched ranges wrapped in <mark>. */
 function Highlighted({ hit }: { hit: SearchHit }) {
   const parts: React.ReactNode[] = [];
@@ -62,8 +69,16 @@ export function Search({ locale, tags, t }: Props) {
         setOpen((v) => !v);
       }
     };
+    const onOpen = () => {
+      load();
+      setOpen(true);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener(OPEN_EVENT, onOpen);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener(OPEN_EVENT, onOpen);
+    };
   }, [load]);
 
   const hits = useMemo(() => (docs ? search(docs, query) : []), [docs, query]);
@@ -89,11 +104,11 @@ export function Search({ locale, tags, t }: Props) {
         }}
         onPointerEnter={load}
         onFocus={load}
-        className="glass-2 flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-foreground sm:w-52 sm:px-2.5"
+        className="glass-2 hidden h-8 w-52 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground md:flex"
       >
         <SearchIcon className="size-4" aria-hidden />
-        <span className="sr-only sm:not-sr-only">{t.open}</span>
-        <kbd className="ml-auto hidden rounded-sm border border-border px-1 font-mono text-[10px] leading-4 sm:inline">⌘K</kbd>
+        <span>{t.open}</span>
+        <kbd className="ml-auto rounded-sm border border-border px-1 font-mono text-[10px] leading-4">⌘K</kbd>
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

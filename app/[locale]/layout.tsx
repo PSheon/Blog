@@ -60,8 +60,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             </a>
             <SiteHeader
               locale={locale}
-              nav={t.nav}
-              search={t.search}
+              t={{ nav: t.nav, search: t.search, locale: t.locale, theme: t.theme, footer: t.footer }}
               tags={getAllTags(locale).map((x) => x.tag)}
             />
             {/* Decorative glows may be wider than the viewport. Clip them at the full-width level, never at the
