@@ -183,3 +183,21 @@ test("phone header: menu left, mark centred, search right; drawer holds navigati
   await expect(page).toHaveURL(/\/en\/tags$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page }) => {
+  const response = await page.goto("/en/posts/hydranet-fruit");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "hydranet-fruit is still a draft");
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(3);
+  await expect(page.getByTestId("hy-seen")).toHaveText("0");
+  await expect(page.getByTestId("hy-reading")).toContainText("Not learned yet");
+  await page.getByTestId("hy-train").click();
+  // Works with emoji or with the shape fallback (headless Linux has no colour emoji font).
+  await expect.poll(async () => Number(await page.getByTestId("hy-box").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.6);
+  await page.getByTestId("hy-train").click();
+  expect(Number(await page.getByTestId("hy-mask").textContent())).toBeGreaterThan(0.4);
+  expect(errors).toEqual([]);
+});
