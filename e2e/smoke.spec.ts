@@ -183,3 +183,59 @@ test("phone header: menu left, mark centred, search right; drawer holds navigati
   await expect(page).toHaveURL(/\/en\/tags$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
+
+test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page }) => {
+  const response = await page.goto("/en/posts/hydranet-fruit");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "hydranet-fruit is still a draft");
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(3);
+  await expect(page.getByTestId("hy-seen")).toHaveText("0");
+  await expect(page.getByTestId("hy-reading")).toContainText("Not learned yet");
+  await page.getByTestId("hy-train").click();
+  // Works with emoji or with the shape fallback (headless Linux has no colour emoji font).
+  await expect.poll(async () => Number(await page.getByTestId("hy-box").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.6);
+  await page.getByTestId("hy-train").click();
+  expect(Number(await page.getByTestId("hy-mask").textContent())).toBeGreaterThan(0.4);
+  expect(errors).toEqual([]);
+});
+
+test("the Lite3 walks in the page and falls over when its joint angles are blindfolded", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (r) => requests.push(r.url()));
+  const response = await page.goto("/zh/posts/lite3-walking");
+  expect(response?.status()).toBe(200);
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  // About 4.5 MB of simulator: none of it may load before the reader asks.
+  await page.waitForLoadState("networkidle");
+  expect(requests.filter((url) => /lite3\/|mujoco/.test(url))).toEqual([]);
+
+  await page.getByRole("button", { name: /載入模擬器/ }).first().click();
+  const remote = page.locator('[data-stage="remote"]'), senses = page.locator('[data-stage="senses"]');
+  await expect(remote).toHaveAttribute("data-here", "true", { timeout: 60_000 });
+  await expect(page.getByTestId("lite3-forward")).toContainText(/→ 0\.[45]\d/, { timeout: 30_000 });
+
+  // One robot, one canvas: it moves to whichever instrument is on screen.
+  await senses.scrollIntoViewIfNeeded();
+  await senses.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await expect(senses).toHaveAttribute("data-here", "true");
+  await expect(page.getByTestId("lite3-stage")).toHaveCount(1);
+  await page.getByRole("button", { name: /蒙住: 關節角度/ }).click();
+  await expect(senses).toContainText("倒了", { timeout: 15_000 });
+
+  // A 400 N shove always topples it (measured: everything from 275 N up does).
+  const push = page.locator('[data-stage="push"]');
+  await push.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await expect(push).toHaveAttribute("data-here", "true");
+  await page.locator('[data-instrument="lite3 / push"]').getByRole("slider").focus();
+  await page.keyboard.press("End");
+  await page.getByTestId("lite3-push-away").click();
+  await expect(page.getByTestId("lite3-push-log")).toContainText("400 N", { timeout: 5_000 });
+  await expect(page.getByTestId("lite3-push-log")).toContainText("倒了", { timeout: 15_000 });
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  expect(errors).toEqual([]);
+});

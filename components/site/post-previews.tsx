@@ -1,32 +1,22 @@
 "use client";
 
-import { HeatCanvas } from "@/components/lab/heat-canvas";
-import { useLab } from "@/content/posts/cnn-from-scratch/components/store";
+import dynamic from "next/dynamic";
 
-/** First-layer feature maps of whatever is on the hero canvas: draw above, watch these change. */
-function CnnPreview() {
-  const { activations } = useLab();
-  const act = activations?.find((a) => a.name === "relu1")?.output;
-  let max = 0;
-  if (act) for (const v of act.data) if (v > max) max = v;
+function Tiles() {
   return (
     <div className="grid grid-cols-4 gap-1" aria-hidden>
-      {Array.from({ length: 8 }, (_, ch) => (
-        <HeatCanvas
-          key={ch}
-          data={act ? act.data.subarray(ch * 784, (ch + 1) * 784) : null}
-          w={act ? 28 : 1}
-          h={act ? 28 : 1}
-          max={max || 1}
-          label=""
-        />
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} className="aspect-square w-full border border-border" />
       ))}
     </div>
   );
 }
 
+// The preview shares the classifier's store, which drags in the model code: load it after hydration.
+const CnnPreview = dynamic(() => import("./cnn-preview"), { ssr: false, loading: () => <Tiles /> });
+
 /** Live thumbnails, keyed by post slug. Keep lib/content/previews.ts in sync. */
-const postPreviews: Record<string, () => React.JSX.Element> = {
+const postPreviews: Record<string, React.ComponentType> = {
   "cnn-from-scratch": CnnPreview,
 };
 
