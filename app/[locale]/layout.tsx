@@ -7,7 +7,7 @@ import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { buildSearchIndex, getAllTags } from "@/lib/content/posts";
+import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
 import { site } from "@/lib/site";
 
@@ -62,7 +62,6 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
               locale={locale}
               nav={t.nav}
               search={t.search}
-              searchIndex={buildSearchIndex(locale)}
               tags={getAllTags(locale).map((x) => x.tag)}
             />
             <main id="content" className="flex-1">

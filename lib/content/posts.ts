@@ -115,21 +115,3 @@ export function getRelatedPosts(slug: string, locale: Locale, limit = 3, opts: Q
     .slice(0, limit)
     .map((x) => x.p);
 }
-
-export interface SearchEntry {
-  slug: string;
-  title: string;
-  description: string;
-  tags: string[];
-  headings: string[];
-}
-
-export function buildSearchIndex(locale: Locale): SearchEntry[] {
-  return getAllPosts(locale).map((p) => ({
-    slug: p.slug,
-    title: p.title,
-    description: p.description,
-    tags: p.tags,
-    headings: getToc(p.slug, locale).map((t) => t.text),
-  }));
-}
