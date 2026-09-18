@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { mulberry32 } from "@/lib/ml";
 import { FlyNet } from "@/content/posts/fly-motion/components/model";
-import { DT, GRID, STEPS, grating, randomClip } from "@/content/posts/fly-motion/components/stimulus";
+import { DT, GRID, STEPS, type Stimuli, edge, grating, randomClip } from "@/content/posts/fly-motion/components/stimulus";
 import { TYPES, compile } from "@/content/posts/fly-motion/components/wiring";
 
 describe("wiring", () => {
@@ -65,10 +65,11 @@ describe.runIf(!!process.env.FLY_BENCH)("bench", () => {
     const kind = (process.env.FLY_WIRING ?? "real") as "real", seed = Number(process.env.FLY_SEED ?? 1);
     const rng = mulberry32(seed), net = new FlyNet(kind, mulberry32(seed + 100), Number(process.env.FLY_REST ?? -0.1)), testRng = mulberry32(999);
     net.keepAlive = Number(process.env.FLY_ALIVE ?? 1);
-    const test = Array.from({ length: 128 }, () => randomClip(testRng));
+    const stim = (process.env.FLY_STIM ?? "gratings") as Stimuli;
+    const test = Array.from({ length: 128 }, () => randomClip(testRng, 4, stim));
     let ms = 0;
-    for (let step = 1; step <= 250; step++) {
-      const clips = Array.from({ length: 16 }, () => randomClip(rng)), t0 = performance.now();
+    for (let step = 1; step <= Number(process.env.FLY_STEPS ?? 250); step++) {
+      const clips = Array.from({ length: 16 }, () => randomClip(rng, 4, stim)), t0 = performance.now();
       const loss = net.step(clips);
       ms += performance.now() - t0;
       if (step % 50 === 0) console.log(`${kind} rest ${process.env.FLY_REST ?? -0.1} seed ${seed}  samples ${net.seen}  loss ${loss.toFixed(3)}  acc ${net.accuracy(test).toFixed(3)}  ${(net.seen / (ms / 1000)).toFixed(0)} samples/s`);
@@ -79,6 +80,12 @@ describe.runIf(!!process.env.FLY_BENCH)("bench", () => {
       let x = 0, y = 0, n = 0;
       angles.forEach((a, k) => { x += resp[k][i] * Math.cos(a); y += resp[k][i] * Math.sin(a); n += resp[k][i]; });
       return `${name} PD ${((Math.atan2(y, x) * 180) / Math.PI + 360).toFixed(0) as unknown as number % 360}° DSI ${(Math.hypot(x, y) / Math.max(n, 1e-9)).toFixed(2)}`;
+    }).join("  "));
+    // Polarity: each subtype's mean response to ON and OFF edges moving along its own anatomical axis.
+    const axes = [173, 355, 75, 277, 178, 352, 72, 282].map((d) => (d * Math.PI) / 180);
+    console.log("edges ON/OFF  " + ["T4a", "T4b", "T4c", "T4d", "T5a", "T5b", "T5c", "T5d"].map((name, i) => {
+      const mean = (p: "on" | "off") => [10, 14, 18].reduce((sum, sp) => sum + net.detectors(edge(axes[i], p, sp, 4))[i], 0) / 3;
+      return `${name} ${mean("on").toFixed(3)}/${mean("off").toFixed(3)}`;
     }).join("  "));
   }, 600_000);
 });
