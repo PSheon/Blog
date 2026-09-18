@@ -2,6 +2,8 @@ import { ACTION_SCALE, DECIMATION, DEFAULT_POSE, JOINTS, KD, KP, OBS, Policy, SE
 
 const ASSETS = "/lite3";
 const MESHES = ["hip", "thigh", "shank", "torso"];
+/** cos 30°. A healthy gait never tips the torso past 9°, even when shoved or on ice; at 30° it is not coming back. */
+const FALLEN_TILT = Math.cos(Math.PI / 6);
 
 export interface Knobs {
   /** Forward, sideways (m/s) and turning (rad/s) speed asked of the robot. */
@@ -114,7 +116,7 @@ export class Lite3Sim {
     }
     for (let s = 0; s < steps; s++, this.tick++) {
       if (this.tick % DECIMATION === 0) {
-        if (this.fell === null && (gravityInBody(qpos[3], qpos[4], qpos[5], qpos[6])[2] > -0.5 || qpos[2] < 0.15)) this.fell = this.data.time;
+        if (this.fell === null && (gravityInBody(qpos[3], qpos[4], qpos[5], qpos[6])[2] > -FALLEN_TILT || qpos[2] < 0.15)) this.fell = this.data.time;
         const obs = observe(qpos, qvel, command, this.last);
         if (noise) {
           for (let i = 0; i < OBS; i++) {
@@ -148,7 +150,7 @@ export class Lite3Sim {
   get orientations(): Float64Array {
     return this.data.xquat;
   }
-  /** Simulated time at which it went down (tipped past 60° or belly on the floor), or null while it is up. */
+  /** Simulated time at which it went down (tipped past 30° or belly on the floor), or null while it is up. */
   get fellAt() {
     return this.fell;
   }
@@ -180,6 +182,14 @@ export class Lite3Sim {
   }
   get velocity(): Float64Array {
     return this.data.qvel.subarray(0, 3);
+  }
+  /** Heading (rad, anticlockwise from +x) and how fast it is changing (rad/s, body frame). */
+  get yaw() {
+    const [w, x, y, z] = this.data.qpos.subarray(3, 7);
+    return Math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
+  }
+  get yawRate() {
+    return this.data.qvel[5];
   }
 
   dispose() {
