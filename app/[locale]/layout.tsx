@@ -19,8 +19,8 @@ export const dynamicParams = false;
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a23" },
-    { media: "(prefers-color-scheme: light)", color: "#f5f6fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#070918" },
+    { media: "(prefers-color-scheme: light)", color: "#fbfbfe" },
   ],
 };
 

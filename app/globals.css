@@ -64,30 +64,32 @@
  * (the second channel: negative values, warnings). Light values are darkened to hold AA on paper.
  */
 :root {
-  --background: #f5f6fa;
-  --foreground: #0d1030;
-  --card: #fcfcfe;
-  --card-foreground: #0d1030;
-  --popover: #fcfcfe;
-  --popover-foreground: #0d1030;
+  --background: #fbfbfe;
+  --foreground: #1c2033;
+  --card: #ffffff;
+  --card-foreground: #1c2033;
+  --popover: #ffffff;
+  --popover-foreground: #1c2033;
   --primary: #086c99;
-  --primary-foreground: #f5f6fa;
-  --secondary: #e8eaf3;
-  --secondary-foreground: #0d1030;
-  --muted: #eceef5;
-  --muted-foreground: #4b5072;
-  --accent: #e2e6f2;
-  --accent-foreground: #0d1030;
+  --primary-foreground: #fbfbfe;
+  --secondary: #eceef5;
+  --secondary-foreground: #1c2033;
+  --muted: #f0f1f7;
+  --muted-foreground: #565b78;
+  --accent: #e6e8f3;
+  --accent-foreground: #1c2033;
   --destructive: #b3261e;
-  --border: #0d10301f;
-  --input: #0d103033;
+  --border: #1c20331f;
+  --input: #1c203333;
   --ring: #086c99;
   --signal: #086c99;
   --signal-2: #c2255c;
   --signal-3: #6347d9;
-  --panel: #eef0f7;
-  --rule: #0d103026;
-  --grid: #0d103014;
+  --panel: #f4f5fa;
+  --rule: #1c203326;
+  --grid: #1c203314;
+  --glow-a: #79dafa26;
+  --glow-b: #ff6e961a;
   --chart-1: #086c99;
   --chart-2: #c2255c;
   --chart-3: #6347d9;
@@ -105,34 +107,37 @@
 }
 
 .dark {
-  --background: #0a0a23;
-  --foreground: #e6e9f5;
-  --card: #0f1030;
-  --card-foreground: #e6e9f5;
-  --popover: #12133a;
-  --popover-foreground: #e6e9f5;
+  /* Sampled from the profile banner: near-black ink navy, lavender-grey secondary text. */
+  --background: #070918;
+  --foreground: #e9eaf6;
+  --card: #0b0d20;
+  --card-foreground: #e9eaf6;
+  --popover: #0e1026;
+  --popover-foreground: #e9eaf6;
   --primary: #79dafa;
-  --primary-foreground: #06071a;
-  --secondary: #181a45;
-  --secondary-foreground: #e6e9f5;
-  --muted: #14163c;
-  --muted-foreground: #9aa0c2;
-  --accent: #1b1e4d;
-  --accent-foreground: #e6e9f5;
+  --primary-foreground: #050714;
+  --secondary: #121430;
+  --secondary-foreground: #e9eaf6;
+  --muted: #0f1128;
+  --muted-foreground: #9b9bc4;
+  --accent: #171a3a;
+  --accent-foreground: #e9eaf6;
   --destructive: #ff6e96;
-  --border: #e6e9f51f;
-  --input: #e6e9f533;
+  --border: #9b9bc42e;
+  --input: #9b9bc447;
   --ring: #79dafa;
   --signal: #79dafa;
   --signal-2: #ff6e96;
   --signal-3: #b9a5ff;
-  --panel: #0d0e2c;
-  --rule: #e6e9f526;
-  --grid: #e6e9f512;
+  --panel: #0a0c1e;
+  --rule: #9b9bc433;
+  --grid: #9b9bc41f;
+  --glow-a: #79dafa14;
+  --glow-b: #ff6e9617;
   --chart-1: #79dafa;
   --chart-2: #ff6e96;
   --chart-3: #b9a5ff;
-  --chart-4: #9aa0c2;
+  --chart-4: #9b9bc4;
   --chart-5: #6fd6b5;
 }
 
@@ -149,6 +154,11 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "kern", "liga", "calt";
+    /* The banner's atmosphere: a cyan haze on the "see" side, a plum one on the "act" side. */
+    background-image:
+      radial-gradient(60rem 36rem at 8% -6rem, var(--glow-a), transparent 70%),
+      radial-gradient(64rem 40rem at 96% 4rem, var(--glow-b), transparent 70%);
+    background-repeat: no-repeat;
   }
   :focus-visible {
     outline: 2px solid var(--ring);
@@ -188,9 +198,18 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* The profile banner's See → Think → Act sweep. */
+  /* The profile banner's See → Think → Act sweep: one continuous gradient, never three flat colours. */
   .triad-gradient {
-    background-image: linear-gradient(90deg, var(--signal), var(--signal-3), var(--signal-2));
+    background-image: linear-gradient(90deg, var(--signal), var(--signal-3) 55%, var(--signal-2));
+  }
+  .triad-text {
+    background-image: linear-gradient(160deg, var(--signal) 8%, var(--signal-3) 52%, var(--signal-2) 94%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .dark .triad-text {
+    filter: drop-shadow(0 0 1.75rem color-mix(in oklab, var(--signal-3) 35%, transparent));
   }
 
   .tabular {
