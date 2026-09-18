@@ -94,3 +94,29 @@ test("feeds and sitemap are served", async ({ request }) => {
   expect(xml).toContain("cnn-from-scratch");
   expect((await request.get("/sitemap.xml")).ok()).toBe(true);
 });
+
+test("flappy birds evolve past the first generation", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/en/posts/ai-flappy-bird");
+  await expect(page.getByTestId("flappy-canvas")).toBeVisible();
+  await expect(page.getByTestId("flappy-generation")).toHaveText("1");
+  await page.getByRole("button", { name: "max", exact: true }).click();
+  await expect(page.getByTestId("flappy-generation")).not.toHaveText("1", { timeout: 15_000 });
+  await page.getByRole("button", { name: "Pause" }).click();
+  await expect(page.getByRole("button", { name: "Play" })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a trading bot can be trained, and the result survives a reload", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/en/posts/trading-agent");
+  await expect(page.getByTestId("roi")).toHaveCount(0);
+  await page.getByTestId("train").click();
+  await expect(page.getByTestId("roi")).toHaveText(/^[+-]\d+\.\d\d$/, { timeout: 30_000 });
+  const roi = await page.getByTestId("roi").textContent();
+
+  await page.reload();
+  await expect(page.getByTestId("roi")).toHaveText(roi!);
+  await expect(page.getByText("Loaded the result of your last training run")).toBeVisible();
+  expect(errors).toEqual([]);
+});
