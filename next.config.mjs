@@ -3,6 +3,10 @@ import createMDX from "@next/mdx";
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
+  turbopack: {
+    // @mujoco/mujoco's Emscripten loader does `await import("module")` inside its Node-only branch.
+    resolveAlias: { module: { browser: "./lib/shims/empty.ts" } },
+  },
 };
 
 // Turbopack runs MDX in Rust-land: plugins are named by string and options must be JSON.
