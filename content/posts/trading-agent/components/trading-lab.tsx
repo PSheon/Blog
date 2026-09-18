@@ -206,7 +206,7 @@ export function TradingLab() {
             {result.trades.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t.noTrades}</p>
             ) : (
-              <div className="max-h-72 overflow-auto rounded-sm border border-border bg-background">
+              <div tabIndex={0} role="group" aria-label={t.log} className="max-h-72 overflow-auto rounded-sm border border-border bg-background">
                 <table className="w-full min-w-[28rem] border-collapse font-mono text-xs tabular">
                   <thead className="sticky top-0 bg-background text-left text-muted-foreground">
                     <tr className="[&>th]:border-b [&>th]:border-border [&>th]:px-3 [&>th]:py-2 [&>th]:font-normal">
