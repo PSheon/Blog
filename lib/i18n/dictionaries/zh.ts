@@ -11,8 +11,8 @@ const zh = {
     posts: "文章",
     tags: "標籤",
   },
-  theme: { toggle: "切換深淺色", light: "淺色", dark: "深色", system: "跟隨系統" },
-  locale: { switch: "切換語言" },
+  theme: { label: "主題", toggle: "切換深淺色", light: "淺色", dark: "深色", system: "跟隨系統" },
+  locale: { label: "語言", switch: "切換語言" },
   hero: {
     eyebrow: "實驗筆記",
     tagline: ["看見", "思考", "行動"],
