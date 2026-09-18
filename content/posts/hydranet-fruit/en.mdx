@@ -97,7 +97,7 @@ $x_i$ is the centre of bin $i$. This is called integral regression, or soft-argm
 
 - **It is differentiable end to end.** There is no non-differentiable "choose a cell" step, so gradients reach every bin.
 - **The answer can fall between two bins.** Half the probability on each of two neighbours puts the expected value midway, so there is no quantisation error.
-- **It can be drawn directly.** The four small plots in the lower half of the instrument are these four distributions. Violet bars are probabilities, the solid cyan line is the expected value, and the dashed pink line is the right answer.
+- **It can be drawn directly.** The four small plots at the lower right of the instrument are these four distributions. Violet bars are probabilities, the solid cyan line is the expected value, and the dashed pink line is the right answer.
 
 ```ts title="content/posts/hydranet-fruit/components/model.ts"
 const maps = t.conv2d(d, P.boxK, P.boxB, { h: HALF, w: HALF, k: 1 });

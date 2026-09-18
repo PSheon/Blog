@@ -2,7 +2,7 @@ import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Instrument } from "@/components/lab/instrument";
-import { HeroInstrument } from "@/components/site/hero-instrument";
+import { HeroInstrumentLazy } from "@/components/site/hero-instrument-lazy";
 import { PostIndex } from "@/components/site/post-index";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
@@ -67,7 +67,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </>
           }
         >
-          <HeroInstrument hint={t.hero.instrumentHint} />
+          <HeroInstrumentLazy hint={t.hero.instrumentHint} />
         </Instrument>
         </div>
       </section>
@@ -130,6 +130,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         </div>
         <PostIndex
           locale={locale}
+          level={3}
           rows={toRows(posts, locale)}
           tags={getAllTags(locale).map((x) => x.tag)}
           labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
