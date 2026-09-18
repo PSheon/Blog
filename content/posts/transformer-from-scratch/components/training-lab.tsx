@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, Dices, Pause, Play, RotateCcw, X } from "lucide-react";
+import { Dices, Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Sparkline } from "@/components/lab/sparkline";
@@ -14,8 +14,7 @@ const SPEEDS = { slow: 1, fast: 0 } as const; // steps per frame; 0 = as many as
 type Speed = keyof typeof SPEEDS;
 const ROLLING = 40;
 const CURVE_POINTS = 240;
-// π, e and φ: recognisable, and none of them is a palindrome.
-const STARTING_QUIZ = [[3, 1, 4, 1, 5, 9], [2, 7, 1, 8, 2, 8], [1, 6, 1, 8, 0, 3]];
+const STARTING_PROBLEM = [3, 1, 4, 1, 5, 9];
 
 /** The whole loss history squeezed into a fixed number of points, each the mean of its bucket. */
 function downsample(values: number[], points = CURVE_POINTS): number[] {
@@ -36,17 +35,17 @@ interface View {
   loss: number | null;
   accuracy: number | null;
   losses: number[];
-  answers: Generation[];
+  answer: Generation;
 }
 
-function view(trainer: Trainer, recent: boolean[], problems: number[][]): View {
+function view(trainer: Trainer, recent: boolean[], problem: number[]): View {
   const tail = trainer.losses.slice(-10);
   return {
     steps: trainer.steps,
     loss: tail.length ? tail.reduce((a, b) => a + b, 0) / tail.length : null,
     accuracy: recent.length ? recent.filter(Boolean).length / recent.length : null,
     losses: downsample(trainer.losses),
-    answers: problems.map((p) => trainer.generate(p)),
+    answer: trainer.generate(problem),
   };
 }
 
@@ -68,19 +67,14 @@ export function TrainingLab() {
   const [task, setTask] = useState<TaskName>("reverse");
   const [running, setRunning] = useState(false);
   const [speed, setSpeed] = useState<Speed>("slow");
-  const [quiz, setQuiz] = useState<number[][]>(STARTING_QUIZ);
-  const [own, setOwn] = useState("");
-  const [selected, setSelected] = useState(0);
+  // The one problem the reader follows: it is answered live above and explained by the maps below.
+  const [problem, setProblem] = useState<number[]>(STARTING_PROBLEM);
   // Bumped to throw the model away and start from fresh random weights.
   const [epoch, setEpoch] = useState(0);
   const [state, setState] = useState<View | null>(null);
 
   const trainerRef = useRef<{ key: string; trainer: Trainer; recent: boolean[] } | null>(null);
   const speedRef = useRef(speed);
-
-  const ownValid = /^\d{6}$/.test(own);
-  const [ownDigits, setOwnDigits] = useState<number[] | null>(null);
-  const problems = ownDigits ? [...quiz, ownDigits] : quiz;
 
   useEffect(() => {
     speedRef.current = speed;
@@ -94,7 +88,7 @@ export function TrainingLab() {
     let frame = 0;
     let visible = true;
     let ticks = 0;
-    const paint = () => setState(view(trainer, recent, problems));
+    const paint = () => setState(view(trainer, recent, problem));
 
     const loop = () => {
       frame = requestAnimationFrame(loop);
@@ -124,14 +118,11 @@ export function TrainingLab() {
       cancelAnimationFrame(frame);
       io.disconnect();
     };
-    // `problems` is derived from quiz + ownDigits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task, epoch, running, quiz, ownDigits]);
+  }, [task, epoch, running, problem]);
 
   const trained = (state?.steps ?? 0) > 0;
-  const index = Math.min(selected, problems.length - 1);
-  const shown = state?.answers[index];
-  const example = STARTING_QUIZ[0];
+  const shown = state?.answer;
+  const want = TASKS[task](problem);
 
   // A sentence that reads the map for the reader: where does the "→" row look, in the head that is most decided?
   let reading = t.readingUntrained;
@@ -181,17 +172,27 @@ export function TrainingLab() {
         </div>
 
         <div className="rounded-md border border-border bg-background px-4 py-3.5">
-          <p className="text-[0.9375rem]">{t.taskIntro[task]}</p>
-          <p className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-3 text-xl">
-            <span>
-              <span className="label mb-1 block">{t.reads}</span>
-              <Digits values={[...example, SEP]} />
-            </span>
-            <span>
-              <span className="label mb-1 block">{t.writes}</span>
-              <Digits values={TASKS[task](example)} className="text-signal" />
-            </span>
-          </p>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[0.9375rem]">{t.taskIntro[task]}</p>
+            <Button size="sm" variant="ghost" className="-mt-1 -mr-2 shrink-0" onClick={() => setProblem(randomDigits(Math.random))}>
+              <Dices />
+              {t.reroll}
+            </Button>
+          </div>
+          <dl className="mt-3 grid gap-x-8 gap-y-3 text-xl sm:grid-cols-3">
+            <div>
+              <dt className="label mb-1">{t.reads}</dt>
+              <dd><Digits values={[...problem, SEP]} /></dd>
+            </div>
+            <div>
+              <dt className="label mb-1">{t.writes}</dt>
+              <dd><Digits values={want} className="text-muted-foreground" /></dd>
+            </div>
+            <div aria-live="off">
+              <dt className="label mb-1">{t.writesNow}</dt>
+              <dd data-testid="tf-output"><Digits values={shown?.output ?? []} compare={want} /></dd>
+            </div>
+          </dl>
         </div>
       </section>
 
@@ -254,78 +255,7 @@ export function TrainingLab() {
         )}
       </section>
 
-      {/* 3 — watch it answer */}
-      <section className="grid gap-3 border-t border-border pt-6">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-medium">{t.quiz}</h3>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setQuiz(STARTING_QUIZ.map(() => randomDigits(Math.random)))}
-          >
-            <Dices />
-            {t.reroll}
-          </Button>
-        </div>
-        <p className="text-sm leading-relaxed text-muted-foreground">{t.quizHelp}</p>
-
-        <ul className="grid gap-1.5" data-testid="tf-quiz">
-          {problems.map((digits, i) => {
-            const want = TASKS[task](digits);
-            const got = state?.answers[i]?.output ?? [];
-            const ok = got.length === LENGTH && got.every((v, k) => v === want[k]);
-            return (
-              <li key={`${i}:${digits.join("")}`}>
-                <button
-                  type="button"
-                  aria-pressed={index === i}
-                  onClick={() => setSelected(i)}
-                  className={cn(
-                    "grid w-full grid-cols-[1fr_auto_1fr_auto] items-center gap-3 rounded-md border px-3 py-2 text-left text-base transition-colors sm:text-lg",
-                    index === i ? "border-signal bg-signal/5" : "border-border hover:border-foreground/30",
-                  )}
-                >
-                  <Digits values={digits} />
-                  <ArrowRight className="size-3.5 text-muted-foreground" aria-hidden />
-                  <Digits values={got} compare={want} />
-                  <span className={cn("flex items-center gap-1 text-xs", ok ? "text-signal" : "text-signal-2")}>
-                    {ok ? <Check className="size-3.5" aria-hidden /> : <X className="size-3.5" aria-hidden />}
-                    <span className="sr-only sm:not-sr-only">{ok ? t.right : t.wrong}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-
-        <label className="mt-1 grid gap-1.5 sm:grid-cols-[auto_12rem] sm:items-center sm:justify-start sm:gap-x-3">
-          <span className="text-sm">{t.yourOwn}</span>
-          <input
-            value={own}
-            onChange={(e) => {
-              const next = e.target.value.replace(/\D/g, "").slice(0, LENGTH);
-              setOwn(next);
-              if (/^\d{6}$/.test(next)) {
-                setOwnDigits([...next].map(Number));
-                setSelected(quiz.length);
-              } else if (next === "") {
-                setOwnDigits(null);
-              }
-            }}
-            inputMode="numeric"
-            placeholder="271828"
-            aria-invalid={own !== "" && !ownValid}
-            aria-describedby="tf-own-help"
-            data-testid="tf-own"
-            className="h-9 w-full min-w-0 rounded-sm border border-border bg-background px-2.5 font-mono text-base tracking-[0.3em] tabular placeholder:text-muted-foreground/40 aria-invalid:border-signal-2"
-          />
-          <span id="tf-own-help" className="text-xs leading-relaxed text-muted-foreground sm:col-span-2">
-            {t.yourOwnHelp}
-          </span>
-        </label>
-      </section>
-
-      {/* 4 — look inside */}
+      {/* 3 — look inside */}
       <section className="grid gap-4 border-t border-border pt-6">
         <h3 className="text-sm font-medium">{t.attention}</h3>
         <div className="grid grid-cols-2 gap-4 sm:gap-8">
