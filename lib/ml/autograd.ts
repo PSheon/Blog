@@ -250,7 +250,12 @@ export class Tape {
    * Stride-1, "same"-padded convolution (cross-correlation, as in every DL framework).
    * x: [Cin, h·w], kernel: [Cout, Cin·k·k], bias: [1, Cout] → [Cout, h·w].
    */
-  conv2d(x: Mat, kernel: Mat, bias: Mat, { h, w, k }: { h: number; w: number; k: number }): Mat {
+  conv2d(
+    x: Mat,
+    kernel: Mat,
+    bias: Mat,
+    { h, w, k, inputGrad = true }: { h: number; w: number; k: number; /** false for the first layer: nobody needs d(loss)/d(pixels) */ inputGrad?: boolean },
+  ): Mat {
     const cIn = x.rows, cOut = kernel.rows, kk = k * k, pad = (k - 1) >> 1;
     if (kernel.cols !== cIn * kk) {
       throw new Error(`conv2d: kernel expects ${kernel.cols / kk} input channels, got ${cIn}`);
@@ -303,10 +308,14 @@ export class Tape {
         let acc = 0;
         for (let y = y0; y < y1; y++) {
           const o = oBase + y * w, xi = xBase + y * w + shift;
-          for (let xx = x0; xx < x1; xx++) {
-            const g = G[o + xx];
-            acc += g * X[xi + xx];
-            dX[xi + xx] += g * wv;
+          if (inputGrad) {
+            for (let xx = x0; xx < x1; xx++) {
+              const g = G[o + xx];
+              acc += g * X[xi + xx];
+              dX[xi + xx] += g * wv;
+            }
+          } else {
+            for (let xx = x0; xx < x1; xx++) acc += G[o + xx] * X[xi + xx];
           }
         }
         dK[wi] += acc;
