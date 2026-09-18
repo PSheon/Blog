@@ -145,13 +145,19 @@ test("a transformer trains in the page and learns to reverse digits", async ({ p
   const errors = watchErrors(page);
   await page.goto("/en/posts/transformer-from-scratch");
   await expect(page.getByTestId("tf-steps")).toHaveText("0");
+  await expect(page.getByTestId("tf-reading")).toContainText("Before training");
   await page.getByTestId("tf-train").click();
   await expect(page.getByTestId("tf-accuracy")).toHaveText("100", { timeout: 45_000 });
   await page.getByTestId("tf-train").click(); // pause
-  await expect(page.getByTestId("tf-output")).toHaveText("951413");
 
-  // The trained model generalises to digits the reader types in.
-  await page.getByRole("textbox").fill("271828");
-  await expect(page.getByTestId("tf-output")).toHaveText("828172");
+  // Every quiz problem is now answered correctly…
+  const quiz = page.getByTestId("tf-quiz");
+  await expect(quiz.getByRole("button").first()).toContainText("951413");
+  await expect(quiz.getByText("has mistakes")).toHaveCount(0);
+
+  // …including one the reader makes up, which also becomes the problem the maps explain.
+  await page.getByTestId("tf-own").fill("271828");
+  await expect(quiz.getByRole("button").last()).toContainText("828172");
+  await expect(page.getByTestId("tf-reading")).toContainText("“8”");
   expect(errors).toEqual([]);
 });

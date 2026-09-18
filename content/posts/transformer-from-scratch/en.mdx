@@ -11,17 +11,21 @@ import { TrainingLab } from "./components";
 
 The weights in [the CNN article](/en/posts/cnn-from-scratch) were trained in PyTorch and carried into the browser afterwards. This one is different: **the training itself happens in your browser**. The model below has completely random weights right now. It can't do anything.
 
-Press Train, and keep your eyes on the two attention maps at the bottom right.
+We are going to teach it a very simple game: **give it six digits and ask it to write them backwards**. Shown `3 1 4 1 5 9`, it should answer `9 5 1 4 1 3`.
 
-<Instrument fig="01" title="transformer / train" size="wide" caption="The task is to write six digits backwards. After reading “3 1 4 1 5 9 →” the model has to produce “9 5 1 4 1 3” by itself, one token at a time. Cyan digits are right, pink ones are wrong.">
+A person doesn't need to learn that, but at the start the model doesn't even know what "backwards" means. Nobody tells it the rule. It only sees problems and their correct answers, over and over, and has to work the rest out by itself.
+
+The instrument below is four steps from top to bottom: look at the task, press Train, watch the answers in the pop quiz turn from pink (wrong) to cyan (right) one by one, and finally look at the attention maps, which show where in the input the model is looking while it writes each digit.
+
+<Instrument fig="01" title="transformer / train" size="wide" caption="Choose “slow” to watch the change happen, or “fast” to finish training in a second or two. The model never saw the quiz problems during training, and you can set one of your own underneath.">
   <TrainingLab />
 </Instrument>
 
-If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the share of correct answers jumps to 100%, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured with fixed random seeds: reverse and copy first reach 100% around step 30 to 40, and a step takes about 4 ms on my laptop. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
+If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the whole quiz turns cyan, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured with fixed random seeds: reverse and copy first reach 100% around step 30 to 40, and a step takes about 4 ms on my laptop. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
 
 I didn't draw that line, and no line of code tells it to appear. It is a result of training. This article is about how it gets there.
 
-## Why not train a model that talks?
+## Why six digits, and not a model that talks?
 
 Transformer tutorials usually train on Shakespeare for tens of minutes and end up with gibberish that looks a bit like English. That has two problems: it is too slow for a browser, and it is hard to tell what the model actually learned.
 
@@ -30,6 +34,8 @@ So here is a toy task instead: six digits in, some rearrangement of them out. It
 - **Right and wrong are obvious.** The answer isn't "does it look plausible"; each digit is correct or it isn't.
 - **It trains in seconds.** The model needs only about fourteen thousand parameters.
 - **The attention maps can be read directly.** To write the first digit of the answer, the model must read the sixth digit of the input, and that shows up in the attention matrix exactly as it is.
+
+As for why exactly six: a fixed length lets the model stay small, and lets its entire attention fit in one 12×12 picture. Inside the model is a position table, and here it has only 12 slots (six inputs, one arrow, and five answer digits already written), so this is the only length it knows. That is a trade-off made for clarity, not a limitation of Transformers.
 
 Nothing about the model is a shortcut. It is a standard decoder-only Transformer, the same structure as GPT, only very small.
 
