@@ -1,0 +1,100 @@
+"""Can a connectome-wired network learn motion direction fast enough for a browser?
+Kernels (who connects to whom, at which hex offset, with how many synapses) and signs are fixed from the
+male CNS data; only one gain per cell-type pair, one time constant and one resting potential per type,
+and a tiny linear readout are learned.  usage: learn.py <real|symmetric|shuffled> <seed> [steps]"""
+import json, math, sys, time
+import numpy as np, torch, torch.nn.functional as F
+
+mode, seed, STEPS = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]) if len(sys.argv) > 3 else 600
+torch.manual_seed(seed); rng = np.random.default_rng(seed)
+TYPES = ["L1", "L2", "L3", "Mi1", "Tm3", "Mi4", "Mi9", "Tm1", "Tm2", "Tm4", "Tm9", "C3"] + [f"T{n}{s}" for n in (4, 5) for s in "abcd"]
+SIGN = {t: 1.0 for t in TYPES}; SIGN.update(L1=-1.0, Mi9=-1.0, Mi4=-1.0, C3=-1.0)  # glutamate and GABA inhibit, acetylcholine excites
+idx = {t: i for i, t in enumerate(TYPES)}
+OUT = [idx[f"T{n}{s}"] for n in (4, 5) for s in "abcd"]
+G, R, DT, T, BATCH = 16, 4, 0.02, 30, 16   # G×G rhombus of columns, kernel radius, 20 ms steps, 0.6 s clips
+
+kern = json.load(open("motion-kernels.json"))
+N = torch.zeros(len(TYPES), len(TYPES), 2 * R + 1, 2 * R + 1)  # [target, source, du, dv]
+for pair, taps in kern.items():
+    a, b = pair.split(">")
+    for du, dv, n in taps: N[idx[b], idx[a], R + du, R + dv] = n
+if mode == "symmetric":   # erase every left/right asymmetry but keep who-talks-to-whom and how much
+    N = (N + N.flip(2, 3)) / 2
+if mode == "shuffled":    # same synapse counts, offsets scrambled within each type pair
+    for b in range(N.shape[0]):
+        for a in range(N.shape[1]):
+            nz = N[b, a].nonzero()
+            if len(nz): N[b, a][nz[:, 0], nz[:, 1]] = N[b, a][nz[:, 0], nz[:, 1]][torch.randperm(len(nz))]
+N = N / N.sum(dim=(1, 2, 3), keepdim=True).clamp(min=1)          # a target's inputs sum to one
+sign = torch.tensor([SIGN[t] for t in TYPES]).view(1, -1, 1, 1)
+mask = (N.sum(dim=(2, 3)) > 0).float()
+print(f"{mode}: {int(mask.sum())} type pairs, {int((N > 0).sum())} taps")
+
+log_alpha = torch.zeros(len(TYPES), len(TYPES), requires_grad=True)
+log_tau = torch.full((len(TYPES),), math.log(0.05), requires_grad=True)
+# Start the motion detectors just below threshold: if they never rectify, the whole network is linear and the
+# spatial mean of its response to a grating cannot depend on direction, so there is no gradient to follow.
+# Interneurons need tonic activity: the ON pathway works by DISinhibition (L1 is inhibitory), so a Mi1 resting at
+# zero can only ever be pushed below threshold and T4 never hears anything.
+rest = torch.full((len(TYPES),), 0.3); rest[OUT] = -0.1; rest.requires_grad_(True)
+readout = torch.nn.Linear(len(OUT), 4)
+params = [log_alpha, log_tau, rest, *readout.parameters()]
+opt = torch.optim.Adam(params, lr=1e-2)
+print("learned parameters:", int(mask.sum()) + 2 * len(TYPES) + sum(p.numel() for p in readout.parameters()))
+
+# Column centres. The dataset's two hex axes are the two diagonals of the eye: horizontal ∝ u − v, vertical ∝ u + v.
+u, v = np.meshgrid(np.arange(G), np.arange(G), indexing="ij")
+X, Y = torch.tensor((u - v) * math.sqrt(3) / 2, dtype=torch.float32), torch.tensor((u + v) * 0.5, dtype=torch.float32)
+
+def gratings(theta, wavelength, hz, phase):
+    """[B, T, G, G] luminance of drifting sine gratings moving towards angle theta."""
+    t = torch.arange(T).view(1, T, 1, 1) * DT
+    th, wl, hz, ph = (torch.as_tensor(a, dtype=torch.float32).view(-1, 1, 1, 1) for a in (theta, wavelength, hz, phase))
+    return 0.5 + 0.5 * torch.sin(2 * math.pi * ((X * torch.cos(th) + Y * torch.sin(th)) / wl - hz * t) + ph)
+
+def run(lum):
+    B = lum.shape[0]
+    V = torch.zeros(B, len(TYPES), G, G)
+    W = N * (log_alpha.exp() * mask).view(len(TYPES), len(TYPES), 1, 1) * sign
+    tau = log_tau.exp().clamp(min=DT).view(1, -1, 1, 1)
+    acc = torch.zeros(B, len(TYPES))
+    for k in range(T):
+        drive = F.conv2d(F.relu(V), W, padding=R) + rest.view(1, -1, 1, 1)
+        drive[:, :3] = drive[:, :3] - 2 * (lum[:, k].unsqueeze(1) - 0.5)   # photoreceptors invert: L1–L3 hyperpolarise to light
+        V = V + DT / tau * (drive - V)
+        if k >= 10: acc = acc + F.relu(V)[:, :, 3:-3, 3:-3].mean(dim=(2, 3))   # ignore the lattice edge and the onset transient
+    return acc / (T - 10)
+
+def batch(n, dirs=4):
+    d = rng.integers(0, dirs, n)
+    return gratings(d * 2 * math.pi / dirs, rng.uniform(4, 8, n), rng.uniform(1, 4, n), rng.uniform(0, 2 * math.pi, n)), torch.tensor(d)
+
+t0, curve = time.perf_counter(), []
+for step in range(1, STEPS + 1):
+    lum, d = batch(BATCH)
+    loss = F.cross_entropy(readout(run(lum)[:, OUT] * 10), d)
+    opt.zero_grad(); loss.backward(); opt.step()
+    if step % 100 == 0 or step == STEPS:
+        with torch.no_grad():
+            lum, d = batch(256); a = (readout(run(lum)[:, OUT] * 10).argmax(1) == d).float().mean().item()
+        curve.append((step * BATCH, round(a, 3))); print(f"samples {step * BATCH:6d}  loss {loss.item():.3f}  acc {a:.3f}  {time.perf_counter() - t0:.0f}s")
+
+# Direction tuning of each T4/T5 subtype after training: response to 12 directions, preferred direction and selectivity.
+with torch.no_grad():
+    angles = np.arange(12) * 2 * math.pi / 12
+    resp = torch.stack([run(gratings(np.full(24, a), rng.uniform(4, 8, 24), rng.uniform(1, 4, 24), rng.uniform(0, 6.28, 24)))[:, OUT].mean(0) for a in angles]).numpy()
+tuning = {}
+for j, o in enumerate(OUT):
+    r = resp[:, j]; vec = (r * np.exp(1j * angles)).sum() / max(r.sum(), 1e-9)
+    tuning[TYPES[o]] = dict(pd_deg=round(float(np.degrees(np.angle(vec))) % 360), dsi=round(float(abs(vec)), 2))
+# Anatomical prediction: the axis from the Mi9 (T4) / Tm9 (T5) input centroid to the Mi4 / Tm4... centroid, in the same x–y frame.
+def centroid(pair):
+    taps = np.array(kern.get(pair, [[0, 0, 1]])); w = taps[:, 2]
+    du, dv = (taps[:, 0] * w).sum() / w.sum(), (taps[:, 1] * w).sum() / w.sum()
+    return np.array([(du - dv) * math.sqrt(3) / 2, (du + dv) * 0.5])
+for s in "abcd":
+    ax = centroid(f"Mi4>T4{s}") - centroid(f"Mi9>T4{s}")
+    tuning[f"T4{s}"]["mi9_to_mi4_deg"] = round(float(np.degrees(np.arctan2(ax[1], ax[0]))) % 360)
+    ax = centroid(f"Tm1>T5{s}") - centroid(f"Tm9>T5{s}")
+    tuning[f"T5{s}"]["tm9_to_tm1_deg"] = round(float(np.degrees(np.arctan2(ax[1], ax[0]))) % 360)
+print(json.dumps(dict(mode=mode, seed=seed, curve=curve, seconds=round(time.perf_counter() - t0), tuning=tuning)))
