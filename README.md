@@ -15,7 +15,8 @@ pnpm e2e          # playwright: builds, serves and smoke-tests the site
 pnpm lint && pnpm typecheck && pnpm build
 ```
 
-Set `NEXT_PUBLIC_SITE_URL` to the production origin (used by RSS, sitemap and metadata).
+The canonical origin (RSS, sitemap, metadata) comes from `NEXT_PUBLIC_SITE_URL` if set, otherwise from the
+production domain Vercel assigns. Set the variable once a custom domain is attached.
 
 ## Write a post
 
