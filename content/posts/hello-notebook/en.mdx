@@ -1,0 +1,82 @@
+---
+title: "How this notebook is written: typography and components"
+description: Articles on this site are MDX files. This one shows every element available in the body — sidenotes, figures, callouts, code, maths and the frame around interactive instruments.
+date: 2026-09-10
+tags: [meta, mdx]
+no: 2
+---
+
+Every article on this blog is a folder containing `zh.mdx`, plus `en.mdx` when there is an English version. Interactive components live in the same folder under `components/` and are imported by the article itself, so an article's code is loaded only on that article.
+
+## Body text
+
+The body is set in a serif face at a measure of about 68 characters, with generous line height so long pieces are easier to read. **Bold** marks a term on first use, *italics* add emphasis, and `inline code` is for identifiers. Links look like [this](https://nextjs.org).
+
+Sidenotes hold things that are worth saying but would interrupt the argument.<Sidenote>Like this. On a wide screen it sits in the right margin, level with the line that cites it. On a phone, tapping the number opens it inline.</Sidenote> Write so that the main text still reads well without them.
+
+> A blockquote looks like this. Use it for something that somebody else said better than you could.
+
+### Lists
+
+- Unordered lists use a square marker, echoing the 3×3 kernel mark on the home page.
+- A second point.
+
+1. Ordered lists have monospaced numerals.
+2. Use them only when the content really is a sequence.
+
+## Code
+
+Code blocks are highlighted by Shiki, with one palette per theme. They can carry a filename and highlight lines:
+
+```ts title="lib/ml/ops.ts" {3}
+export function relu(x: Tensor): Tensor {
+  const out = zeros(x.shape);
+  for (let i = 0; i < x.data.length; i++) out.data[i] = Math.max(0, x.data[i]);
+  return out;
+}
+```
+
+```bash
+pnpm dev
+```
+
+## Maths
+
+Inline maths looks like $\mathrm{softmax}(z)_i$, and display maths is centred:
+
+$$
+\mathrm{softmax}(z)_i = \frac{e^{z_i - \max(z)}}{\sum_j e^{z_j - \max(z)}}
+$$
+
+Subtracting $\max(z)$ doesn't change the result, but it stops $e^{1000}$ from overflowing.
+
+## Tables
+
+| Component | Purpose | Width |
+| --- | --- | --- |
+| `Figure` | Static image or chart | inline / wide / full |
+| `Instrument` | Frame for an interactive | inline / wide / full |
+| `Sidenote` | Margin note | right margin |
+| `Callout` | Boxed aside | body width |
+
+## Callouts
+
+<Callout type="note" title="Note">
+Extra information. Skipping it costs you nothing.
+</Callout>
+
+<Callout type="insight" title="Key point">
+The one thing in this section worth remembering.
+</Callout>
+
+<Callout type="warn" title="Careful">
+A common pitfall, or the limits of a method.
+</Callout>
+
+## The instrument frame
+
+Every interactive sits in the same frame: a monospaced title bar, a dot-grid stage and a caption. The frame includes an error boundary, so if a component breaks, the rest of the article stays readable.
+
+<Instrument fig="01" title="empty shell" caption="An empty instrument frame. For real ones, see the CNN article.">
+  <p className="py-10 text-center font-mono text-sm text-muted-foreground">An interactive goes here</p>
+</Instrument>

@@ -1,0 +1,169 @@
+---
+title: "A CNN from scratch: watching a convolutional network see, in your browser"
+description: A handwritten-digit classifier written in plain TypeScript with no machine-learning library, then opened up so you can look at the output of every layer.
+date: 2026-09-18
+tags: [computer-vision, cnn, from-scratch]
+no: 1
+featured: true
+interactive: true
+---
+
+import { ConvStepper, DrawPredict, FeatureMaps, KernelPlayground, OcclusionMap } from "./components";
+
+Most introductions to convolutional neural networks open with a block diagram: a few boxes, a few arrows, an answer at the end. The diagram isn't wrong, but it hides the interesting part. What happens *inside* the boxes?
+
+This article goes the other way round. The classifier below is already running in your browser. There is no server behind it and no TensorFlow.js or ONNX Runtime; the whole forward pass is about two hundred lines of TypeScript.<Sidenote>The source lives in this site's repo under `lib/ml`: `tensor.ts`, `ops.ts` and `sequential.ts`, with zero dependencies.</Sidenote> Draw a digit first. Then we'll take it apart, layer by layer.
+
+<Instrument fig="01" title="draw → predict" size="wide" caption="Draw a digit from 0 to 9 on the left. The middle shows the 28×28 image the network actually receives; the right shows the probability of each class. If you'd rather not draw, use the sample digits underneath.">
+  <DrawPredict />
+</Instrument>
+
+## An image is a grid of numbers
+
+To a model, a greyscale image is a two-dimensional array in which every cell holds a number between 0 and 1: 0 is blank paper, 1 is ink. The small picture in the middle above is that array, $28 \times 28 = 784$ numbers in all.
+
+The obvious approach is to flatten those 784 numbers and feed them into a fully connected layer. It works, but it's wasteful: a fully connected layer has no idea which pixels are neighbours. Shift the same "7" two pixels to the right and it becomes an entirely different input that has to be learned again.
+
+A CNN starts from two assumptions that hold for almost every image:
+
+- **Locality.** Meaningful features such as edges, corners and stroke ends involve only a small patch of neighbouring pixels.
+- **Translation invariance.** A vertical edge is the same thing in the top-left corner as in the bottom-right, and the same parameters should detect it in both places.
+
+Build those two assumptions into the structure of the model and you get convolution.
+
+## Convolution: a small window sliding over the image
+
+Convolution does something simple. Take a small matrix of weights, called a **kernel**, usually 3×3. Lay it over the top-left corner of the image, multiply the nine overlapping pairs, and add them up to get one number. Slide one pixel to the right and do it again. Once you've covered the whole image, those numbers form a new image called a **feature map**.
+
+As a formula:
+
+$$
+y_{i,j} = b + \sum_{u=0}^{2} \sum_{v=0}^{2} w_{u,v} \, x_{i+u,\, j+v}
+$$
+
+The instrument below slows this down. The input is a bright vertical bar, and the kernel has −1 down its left column and +1 down its right. Press Step and watch each output cell being computed.
+
+<Instrument fig="02" title="conv2d / step" caption="Wherever the kernel rests, the line underneath spells out its nine multiply-adds. The output is positive along the bar's left edge, negative along its right edge, and 0 where the image is flat.">
+  <ConvStepper />
+</Instrument>
+
+What this kernel computes is "right minus left". Over a uniform region that difference is zero; only where dark on the left meets bright on the right does the output become a large positive number. It is a **vertical edge detector**, and it uses the same nine numbers wherever the edge happens to be.<Sidenote>Strictly speaking, what deep-learning frameworks call convolution is cross-correlation: the kernel isn't flipped. Because the weights are learned, flipping makes no difference, and the name stuck.</Sidenote>
+
+In code it is a handful of nested loops and nothing more:
+
+```ts title="lib/ml/ops.ts" {6-8}
+for (let oy = 0; oy < oH; oy++) {
+  for (let ox = 0; ox < oW; ox++) {
+    let sum = bias;
+    for (let ky = 0; ky < kH; ky++) {
+      for (let kx = 0; kx < kW; kx++) {
+        const iy = oy * stride + ky - padding;
+        const ix = ox * stride + kx - padding;
+        if (iy < 0 || iy >= h || ix < 0 || ix >= w) continue; // zero padding
+        sum += x[iy * w + ix] * kernel[ky * kW + kx];
+      }
+    }
+    out[oy * oW + ox] = sum;
+  }
+}
+```
+
+### Change the numbers, change the feature
+
+Nine numbers can do more than you'd expect. The input below is the digit you just drew; edit the kernel and see.
+
+<Instrument fig="03" title="kernel playground" size="wide" caption="Cyan is positive output, amber is negative. Try Vertical edges, then Horizontal edges: the same digit, but different kernels light up different strokes.">
+  <KernelPlayground />
+</Instrument>
+
+In classical computer vision these kernels were designed by hand: Sobel, Laplacian, Gaussian. The key move in a CNN is to **stop designing them**. Treat the nine numbers as parameters, initialise them randomly, and let gradient descent find the sets that are most useful for the task.
+
+## ReLU and pooling
+
+A convolution is usually followed by two very small operations.
+
+**ReLU** sets negative values to zero: $\mathrm{ReLU}(x) = \max(0, x)$. Without it, any stack of convolutions is still one linear operation, equivalent to a single layer. ReLU is the non-linearity that makes depth mean something.
+
+**Max pooling** replaces each 2×2 block with its largest value, halving the width and the height. That does two things: later layers have a quarter as many pixels to process, and a feature gives the same output wherever it falls inside its 2×2 block, so the model is less sensitive to small shifts.
+
+<Callout type="insight" title="The receptive field grows with depth">
+One output pixel of the first layer sees a 3×3 patch of the input. After one round of pooling, a 3×3 window in the second layer covers roughly 8×8 of the original image. Deeper layers see wider, which is why shallow layers learn edges and deeper ones learn "a loop" or "a bend".
+</Callout>
+
+## The whole network
+
+The model in this article has two convolutional blocks and one fully connected layer:
+
+| Layer | Output shape | Parameters |
+| --- | --- | --- |
+| input | 1 × 28 × 28 | 0 |
+| conv1 (3×3, 8 kernels) → ReLU | 8 × 28 × 28 | 80 |
+| maxpool 2×2 | 8 × 14 × 14 | 0 |
+| conv2 (3×3, 16 kernels) → ReLU | 16 × 14 × 14 | 1,168 |
+| maxpool 2×2 | 16 × 7 × 7 | 0 |
+| flatten → dense | 10 | 7,850 |
+| softmax | 10 | 0 |
+
+That is 9,098 parameters in a weights file of about 66 KB, reaching 98.6% accuracy on the MNIST test set.<Sidenote>Training was done once in PyTorch and the weights exported as JSON. The TypeScript forward pass has unit tests that compare it with PyTorch's output to within $10^{-4}$.</Sidenote> A fully connected network needs roughly ten times as many parameters for similar accuracy.
+
+In TypeScript the model is an array:
+
+```ts title="lib/ml/sequential.ts"
+export const MNIST_CNN: LayerSpec[] = [
+  { type: "conv2d", name: "conv1", inC: 1, outC: 8, kernel: 3, padding: 1 },
+  { type: "relu", name: "relu1" },
+  { type: "maxpool", name: "pool1", size: 2 },
+  { type: "conv2d", name: "conv2", inC: 8, outC: 16, kernel: 3, padding: 1 },
+  { type: "relu", name: "relu2" },
+  { type: "maxpool", name: "pool2", size: 2 },
+  { type: "flatten", name: "flatten" },
+  { type: "dense", name: "fc", inF: 784, outF: 10 },
+  { type: "softmax", name: "softmax" },
+];
+```
+
+`Sequential.forward()` differs from an ordinary inference library in one deliberate way: it returns the output of **every** layer, not only the final answer. All the figures below depend on that.
+
+## What the network sees
+
+These are the feature maps of every layer as your digit passes through the network. Brighter means a stronger response at that position.
+
+<Instrument fig="04" title="feature maps" size="wide" caption="The eight images in the first row are the responses of the eight kernels conv1 learned. Some light up only for strokes in one direction. Nobody taught it those edge detectors; training found them. Further down, resolution falls and the content becomes more abstract.">
+  <FeatureMaps />
+</Instrument>
+
+Draw a few different digits and notice:
+
+1. In conv1 you can still recognise the digit; each map emphasises strokes in a different direction.
+2. By conv2 a single map is hard to read. It encodes "some combination of strokes appears somewhere".
+3. The final 16 × 7 × 7 = 784 numbers are everything the fully connected layer has to vote with.
+
+## Which pixels actually matter
+
+High probability doesn't mean the model has understood anything. A direct way to find out which part of the image it relies on is to **cover that part and see how far the confidence falls**.
+
+The instrument below slides a 4×4 blank patch across the image, re-runs the network at each position (169 forward passes in all), and records how far the predicted class's probability drops.
+
+<Instrument fig="05" title="occlusion sensitivity" size="wide" caption="The brighter a spot on the right, the more the model's confidence falls when it is covered. Try 7: the bar and the corner are usually brightest. Then compare 1 with 7. That bar is exactly what the model relies on.">
+  <OcclusionMap />
+</Instrument>
+
+<Callout type="warn" title="What this method can't tell you">
+Occlusion tests one small patch at a time. If the model relies on a combination of two features that are far apart, covering either one alone may barely move the confidence. It's a cheap, intuitive diagnostic, not a complete explanation.
+</Callout>
+
+## Where it fails
+
+Play with it for a while and you'll find ways to break it:
+
+- **Drawing small, or in a corner,** is fine, because preprocessing crops, scales and then centres the drawing by its centre of mass, the same way MNIST was prepared.
+- **Extra strokes** fool it easily, such as a bar through the middle of a 7 or a line under a 1. The training data has almost none of those.
+- **Something that isn't a digit** still gets a confident answer. Softmax outputs always sum to 1; the model has no way to say "I don't know".
+
+That last point is a serious problem in real systems. On a production line or a surveillance feed, most of what a model sees lies outside its training distribution, and high confidence is not the same as being right.
+
+## What comes next
+
+This model has about nine thousand parameters and recognises ten classes. Stack the same bricks (convolution, non-linearity, downsampling) deeper and wider, add residual connections, and you have the backbones that do detection, pose estimation and segmentation on edge devices today. The principle is unchanged; only the scale differs.
+
+The next article takes a Transformer apart in the same way: write attention by hand, then lay the attention matrix out where you can see it.

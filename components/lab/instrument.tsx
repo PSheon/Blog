@@ -12,7 +12,10 @@ interface Props {
   caption?: ReactNode;
   /** Right side of the title bar: status, readouts. */
   status?: ReactNode;
+  /** Classes for the dot-grid stage. */
   className?: string;
+  /** Classes for the outer <figure>, e.g. to drop the prose margins outside an article. */
+  figureClassName?: string;
   children: ReactNode;
 }
 
@@ -21,9 +24,9 @@ interface Props {
  * equipment, a dot-grid stage, and a caption. Server-rendered; the live part is
  * whatever client component you put inside.
  */
-export function Instrument({ fig, title, size = "inline", caption, status, className, children }: Props) {
+export function Instrument({ fig, title, size = "inline", caption, status, className, figureClassName, children }: Props) {
   return (
-    <figure className={cn("not-prose my-10 clear-both", figureSize[size])} data-instrument={title}>
+    <figure className={cn("not-prose my-10 clear-both", figureSize[size], figureClassName)} data-instrument={title}>
       <div className="overflow-hidden rounded-md border border-border bg-panel">
         <div className="flex items-center gap-3 border-b border-border px-3.5 py-2">
           <span className="size-1.5 rounded-full bg-signal" aria-hidden />

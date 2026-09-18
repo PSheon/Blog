@@ -1,6 +1,7 @@
 import type { MDXComponents } from "mdx/types";
 import Link from "next/link";
 import type { ComponentProps } from "react";
+import { Instrument } from "@/components/lab/instrument";
 import { Callout } from "@/components/mdx/callout";
 import { CodeBlock } from "@/components/mdx/code-block";
 import { Figure } from "@/components/mdx/figure";
@@ -41,6 +42,7 @@ const components: MDXComponents = {
   ),
   // Available in every article without an import.
   Figure,
+  Instrument,
   Sidenote,
   Callout,
 };
