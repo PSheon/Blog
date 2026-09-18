@@ -12,8 +12,6 @@
   --font-serif: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
   --font-mono: var(--font-code), var(--font-ui-tc), ui-monospace, monospace;
   --font-heading: var(--font-body), var(--font-body-tc), ui-serif, Georgia, serif;
-  --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
   --color-signal: var(--signal);
   --color-signal-2: var(--signal-2);
   --color-signal-3: var(--signal-3);
@@ -91,8 +89,6 @@
   --panel: #f4f5fa;
   --rule: #1c203326;
   --grid: #1c203314;
-  --brand: var(--signal);
-  --brand-foreground: var(--signal-3);
   --line-width: 1px;
   --glow-a: #79dafa26;
   --glow-b: #ff6e961a;
@@ -208,6 +204,34 @@
   .triad-gradient {
     background-image: linear-gradient(90deg, var(--signal), var(--signal-3) 55%, var(--signal-2));
   }
+  /*
+   * Soft light behind the hero instrument. Two things keep it from reading as a cut-off shape:
+   * it stays inside its own box (closest-side), and the stops follow an ease-out curve so the
+   * falloff reaches zero with zero slope — a linear ramp that stops dead looks like an edge.
+   */
+  .hero-glow {
+    position: absolute;
+    inset: -34% -30%;
+    z-index: -1;
+    pointer-events: none;
+    --c: var(--signal-3);
+    background: radial-gradient(
+      ellipse closest-side,
+      color-mix(in oklab, var(--c) 40%, transparent) 0%,
+      color-mix(in oklab, var(--c) 34%, transparent) 18%,
+      color-mix(in oklab, var(--c) 23%, transparent) 36%,
+      color-mix(in oklab, var(--c) 13%, transparent) 54%,
+      color-mix(in oklab, var(--c) 5.5%, transparent) 72%,
+      color-mix(in oklab, var(--c) 1.4%, transparent) 88%,
+      transparent 100%
+    );
+
+  }
+  :root:not(.dark) .hero-glow {
+    --c: var(--signal);
+    opacity: 0.55;
+  }
+
   .triad-text {
     background-image: linear-gradient(160deg, var(--signal) 8%, var(--signal-3) 52%, var(--signal-2) 94%);
     -webkit-background-clip: text;

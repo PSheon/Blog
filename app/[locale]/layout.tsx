@@ -64,7 +64,9 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
               search={t.search}
               tags={getAllTags(locale).map((x) => x.tag)}
             />
-            <main id="content" className="flex-1">
+            {/* Decorative glows may be wider than the viewport. Clip them at the full-width level, never at the
+                content container (that cuts them off mid-fade). `clip`, unlike `hidden`, keeps sticky children working. */}
+            <main id="content" className="flex-1 overflow-x-clip">
               {children}
             </main>
             <SiteFooter locale={locale} t={t} />
