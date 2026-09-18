@@ -35,6 +35,7 @@ const zh = {
   },
   home: {
     featured: "精選",
+    topics: "依主題瀏覽：看見、思考、行動",
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
     all: "全部",

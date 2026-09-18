@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { type FigureSize, figureSize } from "@/components/mdx/figure";
 import { cn } from "@/lib/utils";
+import { CornerMarks } from "./corner-marks";
 import { ErrorBoundary } from "./error-boundary";
 
 interface Props {
@@ -27,6 +28,8 @@ interface Props {
 export function Instrument({ fig, title, size = "inline", caption, status, className, figureClassName, children }: Props) {
   return (
     <figure className={cn("not-prose my-10 clear-both", figureSize[size], figureClassName)} data-instrument={title}>
+      <div className="relative">
+        <CornerMarks />
       <div className="overflow-hidden rounded-md border border-border bg-panel">
         <div className="flex items-center gap-3 border-b border-border px-3.5 py-2">
           <span className="size-1.5 rounded-full bg-signal" aria-hidden />
@@ -53,6 +56,7 @@ export function Instrument({ fig, title, size = "inline", caption, status, class
             </p>
           </noscript>
         </div>
+      </div>
       </div>
       {caption && (
         <figcaption className="mt-3 font-sans text-sm leading-relaxed text-muted-foreground">{caption}</figcaption>
