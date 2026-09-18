@@ -28,7 +28,7 @@ interface Loaded {
 }
 
 function available(dir: string, slug: string): Locale[] {
-  return locales.filter((l) => fs.existsSync(path.join(dir, slug, `${l}.mdx`)));
+  return locales.filter((l) => fs.existsSync(path.join(/*turbopackIgnore: true*/ dir, slug, `${l}.mdx`)));
 }
 
 function load(dir: string, slug: string, locale: Locale): Loaded | null {
@@ -36,7 +36,7 @@ function load(dir: string, slug: string, locale: Locale): Loaded | null {
   // A post exists only once its zh source does.
   if (!availableLocales.includes("zh")) return null;
   const served = availableLocales.includes(locale) ? locale : "zh";
-  const file = path.join(dir, slug, `${served}.mdx`);
+  const file = path.join(/*turbopackIgnore: true*/ dir, slug, `${served}.mdx`);
   const { data, content } = matter(fs.readFileSync(file, "utf8"));
   const parsed = frontmatterSchema.safeParse(data);
   if (!parsed.success) {
@@ -65,10 +65,10 @@ function showDrafts(opts: QueryOptions): boolean {
 
 export function getAllPosts(locale: Locale, opts: QueryOptions = {}): PostMeta[] {
   const dir = opts.dir ?? POSTS_DIR;
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(/*turbopackIgnore: true*/ dir)) return [];
   const drafts = showDrafts(opts);
   return fs
-    .readdirSync(dir, { withFileTypes: true })
+    .readdirSync(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => load(dir, e.name, locale)?.meta)
     .filter((m): m is PostMeta => !!m && (drafts || !m.draft))

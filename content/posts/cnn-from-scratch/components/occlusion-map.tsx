@@ -19,9 +19,12 @@ const idle: (cb: () => void) => number =
     ? (cb) => window.requestIdleCallback(cb, { timeout: 60 })
     : (cb) => window.setTimeout(cb, 0);
 
-interface Result {
-  heat: Float32Array;
-  lowest: number;
+interface Run {
+  /** The input this run belongs to; a run for an older drawing is simply ignored. */
+  input: Float32Array;
+  progress: number;
+  heat: Float32Array | null;
+  lowest: number | null;
 }
 
 /**
@@ -32,23 +35,18 @@ interface Result {
 export function OcclusionMap() {
   const lab = useLab();
   const t = useLabels();
-  const [result, setResult] = useState<Result | null>(null);
-  const [progress, setProgress] = useState(1);
+  const [run, setRun] = useState<Run | null>(null);
   const { input, prediction, probs } = lab;
 
   useEffect(() => {
     const model = getModel();
-    if (!model || prediction === null || !probs) {
-      setResult(null);
-      return;
-    }
+    if (!model || prediction === null || !probs) return;
     let cancelled = false;
     const base = probs[prediction];
     const drop = new Float32Array(784);
     const hits = new Float32Array(784);
     let lowest = base;
     let pos = 0;
-    setProgress(0);
 
     const work = () => {
       if (cancelled) return;
@@ -74,13 +72,12 @@ export function OcclusionMap() {
         pos++;
       }
       if (pos < STEPS * STEPS) {
-        setProgress(pos / (STEPS * STEPS));
+        setRun({ input, progress: pos / (STEPS * STEPS), heat: null, lowest: null });
         idle(work);
         return;
       }
       for (let i = 0; i < 784; i++) drop[i] = hits[i] ? drop[i] / hits[i] : 0;
-      setResult({ heat: drop, lowest });
-      setProgress(1);
+      setRun({ input, progress: 1, heat: drop, lowest });
     };
     idle(work);
     return () => {
@@ -89,6 +86,8 @@ export function OcclusionMap() {
   }, [input, prediction, probs]);
 
   const base = probs && prediction !== null ? probs[prediction] : null;
+  const current = run?.input === input && base !== null ? run : null;
+  const progress = base === null ? 1 : (current?.progress ?? 0);
 
   return (
     <ModelGate>
@@ -101,7 +100,7 @@ export function OcclusionMap() {
           <p className="label mt-1.5">{t.networkSees}</p>
         </div>
         <div>
-          <HeatCanvas data={result?.heat ?? null} w={28} h={28} label={t.occlusionFor} />
+          <HeatCanvas data={current?.heat ?? null} w={28} h={28} label={t.occlusionFor} />
           <p className="label mt-1.5 flex justify-between">
             <span>{t.important}</span>
             {progress < 1 && <span className="text-signal">{t.computing} {Math.round(progress * 100)}%</span>}
@@ -111,7 +110,7 @@ export function OcclusionMap() {
       <div className="mt-5 grid gap-4 border-t border-border pt-4 sm:grid-cols-[auto_auto_auto_1fr] sm:items-end sm:gap-8">
         <Readout label={t.prediction} value={prediction ?? "–"} />
         <Readout label={t.baseline} value={base === null ? "–" : (base * 100).toFixed(1)} unit="%" tone="plain" />
-        <Readout label={t.lowest} value={result ? (result.lowest * 100).toFixed(1) : "–"} unit="%" tone="amber" />
+        <Readout label={t.lowest} value={current?.lowest != null ? (current.lowest * 100).toFixed(1) : "–"} unit="%" tone="amber" />
         <SamplePicker t={t} digits={[1, 4, 7, 9]} />
       </div>
     </ModelGate>

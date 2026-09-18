@@ -5,7 +5,8 @@ import { Instrument } from "@/components/lab/instrument";
 import { HeroInstrument } from "@/components/site/hero-instrument";
 import { PostIndex } from "@/components/site/post-index";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
-import { PostPreview, postPreviews } from "@/components/site/post-previews";
+import { PostPreview } from "@/components/site/post-previews";
+import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
 import { toRows } from "@/lib/content/rows";
@@ -29,7 +30,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             {t.hero.tagline.map((word) => (
               <span key={word} className="block">
                 {word}
-                <span className="text-signal">{locale === "zh" ? "。" : "."}</span>
+                {locale === "en" && <span className="text-signal">.</span>}
               </span>
             ))}
           </h1>
@@ -91,7 +92,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
                 {featured.description}
               </p>
             </div>
-            {featured.slug in postPreviews && (
+            {hasPreview(featured.slug) && (
               <div className="rounded-md border border-border bg-panel p-2 dot-grid">
                 <PostPreview slug={featured.slug} />
               </div>

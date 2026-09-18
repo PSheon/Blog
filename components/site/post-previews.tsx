@@ -25,8 +25,8 @@ function CnnPreview() {
   );
 }
 
-/** Live thumbnails, keyed by post slug. Posts without one simply show no preview. */
-export const postPreviews: Record<string, () => React.JSX.Element> = {
+/** Live thumbnails, keyed by post slug. Keep lib/content/previews.ts in sync. */
+const postPreviews: Record<string, () => React.JSX.Element> = {
   "cnn-from-scratch": CnnPreview,
 };
 

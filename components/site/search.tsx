@@ -4,6 +4,7 @@ import { FileText, Hash, Search as SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
+  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -53,6 +54,7 @@ export function Search({ locale, index, tags, t }: Props) {
         <kbd className="ml-auto hidden font-mono text-[11px] sm:inline">⌘K</kbd>
       </button>
       <CommandDialog open={open} onOpenChange={setOpen} title={t.open} description={t.placeholder}>
+        <Command>
         <CommandInput placeholder={t.placeholder} />
         <CommandList>
           <CommandEmpty>{t.empty}</CommandEmpty>
@@ -81,6 +83,7 @@ export function Search({ locale, index, tags, t }: Props) {
             ))}
           </CommandGroup>
         </CommandList>
+        </Command>
       </CommandDialog>
     </>
   );
