@@ -78,8 +78,10 @@ test("search is full-text, highlights the match and jumps to the section", async
   await page.goto("/en");
   // The shortcut listener attaches on hydration; the hero prediction only appears after it.
   await expect(page.getByTestId("hero-prediction")).toHaveText("7");
-  if (isMobile) await page.getByRole("button", { name: "Search" }).click();
-  else await page.keyboard.press("ControlOrMeta+k");
+  if (isMobile) {
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("button", { name: "Search" }).click();
+  } else await page.keyboard.press("ControlOrMeta+k");
 
   const input = page.getByPlaceholder(/Search the full text/);
   // Before typing: every post is listed.
@@ -97,8 +99,10 @@ test("search is full-text, highlights the match and jumps to the section", async
 test("search says so when nothing matches, and finds Chinese by substring", async ({ page, isMobile }) => {
   await page.goto("/zh");
   await expect(page.getByTestId("hero-prediction")).toHaveText("7");
-  if (isMobile) await page.getByRole("button", { name: "搜尋" }).click();
-  else await page.keyboard.press("/");
+  if (isMobile) {
+    await page.getByRole("button", { name: "選單" }).click();
+    await page.getByRole("button", { name: "搜尋" }).click();
+  } else await page.keyboard.press("/");
   const input = page.getByPlaceholder(/搜尋全文/);
   await input.fill("qzxv");
   await expect(page.getByText("找不到「qzxv」")).toBeVisible();
@@ -159,4 +163,25 @@ test("a transformer trains in the page and learns to reverse digits", async ({ p
   await expect(page.getByTestId("tf-output").locator(".text-signal-2")).toHaveCount(0);
   await expect(page.getByTestId("tf-output").locator(".text-signal")).toHaveCount(6);
   expect(errors).toEqual([]);
+});
+
+test("phone header: menu on the left, mark centred, drawer holds search and preferences", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout only");
+  await page.goto("/en/posts/cnn-from-scratch");
+  const menu = page.getByRole("button", { name: "Menu" });
+  const logo = page.getByRole("link", { name: /paul\.notebook/ }).first();
+  const width = page.viewportSize()!.width;
+  const m = (await menu.boundingBox())!;
+  const l = (await logo.boundingBox())!;
+  expect(m.x).toBeLessThan(40);
+  expect(Math.abs(l.x + l.width / 2 - width / 2)).toBeLessThan(2);
+
+  await menu.click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer.getByRole("link", { name: "Posts" })).toBeVisible();
+  await expect(drawer.getByRole("button", { name: "Dark" })).toBeVisible();
+  await drawer.getByRole("link", { name: /English|中文/ }).first().waitFor();
+  await drawer.getByRole("link", { name: "Tags" }).click();
+  await expect(page).toHaveURL(/\/en\/tags$/);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 });
