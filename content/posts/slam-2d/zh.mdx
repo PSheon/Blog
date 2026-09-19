@@ -1,0 +1,17 @@
+---
+title: （草稿）從零寫一個 2D SLAM：看地圖在回到原點的那一刻彈正
+description: 草稿。一台只有輪子和一圈測距的小車，怎麼一邊畫地圖、一邊知道自己在地圖上的哪裡，以及回到舊地方時整張圖為什麼會突然變直。
+date: 2026-09-19
+tags: [ai-agent, robotics, from-scratch]
+no: 8
+interactive: true
+draft: true
+---
+
+import { SpikeLab } from "./components";
+
+這是草稿，只在本機開發時看得到。下面是第一版儀器。用方向鍵開車（或按 Autopilot 讓它自己繞），看右邊車子自己畫的地圖慢慢歪掉；繞回起點的那一刻，整張圖會彈正。粉紅色的線是只靠輪子算出來的路徑。
+
+<Instrument fig="00" title="slam / spike" size="wide" caption="左：真實世界。右：車子自己以為的地圖與路徑。紫色細線是認出舊地方時加上的閉環。把 loop closure 關掉、或把 drift 拉到 0.02 以上，看它怎麼壞。">
+  <SpikeLab />
+</Instrument>
