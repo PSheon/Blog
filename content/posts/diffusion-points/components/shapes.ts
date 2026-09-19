@@ -1,7 +1,7 @@
 import type { Point, Rng, Shape } from "./diffusion";
 
 /**
- * Things to learn, each a function that returns one random coloured point on the surface of a small 3-D scene.
+ * Fruit to learn, each a function that returns one random coloured point on its surface.
  * Positions fit in about [−1, 1] with z up; colours are given as 0–1 RGB and stored as −1…1.
  */
 type Rgb = [number, number, number];
@@ -76,28 +76,12 @@ export const watermelon: Shape = parts([
   [3, (rng) => { const a = rng() * Math.PI, y = (rng() * 2 - 1) * 0.11; return point(0.95 * Math.cos(a), y, 0.95 * Math.sin(a) - 0.4, Math.sin(a * 14) > 0.3 ? [0.1, 0.35, 0.14] : [0.25, 0.6, 0.25]); }],
 ]);
 
-/** A small landscape: two snowy peaks, a meadow, a lake, a few trees and a sun. */
-function height(x: number, y: number) {
-  const peak = (cx: number, cy: number, h: number, w: number) => h * Math.exp(-((x - cx) ** 2 + (y - cy) ** 2) / w);
-  return peak(-0.35, 0.3, 0.95, 0.09) + peak(0.4, 0.45, 0.7, 0.07) + peak(0.75, -0.2, 0.3, 0.12) + 0.04 * Math.sin(5 * x) * Math.cos(4 * y);
-}
-const TREES: [number, number][] = [[-0.7, -0.5], [-0.45, -0.65], [-0.15, -0.35], [0.1, -0.7], [0.55, -0.6], [0.8, -0.75], [-0.85, -0.1], [0.25, -0.05]];
-const LAKE = { x: 0.05, y: -0.45, rx: 0.42, ry: 0.22 };
-export const landscape: Shape = parts([
-  [12, (rng) => {
-    const x = rng() * 2 - 1, y = rng() * 2 - 1, inLake = ((x - LAKE.x) / LAKE.rx) ** 2 + ((y - LAKE.y) / LAKE.ry) ** 2 < 1;
-    const h = inLake ? 0.03 : height(x, y);
-    const colour: Rgb = inLake ? mix([0.15, 0.45, 0.8], [0.35, 0.7, 0.95], rng()) : h > 0.55 ? [0.96, 0.97, 1] : h > 0.3 ? mix([0.45, 0.42, 0.4], [0.6, 0.57, 0.55], rng()) : mix([0.25, 0.6, 0.22], [0.5, 0.75, 0.3], rng());
-    return point(x, y, h - 0.55, colour);
-  }],
-  [3, (rng) => {
-    const [tx, ty] = TREES[Math.floor(rng() * TREES.length)], t = rng(), a = rng() * 2 * Math.PI, base = height(tx, ty) - 0.55;
-    if (t < 0.2) return point(tx + 0.015 * Math.cos(a), ty + 0.015 * Math.sin(a), base + t * 0.4, [0.35, 0.22, 0.1]);
-    const u = (t - 0.2) / 0.8, r = 0.09 * (1 - u);
-    return point(tx + r * Math.cos(a), ty + r * Math.sin(a), base + 0.08 + u * 0.3, mix([0.05, 0.3, 0.12], [0.15, 0.45, 0.2], rng()));
-  }],
-  [1.5, (rng) => { const [dx, dy, dz] = direction(rng); return point(0.6 + 0.13 * dx, 0.75 + 0.13 * dy, 0.7 + 0.13 * dz, [1, 0.82, 0.25]); }],
-]);
+/** An orange: a slightly flattened, pitted sphere with a green star where the stalk was. */
+export const orange: Shape = (rng) => {
+  const [dx, dy, dz] = direction(rng), pit = 1 + 0.015 * Math.sin(dx * 40) * Math.sin(dy * 40) * Math.sin(dz * 40), r = 0.72 * pit;
+  const calyx = dz > 0.965 && Math.cos(5 * Math.atan2(dy, dx)) > -0.2;
+  return point(r * dx, r * dy, r * dz * 0.93, calyx ? [0.2, 0.45, 0.15] : mix([0.98, 0.55, 0.08], [0.95, 0.42, 0.05], clamp01(0.5 - dz * 0.5 + (rng() - 0.5) * 0.3)));
+};
 
-export const SHAPES = { apple, banana, grapes, watermelon, landscape } as const;
+export const SHAPES = { apple, banana, grapes, watermelon, orange } as const;
 export type ShapeName = keyof typeof SHAPES;
