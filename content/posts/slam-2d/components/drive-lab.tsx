@@ -55,7 +55,7 @@ export function DriveLab() {
     if (id === "wrong" && w && knobs.loopClosure && !knobs.camera && knobs.drift === PRESETS.wrong.drift) setKnobs((k) => ({ ...k, wrong: true }));
     else restart(PRESETS[id]);
     setAuto(true);
-    root.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    root.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "center" });
   };
   const takeRef = useRef(take);
   useEffect(() => { takeRef.current = take; });

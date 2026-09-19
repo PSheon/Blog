@@ -1,0 +1,117 @@
+---
+title: (Draft) SLAM from scratch, and the moment the map snaps straight
+description: A small car with no GPS and no map has to draw the map and find itself on it at the same time. Drive it round a loop, watch its map bend, and watch the whole thing snap straight the moment it gets back to where it started.
+date: 2026-09-19
+tags: [ai-agent, robotics, from-scratch]
+no: 8
+interactive: true
+draft: true
+---
+
+import { AlignLab, CloudLab, DriveLab, OutcomesLab, SpringsLab, WheelsLab } from "./components";
+
+{/* Draft, translated from zh.mdx (second pass, 2026-09-19). Every number comes from docs/research/2026-09-18-slam-2d-spike.md. */}
+
+The robot dog in [the previous article](/en/posts/lite3-walking) can walk, but it has no idea where it has walked to. There is no GPS indoors, and nobody gave it a map.
+
+What makes this hard is that it is a chicken-and-egg problem: **to know where you are, you need a map; to draw a map, you need to know where you are.** The two have to be done together. The problem is called SLAM, simultaneous localisation and mapping.
+
+Drive first. The pane marked "the real world" is something the car never sees; the other pane is the map the car is drawing, seen from above. Press Autopilot (the first half-lap is fast-forwarded) or drive with the stick, and go once round the corridor back to the start.
+
+<Instrument fig="01" title="slam / drive" size="wide" caption="The car's map bends more and more. Watch what happens to the whole of it at the moment the car gets back to the start and recognises where it is.">
+  <DriveLab />
+</Instrument>
+
+Near the end of the lap, where the car believes it is and where it really is are about two metres apart. In the single step that brings it back to the start, the whole map **snaps straight**, and a centimetre or two of error is all that is left.
+
+This article is about how that one step happens. The core of the code is about 500 lines of TypeScript, with no libraries.
+
+## The car has only two senses
+
+**Wheels.** The car knows how far its wheels have turned, so it knows "I just moved 10 cm forward and turned 1° left". That sense is always there, but every step is a little off, and the errors only ever add up; they never cancel.
+
+**One ring of distances.** On the roof is a spinning laser range finder, a lidar. Each turn gives the distance to the nearest wall in 180 directions, good to 2 cm. It is accurate, but all it tells you is what your surroundings look like right now, not where you are.
+
+What if the car trusted its wheels alone? Below is the same route, twice round: the white line is the path really driven, the pink line is what you get by adding up what the wheels reported, step by step.
+
+<Instrument fig="02" title="slam / wheels" caption="The slider is how wrong the wheels are: if the left and right wheels differ in size by a hair, the car turns a hair extra for every metre it drives.">
+  <WheelsLab />
+</Instrument>
+
+The default is 0.006 radians of extra turn per metre, about a third of a degree; you could not see the car veer. After two laps it is 4.3 metres out. Worse, no part of the pink line *looks* wrong. On wheels alone you would never even know you were lost.
+
+## Lining up two scans
+
+This is where the lidar earns its place. Take a scan at two moments; as long as both saw the same walls, slide one scan over the other until they coincide, and **the shift and turn it took is exactly how the car moved between those two moments**, to the centimetre.
+
+Try dragging the cyan scan onto the white one by hand, then press "Let ICP do it".
+
+<Instrument fig="03" title="slam / align" caption="Each step of ICP does two things: for every cyan point it finds the nearest stretch of white wall, then it works out the one small motion that brings all the points closer to their walls at once. Repeat until nothing moves.">
+  <AlignLab />
+</Instrument>
+
+At **a corner**, starting two metres and nearly thirty degrees off, it is back within ten steps, to better than a centimetre. Press Scramble a few times: most starts are recovered, and when one is not, ICP knows it, because only one or two points in ten found a partner.
+
+Now switch to **mid-corridor** and press again. This time the cyan scan has only been slid two metres back along the corridor, yet ICP stops almost a metre from the right answer, looking quite sure of itself: three quarters of the points matched, 3.5 cm from the wall on average. Two parallel walls tell you how far you are from them and nothing about how far along them you are; slide a metre forward and the scan looks almost the same.
+
+The good news is that this kind of doubt **can be computed**. The small equation ICP solves already carries "which directions am I sure about": it is the pink ellipse in the figure, a small circle at the corner and stretched along the corridor in the corridor. The car simply refuses any match whose ellipse is too flat.
+
+<Sidenote>My first ICP matched point to point, and it never recognised a single place: two scans do not hit the wall at the same points, so even at the right answer the error was five or six centimetres, and good matches could not be told from bad. Matching points to wall segments instead brought the error of a correct match down to the sensor's own 2 cm of noise.</Sidenote>
+
+## Every "I believe", in one picture
+
+The car now holds two kinds of information:
+
+- Every short stretch, the wheels say: "**I believe** I moved this much from the last point to this one." Not very accurate, but there is one for every stretch.
+- Now and then, the lidar says: "**I believe** my position relative to that point from long ago is this." Very accurate, but only available when the car is back somewhere it has been.
+
+Draw every position the car remembered as a dot, and every "I believe" as a **spring** between two dots. The spring's natural length is what the sentence says, and the surer the sentence, the stiffer the spring. This picture is called a pose graph.
+
+With only the wheel springs the chain is slack; any shape will do, so it lies bent the way the wheels said. Press "Close the loop" and one short, stiff spring appears, pulling the two ends of the chain together:
+
+<Instrument fig="04" title="slam / springs" caption="In each pass every dot moves a little, all at once, so that the total tension in all the springs goes down. It is slowed down here so you can watch it pass by pass.">
+  <SpringsLab />
+</Instrument>
+
+The point is that **it is not only the last dot that gets corrected**. The pull of the new spring is shared out along the whole chain, every link gives a little, and the whole path straightens together. And the map hangs on those dots (each one remembers the scan taken there), so when the dots move, the map moves with them. That is the snap at the top of the article.
+
+Mathematically, "make the total tension as small as possible" is a least-squares problem, solved by Gauss–Newton: treat the problem as linear, solve it, take the step, and go again. Three or four passes and nothing moves any more.
+
+## How it breaks
+
+The same route and the same car, twice round under four different settings. This is the map it ends up with.
+
+<Instrument fig="05" title="slam / four ways to fail" size="wide" caption="To try one yourself, press the button on its card: the setting is handed to the car at the top of the article, and the page scrolls back there.">
+  <OutcomesLab />
+</Instrument>
+
+**It never recognises a place.** Without the spring that ties the ends together, the map just keeps bending, and the second lap is drawn beside the first: two corridors where there is one.
+
+**Very wrong wheels.** It does look for places it has been, and never finds one. It looks through old records near *where it believes it is*, and that belief has drifted more than ten metres away. As far as it knows, it never came back.
+
+**The same wheels, plus a camera.** Every wall is painted with its own stripes, and the car gets a panoramic camera one pixel tall. Now "I have seen this view before" nominates old places, and ICP confirms them. In two laps it recognises a place twenty-one times and is never wrong. Search by position, and once you have drifted far enough you are lost for good; search by appearance, and it does not matter how far you drifted.
+
+**One wrong recognition.** The map was fine; one wrong spring was forced in, claiming that two places far apart are the same spot. I measured this separately: a hundred and four correct springs cannot save the map from one wrong one. The mean error goes from 0.10 m to 3.9 m, because least squares has no resistance to an outlier. That is why a real system would rather miss ten places than misrecognise one. Press the button on this card and the map that gets wrecked is the one you drew yourself at the top.
+
+## What is different on the robot dog
+
+Our robot dog uses **a 3-D lidar and cameras**. Compared with this little car, the first half is very different and the second half is almost the same.
+
+**The lidar's ring becomes a cloud.** Sixteen lasers stacked vertically, more than five thousand points per turn. And a position is no longer three numbers in a plane (x, y, heading) but six, adding height, pitch and roll, because a walking dog sways. Lining two sweeps up works exactly as before; the small equation just has six unknowns instead of three.
+
+<Instrument fig="06" title="slam / 3-D lidar" size="wide" caption="Only the first half is done here: every sweep is lined up with the one before and the results are chained, with no springs and no loop closure. So you will see it slowly drift away.">
+  <CloudLab />
+</Instrument>
+
+A single match is good to better than a centimetre and a quarter of a degree, in ten to thirty milliseconds a sweep. After thirty metres round the room it has still drifted more than sixty centimetres and six degrees. **Small errors are not errors that do not add up.** The cure is [the chain from before](#every-i-believe-in-one-picture), with six numbers per dot instead of three.
+
+**The cameras recognise places.** They are the real version of the camera in the previous section: features across a whole image rather than one row of pixels, for the same purpose.
+
+A real system also deals with things this one never touches: a lidar takes a tenth of a second to turn and the dog is moving all that time, so the cloud itself is warped, which is why it is usually fused with an inertial sensor; and there are people walking about, glass, and corridors that look exactly alike.
+
+But the heart of it is the three things you have just played with: line two observations up, put every "I believe" into one picture, and at the moment an old place is recognised, let the whole picture relax at once.
+
+## Sources
+
+- Pose graphs and Gauss–Newton: Grisetti, Kümmerle, Stachniss, Burgard, *A Tutorial on Graph-Based SLAM*, IEEE Intelligent Transportation Systems Magazine, 2010.
+- How a real 2-D lidar SLAM finds old places over a large area: Hess, Kohler, Rapp, Andor, *Real-Time Loop Closure in 2D LIDAR SLAM*, ICRA 2016 (Cartographer).
