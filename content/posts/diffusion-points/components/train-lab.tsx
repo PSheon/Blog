@@ -1,8 +1,9 @@
 "use client";
 
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { Dices, Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
+import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
@@ -24,12 +25,15 @@ export function TrainLab() {
   const { pair, running, steps, loss, perSec, generation } = useLab();
   const canvas = useRef<HTMLCanvasElement>(null);
   const [blend, setBlend] = useState(0.5);
-  const run = useRef({ cloud: new Float64Array(PER_CLOUD * CLOUDS * DIMS), levels: schedule(STEPS), at: STEPS + 1, hold: HOLD_SECONDS, generation: -1, blend });
+  // With reduced motion the clouds are grown once and then left alone until the reader asks again.
+  const still = useReducedMotion();
+  const run = useRef({ cloud: new Float64Array(PER_CLOUD * CLOUDS * DIMS), levels: schedule(STEPS), at: STEPS + 1, hold: HOLD_SECONDS, generation: -1, blend, again: false });
   useEffect(() => { run.current.blend = blend; }, [blend]);
 
   useCloud(canvas, PER_CLOUD * CLOUDS, EXTENT, (view, dt) => {
     const r = run.current;
-    if (r.at > STEPS && ((r.hold += dt) > HOLD_SECONDS || r.generation !== generation)) {
+    if (r.at > STEPS && ((!still && (r.hold += dt) > HOLD_SECONDS) || r.again || r.generation !== generation)) {
+      r.again = false;
       for (let i = 0; i < r.cloud.length; i++) r.cloud[i] = gaussian(Math.random);
       r.at = 0;
       r.hold = 0;
@@ -72,10 +76,14 @@ export function TrainLab() {
         <Slider value={[blend]} min={0} max={1} step={0.05} aria-label={t.blend} onValueChange={(v) => setBlend(Array.isArray(v) ? v[0] : v)} />
       </label>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           <Button onClick={() => setRunning(!running)} data-testid="diffusion-train">
             {running ? <Pause /> : <Play />}
             {running ? t.pause : steps ? t.resume : t.train}
+          </Button>
+          <Button variant="outline" onClick={() => (run.current.again = true)}>
+            <Dices />
+            {t.again}
           </Button>
           <Button variant="ghost" disabled={steps === 0} onClick={() => resetModel()}>
             <RotateCcw />
