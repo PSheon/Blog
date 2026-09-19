@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
 interface Stop {
   word: string;
@@ -9,16 +10,16 @@ interface Stop {
 }
 
 /**
- * See → Think → Act as a signal path, after the pipeline drawn along the bottom of the profile
+ * See → Think → Generate → Act as a signal path, after the pipeline drawn along the bottom of the profile
  * banner. Each stop is a real destination: the tag that holds that kind of article.
  */
 export function TriadRail({ locale, stops, label }: { locale: Locale; stops: Stop[]; label: string }) {
   return (
     <nav aria-label={label} className="relative py-10">
       <div className="triad-gradient absolute inset-x-0 top-1/2 h-px opacity-40 [mask-image:repeating-linear-gradient(90deg,#000_0_4px,transparent_4px_10px)]" aria-hidden />
-      <ol className="relative grid grid-cols-3">
+      <ol className="relative grid grid-cols-2 gap-y-3 sm:grid-cols-4">
         {stops.map((stop, i) => (
-          <li key={stop.tag} className={i === 0 ? "justify-self-start" : i === stops.length - 1 ? "justify-self-end" : "justify-self-center"}>
+          <li key={stop.tag} className={cn(i % 2 === 0 ? "justify-self-start" : "justify-self-end", i === 0 ? "sm:justify-self-start" : i === stops.length - 1 ? "sm:justify-self-end" : "sm:justify-self-center")}>
             <Link
               href={`/${locale}/tags/${stop.tag}`}
               className="group flex items-center gap-2.5 rounded-full border border-border bg-background py-1.5 pr-3.5 pl-2.5 text-sm transition-colors hover:border-foreground/30"

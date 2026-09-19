@@ -2,9 +2,9 @@ import type { Dictionary } from "./zh";
 
 const en: Dictionary = {
   meta: {
-    title: "paul.notebook — machines that see, agents that act",
+    title: "paul.notebook — machine learning models, built from scratch",
     description:
-      "Paul's lab notebook: interactive, hands-on articles that take apart computer vision, LLMs and multi-agent systems.",
+      "Paul's lab notebook: machine learning models built from scratch that you can train, take apart and break in your browser. Computer vision, reinforcement learning, Transformers, diffusion and robots.",
   },
   nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home" },
   search: {
@@ -25,7 +25,14 @@ const en: Dictionary = {
   locale: { label: "Language", switch: "Switch language" },
   hero: {
     eyebrow: "Lab notebook",
-    tagline: ["See", "Think", "Act"],
+    title: "Machine learning models, built from scratch",
+    subtitle: "Train them, take them apart and break them, right in your browser",
+    topics: [
+      { word: "See", tag: "computer-vision" },
+      { word: "Think", tag: "llm" },
+      { word: "Generate", tag: "generative" },
+      { word: "Act", tag: "ai-agent" },
+    ],
     intro:
       "I'm Paul. I build machines that see and agents that act. This notebook takes models apart in writing — every article ships with instruments you can operate right in the browser, all written from scratch in TypeScript.",
     ctaPrimary: "Read the latest",
@@ -37,7 +44,7 @@ const en: Dictionary = {
   },
   home: {
     featured: "Featured",
-    topics: "Browse by theme: see, think, act",
+    topics: "Browse by theme: see, think, generate, act",
     index: "Notebook index",
     indexLead: "Newest first.",
     all: "All",

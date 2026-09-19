@@ -1,7 +1,7 @@
 const zh = {
   meta: {
-    title: "paul.notebook — 看得見的機器，會行動的代理",
-    description: "Paul 的實驗筆記：用可以動手玩的互動文章，拆解電腦視覺、LLM 與多代理系統。",
+    title: "paul.notebook — 從零實作機器學習模型",
+    description: "Paul 的實驗筆記：從零實作機器學習模型，每一篇都能在瀏覽器裡訓練、拆開、弄壞。電腦視覺、強化學習、Transformer、擴散模型與機器人。",
   },
   nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁" },
   search: {
@@ -23,7 +23,15 @@ const zh = {
   locale: { label: "語言", switch: "切換語言" },
   hero: {
     eyebrow: "實驗筆記",
-    tagline: ["看見", "思考", "行動"],
+    title: "從零實作機器學習模型",
+    subtitle: "每一篇都能在瀏覽器裡訓練、拆開、弄壞",
+    // The rail under the hero: one stop per kind of article, each a real tag.
+    topics: [
+      { word: "看見", tag: "computer-vision" },
+      { word: "思考", tag: "llm" },
+      { word: "生成", tag: "generative" },
+      { word: "行動", tag: "ai-agent" },
+    ],
     intro:
       "我是 Paul，做會看的機器，也做會行動的代理。這本筆記把模型拆開來寫：每篇文章都附上能在瀏覽器裡直接操作的儀器，全部用 TypeScript 從零寫起。",
     ctaPrimary: "讀最新一篇",
@@ -35,7 +43,7 @@ const zh = {
   },
   home: {
     featured: "精選",
-    topics: "依主題瀏覽：看見、思考、行動",
+    topics: "依主題瀏覽：看見、思考、生成、行動",
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
     all: "全部",
