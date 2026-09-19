@@ -280,8 +280,7 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
 
 test("a diffusion model trains in the page and its instruments share it", async ({ page }) => {
   const response = await page.goto("/zh/posts/diffusion-points");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "diffusion-points is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(120_000);
   const errors = watchErrors(page);
 
