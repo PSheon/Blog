@@ -31,11 +31,13 @@ export function useCloud(canvas: RefObject<HTMLCanvasElement | null>, count: num
       latest.current.onVisible?.(visible);
     });
     seen.observe(el);
-    void CloudView.create(el, count, extent, narrowExtent).then((v) => {
+    // three.js is 180 KB that the first paint does not need: fetch it once the browser is idle, not on mount.
+    const start = () => void CloudView.create(el, count, extent, narrowExtent).then((v) => {
       if (disposed) return v.dispose();
       view = v;
       raf = requestAnimationFrame(loop);
     });
-    return () => { disposed = true; cancelAnimationFrame(raf); seen.disconnect(); latest.current.onVisible?.(false); view?.dispose(); };
+    const idle = window.requestIdleCallback ? window.requestIdleCallback(start, { timeout: 2500 }) : window.setTimeout(start, 300);
+    return () => { disposed = true; (window.cancelIdleCallback ?? window.clearTimeout)(idle); cancelAnimationFrame(raf); seen.disconnect(); latest.current.onVisible?.(false); view?.dispose(); };
   }, [canvas, count, extent, narrowExtent, still]);
 }

@@ -3,7 +3,8 @@ import { Instrument_Sans, JetBrains_Mono, Source_Serif_4 } from "next/font/googl
 // Prose and headings share one serif; instruments speak in mono; chrome in a quiet sans.
 const body = Source_Serif_4({ subsets: ["latin"], variable: "--font-body", display: "swap" });
 const ui = Instrument_Sans({ subsets: ["latin"], variable: "--font-ui", display: "swap" });
-const code = JetBrains_Mono({ subsets: ["latin"], variable: "--font-code", display: "swap" });
+// Labels and code only: not worth a place among the preloaded fonts that compete with the first paint.
+const code = JetBrains_Mono({ subsets: ["latin"], variable: "--font-code", display: "swap", preload: false });
 
 /*
  * Chinese is set in the reader's system fonts on purpose (see the stacks in globals.css).
