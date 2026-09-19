@@ -233,8 +233,10 @@ test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page 
   await page.getByTestId("hy-train").click();
   // Works with emoji or with the shape fallback (headless Linux has no colour emoji font).
   await expect.poll(async () => Number(await page.getByTestId("hy-box").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.6);
+  // The two heads do not learn at the same pace, and on the shape fallback the mask trails the box: wait for it
+  // too instead of reading it the moment the box is good enough (that failed on CI and, once, locally).
+  await expect.poll(async () => Number(await page.getByTestId("hy-mask").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.4);
   await page.getByTestId("hy-train").click();
-  expect(Number(await page.getByTestId("hy-mask").textContent())).toBeGreaterThan(0.4);
   expect(errors).toEqual([]);
 });
 
