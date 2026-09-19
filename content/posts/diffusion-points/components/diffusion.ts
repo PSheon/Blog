@@ -9,10 +9,13 @@ export const ALPHA_BAR = (() => {
 })();
 
 const TIME_FREQ = [1, 2, 4, 8], SPACE_FREQ = [1, 2, 4];
-const INPUTS = 3 + 3 * 2 * SPACE_FREQ.length + 2 * TIME_FREQ.length;
+/** Every point is a position and a colour: x, y, z, then r, g, b, all in about [−1, 1]. */
+export const DIMS = 6;
+const INPUTS = DIMS + 3 * 2 * SPACE_FREQ.length + 2 * TIME_FREQ.length;
 
 export type Rng = () => number;
-export type Shape = (rng: Rng) => [number, number, number];
+export type Point = [number, number, number, number, number, number];
+export type Shape = (rng: Rng) => Point;
 
 export function gaussian(rng: Rng): number {
   return Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
@@ -23,11 +26,11 @@ function features(x: ArrayLike<number>, n: number, level: (i: number) => number)
   const m = new Mat(n, INPUTS);
   for (let i = 0; i < n; i++) {
     let o = i * INPUTS;
-    for (let k = 0; k < 3; k++) m.data[o++] = x[i * 3 + k];
+    for (let k = 0; k < DIMS; k++) m.data[o++] = x[i * DIMS + k];
     for (const f of SPACE_FREQ) {
       for (let k = 0; k < 3; k++) {
-        m.data[o++] = Math.sin(f * Math.PI * x[i * 3 + k]);
-        m.data[o++] = Math.cos(f * Math.PI * x[i * 3 + k]);
+        m.data[o++] = Math.sin(f * Math.PI * x[i * DIMS + k]);
+        m.data[o++] = Math.cos(f * Math.PI * x[i * DIMS + k]);
       }
     }
     for (const f of TIME_FREQ) {
@@ -38,7 +41,7 @@ function features(x: ArrayLike<number>, n: number, level: (i: number) => number)
   return m;
 }
 
-/** A DDPM over single 3-D points: an MLP that looks at a noisy point and guesses the noise that was added to it. */
+/** A DDPM over single coloured 3-D points: an MLP that looks at a noisy point and guesses the noise that was added to it. */
 export class PointDiffusion {
   readonly params: Record<string, Mat>;
   private readonly adam: Adam;
@@ -56,7 +59,7 @@ export class PointDiffusion {
       w1: init(INPUTS, hidden), b1: new Mat(1, hidden),
       w2: init(hidden, hidden), b2: new Mat(1, hidden),
       w3: init(hidden, hidden), b3: new Mat(1, hidden),
-      w4: init(hidden, 3), b4: new Mat(1, 3),
+      w4: init(hidden, DIMS), b4: new Mat(1, DIMS),
     };
     this.adam = new Adam(this.params);
   }
@@ -75,14 +78,14 @@ export class PointDiffusion {
 
   /** One step: take clean points, add a random amount of noise to each, ask the network which noise it was. */
   train(shape: Shape, batch = 256, lr = 2e-3) {
-    const x = new Float64Array(batch * 3), noise = new Float64Array(batch * 3), levels = new Float64Array(batch);
+    const x = new Float64Array(batch * DIMS), noise = new Float64Array(batch * DIMS), levels = new Float64Array(batch);
     for (let i = 0; i < batch; i++) {
       const p = shape(this.rng), t = 1 + Math.floor(this.rng() * T);
       levels[i] = t;
-      for (let k = 0; k < 3; k++) {
+      for (let k = 0; k < DIMS; k++) {
         const e = gaussian(this.rng);
-        noise[i * 3 + k] = e;
-        x[i * 3 + k] = Math.sqrt(ALPHA_BAR[t]) * p[k] + Math.sqrt(1 - ALPHA_BAR[t]) * e;
+        noise[i * DIMS + k] = e;
+        x[i * DIMS + k] = Math.sqrt(ALPHA_BAR[t]) * p[k] + Math.sqrt(1 - ALPHA_BAR[t]) * e;
       }
     }
     for (const m of Object.values(this.params)) m.grad.fill(0);
@@ -95,7 +98,7 @@ export class PointDiffusion {
 
   /** Move every point in `x` (in place) from noise level `from` down to `to`: one deterministic DDIM step. */
   denoise(x: Float64Array, from: number, to: number) {
-    const n = x.length / 3, eps = this.predict(new Tape(), features(x, n, () => from)).data;
+    const n = x.length / DIMS, eps = this.predict(new Tape(), features(x, n, () => from)).data;
     const a = ALPHA_BAR[from], b = ALPHA_BAR[to];
     for (let i = 0; i < x.length; i++) {
       const clean = Math.max(-1.5, Math.min(1.5, (x[i] - Math.sqrt(1 - a) * eps[i]) / Math.sqrt(a)));
