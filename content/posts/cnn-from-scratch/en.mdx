@@ -42,7 +42,7 @@ $$
 y_{i,j} = b + \sum_{u=0}^{2} \sum_{v=0}^{2} w_{u,v} \, x_{i+u,\, j+v}
 $$
 
-The instrument below slows this down. The input is a bright vertical bar, and the kernel has −1 down its left column and +1 down its right. Press Step and watch each output cell being computed.
+The instrument below slows this down. The input is a bright vertical bar (its bottom two rows are shifted one pixel to the left), and the kernel has −1 down its left column and +1 down its right. Press Step and watch each output cell being computed.
 
 <Instrument fig="02" title="conv2d / step" caption="Wherever the kernel rests, the line underneath spells out its nine multiply-adds. The output is positive along the bar's left edge, negative along its right edge, and 0 where the image is flat.">
   <ConvStepper />
@@ -50,7 +50,7 @@ The instrument below slows this down. The input is a bright vertical bar, and th
 
 What this kernel computes is "right minus left". Over a uniform region that difference is zero; only where dark on the left meets bright on the right does the output become a large positive number. It is a **vertical edge detector**, and it uses the same nine numbers wherever the edge happens to be.<Sidenote>Strictly speaking, what deep-learning frameworks call convolution is cross-correlation: the kernel isn't flipped. Because the weights are learned, flipping makes no difference, and the name stuck.</Sidenote>
 
-In code it is a handful of nested loops and nothing more:
+In code it is a handful of nested loops. Below is a simplified single-channel version; the one in `lib/ml/ops.ts` wraps it in loops over the batch and the channels, and the innermost loops are the same:
 
 ```ts title="lib/ml/ops.ts" {6-8}
 for (let oy = 0; oy < oH; oy++) {
@@ -71,7 +71,7 @@ for (let oy = 0; oy < oH; oy++) {
 
 ### Change the numbers, change the feature
 
-Nine numbers can do more than you'd expect. The input below is the digit you just drew; edit the kernel and see.
+Nine numbers can do more than you'd expect. The input below is the digit you just drew (or the sample 7 if you drew nothing); edit the kernel and see.
 
 <Instrument fig="03" title="kernel playground" size="wide" caption="Cyan is positive output, pink is negative. Try Vertical edges, then Horizontal edges: the same digit, but different kernels light up different strokes.">
   <KernelPlayground />
@@ -88,7 +88,7 @@ A convolution is usually followed by two very small operations.
 **Max pooling** replaces each 2×2 block with its largest value, halving the width and the height. That does two things: later layers have a quarter as many pixels to process, and a feature gives the same output wherever it falls inside its 2×2 block, so the model is less sensitive to small shifts.
 
 <Callout type="insight" title="The receptive field grows with depth">
-One output pixel of the first layer sees a 3×3 patch of the input. After one round of pooling, a 3×3 window in the second layer covers roughly 8×8 of the original image. Deeper layers see wider, which is why shallow layers learn edges and deeper ones learn "a loop" or "a bend".
+One output pixel of the first layer sees a 3×3 patch of the input. After one round of pooling, a 3×3 window in the second layer covers 8×8 of the original image. Deeper layers see wider, which is why shallow layers learn edges and deeper ones learn "a loop" or "a bend".
 </Callout>
 
 ## The whole network
@@ -105,7 +105,7 @@ The model in this article has two convolutional blocks and one fully connected l
 | flatten → dense | 10 | 7,850 |
 | softmax | 10 | 0 |
 
-That is 9,098 parameters in a weights file of about 66 KB, reaching 98.6% accuracy on the MNIST test set.<Sidenote>Training was done once in PyTorch and the weights exported as JSON. The TypeScript forward pass has unit tests that compare it with PyTorch's output to within $10^{-4}$.</Sidenote> A fully connected network needs roughly ten times as many parameters for similar accuracy.
+That is 9,098 parameters in a weights file of about 66 KB, reaching 98.6% accuracy on the MNIST test set.<Sidenote>Training was done once in PyTorch and the weights exported as JSON. The TypeScript forward pass has unit tests that compare it with PyTorch's output to within $10^{-4}$.</Sidenote> A fully connected network needs roughly ten times as many parameters for similar accuracy [needs verification].
 
 In TypeScript the model is an array:
 
@@ -133,7 +133,7 @@ These are the feature maps of every layer as your digit passes through the netwo
   <FeatureMaps />
 </Instrument>
 
-Draw a few different digits and notice:
+Draw a few different digits:
 
 1. In conv1 you can still recognise the digit; each map emphasises strokes in a different direction.
 2. By conv2 a single map is hard to read. It encodes "some combination of strokes appears somewhere".
@@ -143,7 +143,7 @@ Draw a few different digits and notice:
 
 High probability doesn't mean the model has understood anything. A direct way to find out which part of the image it relies on is to **cover that part and see how far the confidence falls**.
 
-The instrument below slides a 4×4 blank patch across the image, re-runs the network at each position (169 forward passes in all), and records how far the predicted class's probability drops.
+The instrument below slides a 4×4 blank patch across the image two pixels at a time, 13 × 13 = 169 positions in all. It re-runs the network at each position (skipping any where the patch covers only blank paper) and records how far the predicted class's probability drops.
 
 <Instrument fig="05" title="occlusion sensitivity" size="wide" caption="The brighter a spot on the right, the more the model's confidence falls when it is covered. Try 7: the bar and the corner are usually brightest. Then compare 1 with 7. That bar is exactly what the model relies on.">
   <OcclusionMap />
@@ -157,14 +157,15 @@ Occlusion tests one small patch at a time. If the model relies on a combination 
 
 Play with it for a while and you'll find ways to break it:
 
-- **Drawing small, or in a corner,** is fine, because preprocessing crops, scales and then centres the drawing by its centre of mass, the same way MNIST was prepared.
 - **Extra strokes** fool it easily, such as a bar through the middle of a 7 or a line under a 1. The training data has almost none of those.
 - **Something that isn't a digit** still gets a confident answer. Softmax outputs always sum to 1; the model has no way to say "I don't know".
 
-That last point is a serious problem in real systems. On a production line or a surveillance feed, most of what a model sees lies outside its training distribution, and high confidence is not the same as being right.
+(Drawing small, or only in a corner, is fine: preprocessing crops, scales and then centres the drawing by its centre of mass, the same way MNIST was prepared.)
+
+Having no way to say "I don't know" is a serious problem in real systems. On a production line or a surveillance feed, a model will sooner or later see something outside its training distribution, and high confidence is not the same as being right.
 
 ## What comes next
 
 This model has about nine thousand parameters and recognises ten classes. Stack the same bricks (convolution, non-linearity, downsampling) deeper and wider, add residual connections, and you have the backbones that do detection, pose estimation and segmentation on edge devices today. The principle is unchanged; only the scale differs.
 
-This model was trained with gradient descent. [The next entry](/en/posts/ai-flappy-bird) takes a completely different road: no gradients, no backpropagation, only survival of the fittest, as 50 birds teach themselves to play Flappy Bird. And if you want to watch training itself happen in the browser, [№ 004](/en/posts/transformer-from-scratch) trains a Transformer from scratch while you watch its attention matrix take shape.
+This model was trained beforehand and then brought in. If you want to watch training itself happen in the browser, [№ 004](/en/posts/transformer-from-scratch) trains a Transformer from scratch while you watch its attention matrix take shape.

@@ -1,0 +1,5 @@
+reverse: first 100% at step 40, 35, 35, 40, 40 (seeds 1-5); loss at step 100: 0.010, 0.008, 0.007, 0.007, 0.010; 4.7 ms per step on this machine
+copy: first 100% at step 35, 35, 30, 40, 40 (seeds 1-5); loss at step 100: 0.010, 0.009, 0.008, 0.007, 0.010; 4.7 ms per step on this machine
+sort: first 100% at step 800, 725, 650, 675, 725 (seeds 1-5); loss at step 100: 0.344, 0.214, 0.238, 0.216, 0.216; 4.3 ms per step on this machine
+
+(this machine: Apple-silicon Mac, Node via vitest, 2026-09-20)
