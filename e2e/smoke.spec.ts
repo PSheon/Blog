@@ -133,6 +133,16 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
   });
 }
 
+test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
+  await page.goto("/zh/posts/lite3-walking");
+  const hidden = page.locator(".katex-mathml");
+  expect(await hidden.count()).toBeGreaterThan(5);
+  // KaTeX ships the MathML copy clipped to a pixel; without its stylesheet every formula shows up twice.
+  for (const box of await hidden.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => [r.width, r.height]))) {
+    expect(Math.max(...box)).toBeLessThanOrEqual(1);
+  }
+});
+
 test("an article describes itself to search engines as a BlogPosting with an image", async ({ page }) => {
   await page.goto("/en/posts/lite3-walking");
   const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent())!);
