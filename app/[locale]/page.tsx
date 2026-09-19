@@ -11,7 +11,7 @@ import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
 import { toRows } from "@/lib/content/rows";
-import { formatDate, getDictionary, isLocale } from "@/lib/i18n";
+import { formatDate, getDictionary, htmlLang, isLocale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 
 export default async function HomePage({ params }: PageProps<"/[locale]">) {
@@ -22,8 +22,21 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const featured = posts.find((p) => p.featured) ?? posts[0];
   const latest = posts[0];
 
+  // What the site is and who writes it, for search engines: the home page had no structured data at all.
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    name: site.name,
+    description: t.meta.description,
+    url: `${site.url}/${locale}`,
+    inLanguage: htmlLang[locale],
+    author: { "@type": "Person", name: site.author, url: site.github },
+    blogPost: posts.slice(0, 10).map((p) => ({ "@type": "BlogPosting", headline: p.title, url: `${site.url}/${p.locale}/posts/${p.slug}`, datePublished: p.date })),
+  };
+
   return (
     <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       {/* Hero: the thing itself first, the words beside it. */}
       <section className="relative grid gap-10 pt-12 pb-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-14">
         <div className="hero-grid" aria-hidden />

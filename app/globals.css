@@ -67,33 +67,33 @@
  */
 :root {
   --background: #fbfbfe;
-  --foreground: #1c2033;
+  --foreground: #12162a;
   --card: #ffffff;
-  --card-foreground: #1c2033;
+  --card-foreground: #12162a;
   --popover: #ffffff;
-  --popover-foreground: #1c2033;
-  --primary: #086c99;
+  --popover-foreground: #12162a;
+  --primary: #065a82;
   --primary-foreground: #fbfbfe;
   --secondary: #eceef5;
   --secondary-foreground: #1c2033;
-  --muted: #f0f1f7;
-  --muted-foreground: #565b78;
+  --muted: #e9ebf4;
+  --muted-foreground: #40455f;
   --accent: #e6e8f3;
   --accent-foreground: #1c2033;
   --destructive: #b3261e;
-  --border: #1c20331f;
-  --input: #1c203333;
-  --ring: #086c99;
-  --signal: #086c99;
+  --border: #12162a38;
+  --input: #12162a52;
+  --ring: #065a82;
+  --signal: #065a82;
   --signal-2: #c2255c;
   --signal-3: #6347d9;
-  --panel: #f4f5fa;
-  --rule: #1c203326;
-  --grid: #1c203314;
+  --panel: #eef0f8;
+  --rule: #12162a40;
+  --grid: #12162a1a;
   --line-width: 1px;
   --glow-a: #79dafa26;
   --glow-b: #ff6e961a;
-  --chart-1: #086c99;
+  --chart-1: #065a82;
   --chart-2: #c2255c;
   --chart-3: #6347d9;
   --chart-4: #4b5072;
@@ -107,6 +107,15 @@
   --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
+}
+
+/*
+ * Greyscale antialiasing thins every stroke. On a dark page that is what you want; on a light one it makes the
+ * system CJK serif, already hairline-thin, hard to read. Light theme gets the platform's default smoothing back.
+ */
+html:not(.dark) {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
 }
 
 .dark {

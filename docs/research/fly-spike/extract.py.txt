@@ -1,0 +1,51 @@
+"""Reduce the male CNS connectome to what a browser model of the motion pathway needs:
+for every (source type, target type) pair, the mean synapse count as a function of the hex offset
+between the two neurons' home columns. Right optic lobe only (the proofread one)."""
+import json, sys
+import numpy as np, pandas as pd, pyarrow.feather as feather, pyarrow.compute as pc, pyarrow as pa
+
+COLUMNAR = ["L1", "L2", "L3", "Mi1", "Tm3", "Mi4", "Mi9", "Tm1", "Tm2", "Tm4", "Tm9", "C3"]
+T45 = [f"T{n}{s}" for n in (4, 5) for s in "abcd"]
+TYPES = COLUMNAR + T45
+
+ann = pd.read_feather("body-annotations.feather")
+ann = ann[(ann.type.isin(TYPES)) & (ann.somaSide == "R")][["bodyId", "type", "assignedOlHex1", "assignedOlHex2"]]
+print("neurons:", len(ann))
+
+tbl = feather.read_table("weights.feather")
+print("weights columns:", tbl.schema.names, "rows:", tbl.num_rows)
+pre, post, wcol = [n for n in tbl.schema.names if "pre" in n.lower()][0], [n for n in tbl.schema.names if "post" in n.lower()][0], [n for n in tbl.schema.names if "weight" in n.lower()][0]
+ids = pa.array(ann.bodyId.values)
+tbl = tbl.filter(pc.and_(pc.is_in(tbl[pre], value_set=ids), pc.is_in(tbl[post], value_set=ids)))
+w = tbl.select([pre, post, wcol]).to_pandas().groupby([pre, post], as_index=False)[wcol].sum()  # a pair may be split by ROI
+w.columns = ["pre", "post", "n"]
+print("connections among these neurons:", len(w), "synapses:", int(w.n.sum()))
+
+# T4/T5 (and Tm3) have no assigned column. Give each the synapse-weighted mean column of its inputs from
+# columnar neurons — i.e. the centre of its dendrite — and keep the fractional value.
+hexcol = ann.set_index("bodyId")[["assignedOlHex1", "assignedOlHex2"]].rename(columns={"assignedOlHex1": "u", "assignedOlHex2": "v"})
+typ = ann.set_index("bodyId").type
+known = hexcol.dropna()
+win = w.join(known, on="pre", how="inner")
+centre = win.assign(uw=win.u * win.n, vw=win.v * win.n).groupby("post")[["uw", "vw", "n"]].sum()
+centre = pd.DataFrame({"u": centre.uw / centre.n, "v": centre.vw / centre.n})
+home = known.combine_first(centre)  # assigned column wins where it exists
+print("neurons with a home column:", len(home), "of", len(ann))
+
+w = w.join(home.add_prefix("pre_"), on="pre").join(home.add_prefix("post_"), on="post").dropna()
+w["tpre"], w["tpost"] = w.pre.map(typ), w.post.map(typ)
+w["du"], w["dv"] = w.pre_u - w.post_u, w.pre_v - w.post_v
+w.to_feather("motion-edges.feather")
+
+# Where, relative to a T4/T5 dendrite's centre, does each input type sit? (synapse-weighted mean offset)
+rows = []
+for t in T45:
+    sub = w[w.tpost == t]
+    n_cells = sub.post.nunique()
+    for src, g in sub.groupby("tpre"):
+        if g.n.sum() / n_cells < 3: continue
+        rows.append(dict(target=t, source=src, syn_per_cell=round(g.n.sum() / n_cells, 1),
+                         du=round(np.average(g.du, weights=g.n), 2), dv=round(np.average(g.dv, weights=g.n), 2)))
+out = pd.DataFrame(rows)
+out.to_csv("t4t5-input-offsets.csv", index=False)
+print(out.to_string())

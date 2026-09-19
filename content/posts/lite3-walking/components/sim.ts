@@ -1,6 +1,11 @@
 import { ACTION_SCALE, DECIMATION, DEFAULT_POSE, JOINTS, KD, KP, OBS, Policy, SENSES, type Sense, TORQUE_LIMIT, gravityInBody, observe } from "./policy";
 
 const ASSETS = "/lite3";
+/**
+ * /lite3 is served with a one-year immutable cache (next.config.mjs), so bump this whenever a file under
+ * public/lite3 changes. The meshes are STL files named .bin: Vercel compresses application/octet-stream but not model/stl.
+ */
+export const ASSET_VERSION = "1";
 const MESHES = ["hip", "thigh", "shank", "torso"];
 /** cos 30°. A healthy gait never tips the torso past 9°, even when shoved or on ice; at 30° it is not coming back. */
 const FALLEN_TILT = Math.cos(Math.PI / 6);
@@ -26,7 +31,7 @@ export interface Knobs {
 export type ReadAsset = (path: string) => Promise<Uint8Array>;
 
 const fetchAsset: ReadAsset = async (path) => {
-  const res = await fetch(`${ASSETS}/${path}`);
+  const res = await fetch(`${ASSETS}/${path}?v=${ASSET_VERSION}`);
   if (!res.ok) throw new Error(`lite3: ${path} → ${res.status}`);
   return new Uint8Array(await res.arrayBuffer());
 };
@@ -69,7 +74,7 @@ export class Lite3Sim {
     const { default: init } = await import("@mujoco/mujoco");
     const mujoco = await init();
     const t1 = performance.now();
-    const [xml, weights, ...meshes] = await Promise.all([get("mjcf/Lite3.xml"), get("policy.f32"), ...MESHES.map((m) => get(`meshes/${m}.STL`))]);
+    const [xml, weights, ...meshes] = await Promise.all([get("mjcf/Lite3.xml"), get("policy.f32"), ...MESHES.map((m) => get(`meshes/${m}.bin`))]);
     const t2 = performance.now();
     mujoco.FS.mkdirTree("/lite3/mjcf", 0o777);
     mujoco.FS.mkdirTree("/lite3/meshes", 0o777);

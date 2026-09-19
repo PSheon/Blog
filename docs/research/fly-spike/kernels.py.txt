@@ -1,0 +1,33 @@
+"""Per type-pair hex kernels: mean synapses from a source neuron at offset (du,dv) onto one target neuron."""
+import json, numpy as np, pandas as pd
+w = pd.read_feather("motion-edges.feather")
+ann = pd.read_feather("body-annotations.feather"); ann = ann[ann.somaSide == "R"]
+T4 = [f"T4{s}" for s in "abcd"]; T5 = [f"T5{s}" for s in "abcd"]
+# Integer home column: assigned one if present, else the column of the strongest anchor input (Mi1 for T4, Tm1 for T5, Mi1 for Tm3).
+assigned = ann.dropna(subset=["assignedOlHex1"]).set_index("bodyId")[["assignedOlHex1", "assignedOlHex2"]].astype(int)
+assigned.columns = ["u", "v"]
+anchor = {**{t: "Mi1" for t in T4 + ["Tm3"]}, **{t: "Tm1" for t in T5}}
+homes = [assigned]
+for t, a in anchor.items():
+    g = w[(w.tpost == t) & (w.tpre == a)].sort_values("n").groupby("post").tail(1).set_index("post")
+    homes.append(assigned.loc[g.pre].set_index(g.index))
+home = pd.concat(homes); home = home[~home.index.duplicated()]
+w = w.drop(columns=["du", "dv"]).join(home.add_prefix("h_pre_"), on="pre").join(home.add_prefix("h_post_"), on="post").dropna()
+w["du"], w["dv"] = (w.h_pre_u - w.h_post_u).astype(int), (w.h_pre_v - w.h_post_v).astype(int)
+cells = w.groupby("tpost").post.nunique()
+occupancy = {t: round(float(home.loc[home.index.intersection(ann[ann.type == t].bodyId)].value_counts().mean()), 2) for t in T4 + T5 + ["Tm3"]}
+print("cells of that type sharing a home column (mean):", occupancy)
+k = w.groupby(["tpre", "tpost", "du", "dv"]).n.sum().reset_index()
+k["per_target"] = k.n / k.tpost.map(cells)
+k = k[(k.per_target >= 0.5) & (k.du.abs() <= 4) & (k.dv.abs() <= 4)]
+pairs = k.groupby(["tpre", "tpost"]).per_target.sum()
+pairs = pairs[pairs >= 5]   # drop weak type pairs
+k = k.set_index(["tpre", "tpost"]).loc[pairs.index].reset_index()
+out = {}
+for (a, b), g in k.groupby(["tpre", "tpost"]):
+    out[f"{a}>{b}"] = [[int(r.du), int(r.dv), round(float(r.per_target), 1)] for r in g.itertuples()]
+json.dump(out, open("motion-kernels.json", "w"), separators=(",", ":"))
+import os; print("type pairs:", len(out), "taps:", len(k), "json bytes:", os.path.getsize("motion-kernels.json"))
+for p in ["Mi9>T4a", "Mi1>T4a", "Mi4>T4a", "Mi9>T4b", "Mi4>T4b", "Mi9>T4c", "Mi4>T4c", "Tm9>T5a", "Tm1>T5a", "Tm4>T5a"]:
+    print(p, sorted(out.get(p, []), key=lambda r: -r[2])[:5])
+print("strongest type pairs:"); print(pairs.sort_values(ascending=False).head(25).round(1).to_string())

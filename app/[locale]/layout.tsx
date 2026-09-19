@@ -5,6 +5,8 @@ import "../globals.css";
 import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
@@ -72,6 +74,11 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             </main>
             <SiteFooter locale={locale} t={t} />
         </ThemeProvider>
+        {/* Real-visitor numbers: page views without cookies, and Core Web Vitals from actual devices. Their scripts
+            are served by Vercel itself (/_vercel/…), so anywhere else they would only 404 into the console. Both
+            also have to be switched on once in the project's dashboard. */}
+        {process.env.VERCEL && <Analytics />}
+        {process.env.VERCEL && <SpeedInsights />}
       </body>
     </html>
   );

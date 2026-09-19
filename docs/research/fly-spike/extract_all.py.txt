@@ -1,0 +1,35 @@
+"""Whole-optic-lobe version: every right-side cell type with at least MIN cells becomes a channel on the hex lattice."""
+import json, os, numpy as np, pandas as pd, pyarrow as pa, pyarrow.feather as feather, pyarrow.compute as pc
+MIN = 300
+ann = pd.read_feather("body-annotations.feather")
+ann = ann[(ann.somaSide == "R") & ann.type.notna() & ann.superclass.isin(["ol_intrinsic", "visual_projection", "ol_sensory", "visual_centrifugal"])]
+counts = ann.groupby("type").size()
+types = sorted(counts[counts >= MIN].index)
+ann = ann[ann.type.isin(types)]
+print(len(types), "types,", len(ann), "neurons"); print(counts[types].sort_values(ascending=False).to_string())
+tbl = feather.read_table("weights.feather"); ids = pa.array(ann.bodyId.values)
+tbl = tbl.filter(pc.and_(pc.is_in(tbl["body_pre"], value_set=ids), pc.is_in(tbl["body_post"], value_set=ids)))
+w = tbl.to_pandas().groupby(["body_pre", "body_post"], as_index=False).weight.sum(); w.columns = ["pre", "post", "n"]
+print("connections:", len(w), "synapses:", int(w.n.sum()))
+typ = ann.set_index("bodyId").type
+assigned = ann.dropna(subset=["assignedOlHex1"]).set_index("bodyId")[["assignedOlHex1", "assignedOlHex2"]].astype(int); assigned.columns = ["u", "v"]
+# Home column of an unassigned neuron: the column of the assigned neuron it exchanges the most synapses with (either direction).
+both = pd.concat([w.rename(columns={"pre": "other", "post": "me"}), w.rename(columns={"post": "other", "pre": "me"})])
+both = both[both.other.isin(assigned.index) & ~both.me.isin(assigned.index)]
+best = both.sort_values("n").groupby("me").tail(1).set_index("me")
+home = pd.concat([assigned, assigned.loc[best.other].set_index(best.index)])
+print("neurons with a home:", len(home), "of", len(ann))
+w = w.join(home.add_prefix("a_"), on="pre").join(home.add_prefix("b_"), on="post").dropna()
+w["tpre"], w["tpost"] = w.pre.map(typ), w.post.map(typ)
+w["du"], w["dv"] = (w.a_u - w.b_u).astype(int), (w.a_v - w.b_v).astype(int)
+cells = ann.groupby("type").size()
+k = w.groupby(["tpre", "tpost", "du", "dv"]).n.sum().reset_index()
+k["per_target"] = k.n / k.tpost.map(cells)
+k = k[(k.per_target >= 0.5) & (k.du.abs() <= 4) & (k.dv.abs() <= 4)]
+pairs = k.groupby(["tpre", "tpost"]).per_target.sum(); pairs = pairs[pairs >= 5]
+k = k.set_index(["tpre", "tpost"]).loc[pairs.index].reset_index()
+nt = pd.read_feather("body-nt.feather").set_index("body").consensus_nt
+sign = {t: (-1 if str(nt.reindex(ann[ann.type == t].bodyId).mode().iloc[0]) in ("gaba", "glutamate", "histamine") else 1) for t in types}
+out = {"types": types, "sign": sign, "kernels": {f"{a}>{b}": [[int(r.du), int(r.dv), round(float(r.per_target), 1)] for r in g.itertuples()] for (a, b), g in k.groupby(["tpre", "tpost"])}}
+json.dump(out, open("optic-kernels.json", "w"), separators=(",", ":"))
+print("pairs:", len(out["kernels"]), "taps:", len(k), "bytes:", os.path.getsize("optic-kernels.json"), "inhibitory types:", sum(v < 0 for v in sign.values()))

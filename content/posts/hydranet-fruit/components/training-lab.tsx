@@ -103,15 +103,17 @@ export function TrainingLab() {
     const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
       if (!visible) return;
+      // Scoring 48 images costs about as much as training 48: do it once a second, and give it the frame to
+      // itself. Training in the same frame made a 70 ms task once a second, which shows when you scroll.
+      if (now - lastEval > EVAL_EVERY_MS) {
+        lastEval = now;
+        evaluate();
+        return;
+      }
       const t0 = performance.now(), deadline = t0 + 11;
       do s.net.step(Array.from({ length: 8 }, () => s.source.next(s.rng)));
       while (performance.now() < deadline);
       s.trainMs += performance.now() - t0;
-      // Scoring 48 images costs about as much as training 48: do it once a second, not every frame.
-      if (now - lastEval > EVAL_EVERY_MS) {
-        lastEval = now;
-        evaluate();
-      }
     };
 
     const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));

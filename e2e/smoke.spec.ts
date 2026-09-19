@@ -133,11 +133,39 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
   });
 }
 
+test("a URL that matches nothing gets the site's own 404, not the framework's", async ({ page }) => {
+  const response = await page.goto("/zh/no-such-page/at-all");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+});
+
+test("the home page describes the blog to search engines and has an icon iOS can use", async ({ page }) => {
+  await page.goto("/en");
+  const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').first().textContent())!);
+  expect(ld).toMatchObject({ "@type": "Blog", inLanguage: "en", author: { "@type": "Person" } });
+  expect(ld.blogPost.length).toBeGreaterThan(3);
+  const icon = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+  expect((await page.request.get(icon!)).headers()["content-type"]).toBe("image/png");
+});
+
+test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
+  await page.goto("/zh/posts/lite3-walking");
+  const hidden = page.locator(".katex-mathml");
+  expect(await hidden.count()).toBeGreaterThan(5);
+  // KaTeX ships the MathML copy clipped to a pixel; without its stylesheet every formula shows up twice.
+  for (const box of await hidden.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => [r.width, r.height]))) {
+    expect(Math.max(...box)).toBeLessThanOrEqual(1);
+  }
+});
+
 test("an article describes itself to search engines as a BlogPosting with an image", async ({ page }) => {
   await page.goto("/en/posts/lite3-walking");
   const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent())!);
   expect(ld).toMatchObject({ "@type": "BlogPosting", inLanguage: "en", keywords: expect.stringContaining("robotics") });
-  expect((await page.request.get(ld.image)).headers()["content-type"]).toBe("image/png");
+  // The absolute URL carries the canonical origin, which is not where the test server listens.
+  expect((await page.request.get(new URL(ld.image).pathname)).headers()["content-type"]).toBe("image/png");
 });
 
 test("flappy birds evolve past the first generation", async ({ page }) => {
@@ -222,8 +250,10 @@ test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page 
   await page.getByTestId("hy-train").click();
   // Works with emoji or with the shape fallback (headless Linux has no colour emoji font).
   await expect.poll(async () => Number(await page.getByTestId("hy-box").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.6);
+  // The two heads do not learn at the same pace, and on the shape fallback the mask trails the box: wait for it
+  // too instead of reading it the moment the box is good enough (that failed on CI and, once, locally).
+  await expect.poll(async () => Number(await page.getByTestId("hy-mask").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.4);
   await page.getByTestId("hy-train").click();
-  expect(Number(await page.getByTestId("hy-mask").textContent())).toBeGreaterThan(0.4);
   expect(errors).toEqual([]);
 });
 
@@ -246,21 +276,49 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
 
   // One robot, one canvas: it moves to whichever instrument is on screen.
   await senses.scrollIntoViewIfNeeded();
-  await senses.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await expect(senses).toHaveAttribute("data-here", "true");
+  await senses.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+  await expect(senses).toHaveAttribute("data-here", "true", { timeout: 20_000 });
   await expect(page.getByTestId("lite3-stage")).toHaveCount(1);
   await page.getByRole("button", { name: /蒙住: 關節角度/ }).click();
   await expect(senses).toContainText("倒了", { timeout: 15_000 });
 
   // A 400 N shove always topples it (measured: everything from 275 N up does).
   const push = page.locator('[data-stage="push"]');
-  await push.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await expect(push).toHaveAttribute("data-here", "true");
+  await push.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+  await expect(push).toHaveAttribute("data-here", "true", { timeout: 20_000 });
   await page.locator('[data-instrument="lite3 / push"]').getByRole("slider").focus();
   await page.keyboard.press("End");
   await page.getByTestId("lite3-push-away").click();
   await expect(page.getByTestId("lite3-push-log")).toContainText("400 N", { timeout: 5_000 });
   await expect(page.getByTestId("lite3-push-log")).toContainText("倒了", { timeout: 15_000 });
   await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  expect(errors).toEqual([]);
+});
+
+test("a diffusion model trains in the page and its instruments share it", async ({ page }) => {
+  const response = await page.goto("/zh/posts/diffusion-points");
+  expect(response?.status()).toBe(200);
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
+  await page.getByTestId("diffusion-train").click();
+  await expect.poll(async () => Number((await page.getByTestId("diffusion-steps").textContent())!.replace(/,/g, "")), { timeout: 90_000 }).toBeGreaterThan(200);
+  await page.getByTestId("diffusion-train").click();
+
+  // The step-by-step instrument samples from the model trained above, not from one of its own.
+  // …and it refreshes by itself on scrolling into view: it once showed a run from before Train was pressed.
+  await page.getByTestId("diffusion-sample").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("diffusion-steps-note")).toContainText(/訓練了 [\d,]{3,} 步/, { timeout: 20_000 });
+  // An early guess of the result is a blob, and the instrument says that this is right.
+  await page.getByTestId("diffusion-guess").click();
+  await page.locator('[data-instrument="diffusion / steps"]').getByRole("slider").focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("diffusion-guess-hint")).toContainText("平均");
+
+  // Choosing another fruit throws the model away: it knows nothing about the new one.
+  await page.locator('[data-instrument="diffusion / train"]').getByRole("button", { name: "草莓" }).first().click();
+  await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
   expect(errors).toEqual([]);
 });
