@@ -4,31 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { CloudView } from "./cloud-view";
-import { PointDiffusion, type Shape, T, gaussian, schedule } from "./diffusion";
-import { fromPoints, knot, torus } from "./shapes";
+import { DIMS, PointDiffusion, T, gaussian, schedule } from "./diffusion";
+import { SHAPES, type ShapeName } from "./shapes";
 
-const POINTS = 3000, SAMPLING_STEPS = 40;
-type ShapeName = "lite3" | "knot" | "torus";
+const POINTS = 3000, SAMPLING_STEPS = 40, HIDDEN = 96;
 
 /** Throwaway first version: does a from-scratch diffusion model learn a 3-D shape fast enough to watch? */
 export function SpikeLab() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const still = useReducedMotion();
-  const [shapeName, setShapeName] = useState<ShapeName>("lite3");
+  const [shapeName, setShapeName] = useState<ShapeName>("apple");
   const [running, setRunning] = useState(false);
   const [stats, setStats] = useState({ steps: 0, loss: 0, perSec: 0, level: T });
-  const live = useRef({ running: false, replay: 0 });
+  const live = useRef({ running: false, replay: 0, truth: false });
 
   useEffect(() => {
     let frame = 0, disposed = false, view: CloudView | null = null;
-    const net = new PointDiffusion(64);
-    const cloud = new Float64Array(POINTS * 3);
-    let shape: Shape | null = shapeName === "knot" ? knot : shapeName === "torus" ? torus : null;
-    if (!shape) {
-      void fetch("/diffusion/lite3-points.i16").then((r) => r.arrayBuffer()).then((b) => {
-        shape = fromPoints(Float32Array.from(new Int16Array(b), (v) => v / 32767));
-      });
-    }
+    const net = new PointDiffusion(HIDDEN);
+    const cloud = new Float64Array(POINTS * DIMS), truth = new Float64Array(POINTS * DIMS);
+    for (let i = 0; i < POINTS; i++) truth.set(SHAPES[shapeName](Math.random), i * DIMS);
+    const shape = SHAPES[shapeName];
     let levels: number[] = [], at = 0, hold = 0, trainMs = 0, prev = performance.now(), sinceStats = 0;
     const restart = () => { for (let i = 0; i < cloud.length; i++) cloud[i] = gaussian(Math.random); levels = schedule(SAMPLING_STEPS); at = 0; hold = 0; };
     restart();
@@ -38,7 +33,7 @@ export function SpikeLab() {
       frame = requestAnimationFrame(loop);
       const dt = (now - prev) / 1000;
       prev = now;
-      if (live.current.running && shape) {
+      if (live.current.running) {
         const t0 = performance.now();
         do net.train(shape, 256, net.steps < 4000 ? 2e-3 : 5e-4);
         while (performance.now() - t0 < 9);
@@ -47,7 +42,7 @@ export function SpikeLab() {
       // Keep sampling with whatever the network knows so far: noise → shape, pause, start over.
       if (at < SAMPLING_STEPS) { net.denoise(cloud, levels[at], levels[at + 1]); at++; }
       else if ((hold += dt) > 1.6 || live.current.replay) { live.current.replay = 0; restart(); }
-      view?.set(cloud);
+      view?.set(live.current.truth ? truth : cloud);
       view?.render(dt, !still);
       if ((sinceStats += dt) > 0.25) {
         sinceStats = 0;
@@ -71,11 +66,13 @@ export function SpikeLab() {
         <Button onClick={() => setRunning((r) => !r)} data-testid="diffusion-train">{running ? "Pause" : "Train"}</Button>
         <Button variant="outline" onClick={() => (live.current.replay = 1)}>Sample again</Button>
         <label className="flex items-center gap-2">
+          <input type="checkbox" onChange={(e) => (live.current.truth = e.target.checked)} data-testid="diffusion-truth" />
+          show the real shape
+        </label>
+        <label className="flex items-center gap-2">
           shape
           <select className="rounded border border-border bg-background px-1 py-0.5" value={shapeName} onChange={(e) => { setRunning(false); setShapeName(e.target.value as ShapeName); }}>
-            <option value="lite3">Lite3</option>
-            <option value="knot">trefoil knot</option>
-            <option value="torus">torus</option>
+            {Object.keys(SHAPES).map((name) => <option key={name} value={name}>{name}</option>)}
           </select>
         </label>
       </div>

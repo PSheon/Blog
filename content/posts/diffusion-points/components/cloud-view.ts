@@ -30,25 +30,23 @@ export class CloudView {
     fade.addColorStop(1, "rgba(255,255,255,0)");
     pen.fillStyle = fade;
     pen.fillRect(0, 0, 64, 64);
-    const material = new three.PointsMaterial({ size: 0.05, map: new three.CanvasTexture(dot), vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true });
+    const material = new three.PointsMaterial({ size: 0.045, map: new three.CanvasTexture(dot), vertexColors: true, transparent: true, depthWrite: false, sizeAttenuation: true });
     scene.add(new three.Points(geometry, material));
     return new CloudView(three, renderer, scene, camera, geometry, positions, colors);
   }
 
-  /** Show these points, coloured along the palette by height so the shape reads in 3-D. */
-  set(points: ArrayLike<number>) {
-    const n = Math.min(points.length, this.positions.length), c = new this.three.Color();
-    // cyan → violet → pink, the site's gradient
-    const stops = [new this.three.Color("#79dafa"), new this.three.Color("#b9a5ff"), new this.three.Color("#ff6e96")];
-    for (let i = 0; i < n; i += 3) {
-      this.positions[i] = points[i];
-      this.positions[i + 1] = points[i + 1];
-      this.positions[i + 2] = points[i + 2];
-      const h = Math.max(0, Math.min(1, (points[i + 2] + 0.7) / 1.4)) * 2;
-      c.copy(stops[Math.min(1, Math.floor(h))]).lerp(stops[Math.min(2, Math.floor(h) + 1)], h - Math.floor(h));
-      this.colors[i] = c.r; this.colors[i + 1] = c.g; this.colors[i + 2] = c.b;
+  /** Show these points: `stride` numbers each, position first, then (if there are six) the colour as −1…1. */
+  set(points: ArrayLike<number>, stride = 6) {
+    const n = Math.min(points.length / stride, this.positions.length / 3);
+    for (let i = 0; i < n; i++) {
+      for (let k = 0; k < 3; k++) {
+        this.positions[i * 3 + k] = points[i * stride + k];
+        // Stored colours are sRGB; three.js expects linear values in a colour attribute.
+        const c = Math.max(0, Math.min(1, (points[i * stride + 3 + k] + 1) / 2));
+        this.colors[i * 3 + k] = c ** 2.2;
+      }
     }
-    this.geometry.setDrawRange(0, n / 3);
+    this.geometry.setDrawRange(0, n);
     this.geometry.attributes.position.needsUpdate = true;
     this.geometry.attributes.color.needsUpdate = true;
   }
@@ -61,7 +59,7 @@ export class CloudView {
       this.camera.updateProjectionMatrix();
     }
     if (spin) this.angle += dt * 0.35;
-    this.camera.position.set(Math.cos(this.angle) * 3.1, Math.sin(this.angle) * 3.1, 1.1);
+    this.camera.position.set(Math.cos(this.angle) * 4, Math.sin(this.angle) * 4, 1.5);
     this.camera.lookAt(0, 0, 0);
     this.renderer.render(this.scene, this.camera);
   }
