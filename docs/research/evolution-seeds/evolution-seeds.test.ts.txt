@@ -1,0 +1,74 @@
+/**
+ * Measurements behind the seed claims in articles 002 (ai-flappy-bird) and 003 (trading-agent).
+ * Kept as .txt under docs/research/evolution-seeds/; to re-run, copy to tests/_probe/evolution-seeds.test.ts and
+ *   pnpm vitest run tests/_probe/evolution-seeds.test.ts
+ * Everything is seeded with mulberry32, so the output is identical on every machine.
+ */
+import { test } from "vitest";
+import { Mlp, mulberry32 } from "@/lib/ml";
+import { FlappyWorld, WORLD } from "@/content/posts/ai-flappy-bird/components/world";
+import { SHAPE, Trainer, buyAndHold, simulate } from "@/content/posts/trading-agent/components/trading";
+import data from "@/content/posts/trading-agent/aapl-2024.json";
+
+const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+
+test("002: how many seeds learn Flappy Bird within 60 generations", () => {
+  const rows: string[] = [];
+  const first: number[] = [];
+  let contrast = 0, graduated = 0;
+  for (let seed = 1; seed <= 40; seed++) {
+    const world = new FlappyWorld({ rng: mulberry32(seed) });
+    let leader: Float32Array | null = null;
+    while (world.history.length < 60 && !world.history.includes(WORLD.graduateAt)) {
+      const before = world.history.length;
+      const genomes = world.population.genomes.map((g) => Float32Array.from(g));
+      const alive = world.birds.map((b) => b.alive);
+      world.step();
+      // The generation just ended by graduating: remember one bird that was still flying.
+      if (world.history.length > before && world.history[before] >= WORLD.graduateAt) leader = genomes[alive.indexOf(true)];
+    }
+    const gen = world.history.indexOf(WORLD.graduateAt) + 1;
+    first.push(gen);
+    rows.push(`seed ${seed}: ${gen ? `graduates in generation ${gen}` : `never (best ${Math.max(...world.history)} pipes)`}`);
+    if (leader) {
+      graduated++;
+      // weights: hidden j reads [bird height, gap height] at leader[2j], leader[2j+1]
+      if ([0, 1].some((j) => leader![2 * j] * leader![2 * j + 1] < 0)) contrast++;
+    }
+  }
+  const twelve = first.slice(0, 12);
+  console.log(rows.join("\n"));
+  console.log(`seeds 1-12: ${twelve.filter((g) => g > 0).length} graduate within 60 generations, ${twelve.filter((g) => g > 0 && g < 30).length} before generation 30, median ${median(twelve.filter((g) => g > 0))}`);
+  console.log(`seeds 1-40: ${first.filter((g) => g > 0).length} graduate within 60, ${first.filter((g) => g > 0 && g < 30).length} before generation 30, median ${median(first.filter((g) => g > 0))}`);
+  console.log(`graduating birds with a hidden neuron whose two input weights have opposite signs: ${contrast} of ${graduated}`);
+}, 600_000);
+
+test("003: trading, six seeds, and how good random bots already are", () => {
+  const closes = data.closes;
+  console.log(`buy and hold: ${buyAndHold(closes).roi.toFixed(2)}%`);
+  for (const gens of [20, 30]) {
+    const out: string[] = [];
+    for (let seed = 1; seed <= 6; seed++) {
+      const trainer = new Trainer({ closes, size: 50, mutationRate: 0.15, rng: mulberry32(seed) });
+      for (let g = 0; g < gens; g++) trainer.step();
+      const best = trainer.best();
+      const sells = best.trades.filter((t) => t.action === "sell");
+      const buys = best.trades.filter((t) => t.action === "buy");
+      const early = buys.filter((t) => data.dates[t.day] < "2024-07-01").length;
+      out.push(
+        `seed ${seed}: generation 1 ${trainer.history[0].toFixed(2)}%, generation ${gens} ${trainer.history[gens - 1].toFixed(2)}%, ` +
+          `${buys.length} buys (${early} before July), ${sells.length} sells (${sells.filter((t) => (t.returnPct ?? 0) > 0).length} at a profit), cash left $${best.cash.toFixed(0)}`,
+      );
+    }
+    console.log(`--- ${gens} generations, population 50, mutation 15%\n${out.join("\n")}`);
+  }
+  const rng = mulberry32(1);
+  const rois: number[] = [];
+  const hold = buyAndHold(closes).roi;
+  for (let i = 0; i < 2000; i++) {
+    const genome = Float32Array.from({ length: 30 * 24 + 24 * 3 }, () => rng() * 2 - 1);
+    const net = new Mlp(SHAPE, genome, "relu");
+    rois.push(simulate((o) => { const y = net.forward(o); let a = 0; if (y[1] > y[a]) a = 1; if (y[2] > y[a]) a = 2; return a; }, closes).roi);
+  }
+  console.log(`2000 untrained random bots: ${((rois.filter((r) => r > hold).length / rois.length) * 100).toFixed(1)}% beat buy and hold, median ${median(rois).toFixed(1)}%, best ${Math.max(...rois).toFixed(1)}%`);
+}, 600_000);
