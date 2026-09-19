@@ -150,6 +150,24 @@ test("the home page describes the blog to search engines and has an icon iOS can
   expect((await page.request.get(icon!)).headers()["content-type"]).toBe("image/png");
 });
 
+test("on a phone the hero instrument is on the first screen and small controls are easy to hit", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout");
+  await page.goto("/zh");
+  const figure = await page.locator("figure[data-instrument]").first().boundingBox();
+  expect(figure!.y).toBeLessThan(page.viewportSize()!.height * 0.5);
+
+  // A sidenote marker is a 7×12 px digit; a tap 9 px off its centre still has to open the note.
+  await page.goto("/zh/posts/diffusion-points");
+  const marker = page.locator("button.sidenote-ref").first();
+  await marker.scrollIntoViewIfNeeded();
+  const box = (await marker.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2 + 9, box.y + box.height / 2 + 8);
+  await expect(marker).toHaveAttribute("aria-expanded", "true");
+  // Sliders: the touchable row is at least 24 px tall, not the 12 px of the thumb.
+  const control = await page.locator("[data-slot=slider] > div").first().boundingBox();
+  expect(control!.height).toBeGreaterThanOrEqual(24);
+});
+
 test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
   await page.goto("/zh/posts/lite3-walking");
   const hidden = page.locator(".katex-mathml");
