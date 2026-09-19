@@ -38,10 +38,12 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
     <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       {/* Hero: the thing itself first, the words beside it. */}
-      <section className="relative grid gap-10 pt-12 pb-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-14">
+      {/* On a phone the instrument goes straight under the headline, ahead of the intro: it is the point of the site,
+          and it used to start on the second screen. The left column dissolves (`contents`) so its children can be ordered. */}
+      <section className="relative grid gap-7 pt-10 pb-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-14">
         <div className="hero-grid" aria-hidden />
-        <div>
-          <h1 className="triad-text w-fit font-heading text-[clamp(2.75rem,7vw,5.25rem)] leading-[1.08] font-semibold tracking-tight">
+        <div className="max-lg:contents">
+          <h1 className="triad-text order-1 w-fit font-heading text-[clamp(2.75rem,7vw,5.25rem)] leading-[1.08] font-semibold tracking-tight">
             {t.hero.tagline.map((word) => (
               <span key={word} className="block">
                 {word}
@@ -49,8 +51,8 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               </span>
             ))}
           </h1>
-          <p className="mt-8 max-w-[52ch] font-serif text-lg leading-relaxed text-muted-foreground">{t.hero.intro}</p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <p className="order-3 max-w-[52ch] font-serif text-lg leading-relaxed text-muted-foreground lg:mt-8">{t.hero.intro}</p>
+          <div className="order-4 flex flex-wrap gap-3 lg:mt-8">
             {latest && (
               <Link href={`/${locale}/posts/${latest.slug}`} className={buttonVariants({ size: "lg" })}>
                 {t.hero.ctaPrimary}
@@ -63,7 +65,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative order-2">
           <div className="hero-glow" aria-hidden />
         <Instrument
           title={t.hero.instrumentTitle}
