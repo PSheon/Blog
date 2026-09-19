@@ -8,7 +8,7 @@ import { type Autopilot, Car, type Controls, autopilot, newAutopilot } from "./c
 import { useLabels } from "./labels";
 import { DriveView } from "./drive-view3d";
 import { CYAN, PINK, VIOLET } from "./paint";
-import { Param } from "./param";
+import { PRESETS, type PresetId, onPreset } from "./presets";
 import { type Pose, compose } from "./se2";
 import { DEFAULTS, Slam } from "./slam";
 import { Stick } from "./stick";
@@ -17,21 +17,23 @@ import { RING } from "./world";
 
 const START: Pose = { x: 2, y: 2, theta: 0 };
 const MAX_KEYFRAMES = 320;
+/** On autopilot the first lap is fast-forwarded, then slowed down in time to watch the loop close: nobody should wait 35 s for the point of the article. */
+const FAST = 4, SLOW_AGAIN_AFTER = 40; // metres driven
 
-interface Knobs { drift: number; loopClosure: boolean; camera: boolean }
-interface World { car: Car; slam: Slam; wheels: Pose[]; pilot: Autopilot; moved: boolean; flash: number; lastFix: number; wrong: { from: number; to: number } | null }
+interface Knobs { drift: number; loopClosure: boolean; camera: boolean; wrong: boolean }
+interface World { car: Car; slam: Slam; wheels: Pose[]; pilot: Autopilot; moved: boolean; driven: number; flash: number; lastFix: number; wrong: { from: number; to: number } | null }
 
 const fresh = (k: Knobs): World => ({
   car: new Car(RING, START, mulberry32(7), k.drift),
   slam: new Slam({ ...DEFAULTS, loopClosure: k.loopClosure, candidates: k.camera ? "appearance" : "position" }),
-  wheels: [], pilot: newAutopilot(), moved: true, flash: 0, lastFix: 0, wrong: null,
+  wheels: [], pilot: newAutopilot(), moved: true, driven: 0, flash: 0, lastFix: 0, wrong: null,
 });
 
 /**
- * Figs. 01 and 05: drive the car and watch the map it draws of a world it cannot see. `breakable` adds the switches
- * that make it fail: no loop closure, wheels too wrong for it to notice it is back, and one deliberately wrong link.
+ * Fig. 01: drive the car and watch the map it draws of a world it cannot see. Section 5's cards can hand it a setting
+ * that makes it fail — no loop closure, wheels too wrong for it to notice it is back, one deliberately wrong link.
  */
-export function DriveLab({ breakable = false }: { breakable?: boolean }) {
+export function DriveLab() {
   const t = useLabels();
   const root = useRef<HTMLDivElement>(null), stage = useRef<HTMLCanvasElement>(null), glow = useRef<HTMLDivElement>(null);
   const view = useRef<DriveView | null>(null);
@@ -39,11 +41,25 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
   const visible = useVisible(root);
   const keys = useRef<Controls>({ throttle: 0, steer: 0 });
   const [auto, setAuto] = useState(false);
-  const [knobs, setKnobs] = useState<Knobs>({ drift: 0.006, loopClosure: true, camera: false });
+  const [knobs, setKnobs] = useState<Knobs>(PRESETS.healthy);
+  const [preset, setPreset] = useState<PresetId>("healthy");
+  const [fast, setFast] = useState(false);
   const [seen, setSeen] = useState({ error: 0, wheels: 0, closures: 0, lastFix: 0, keyframes: 0, wrong: false });
   const world = useRef<World | null>(null);
 
   const restart = (k: Knobs) => { world.current = fresh(k); setKnobs(k); };
+  const take = (id: PresetId) => {
+    setPreset(id);
+    const w = world.current;
+    // A wrong link is most telling on the map the reader has already built; every other setting needs a fresh start.
+    if (id === "wrong" && w && knobs.loopClosure && !knobs.camera && knobs.drift === PRESETS.wrong.drift) setKnobs((k) => ({ ...k, wrong: true }));
+    else restart(PRESETS[id]);
+    setAuto(true);
+    root.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  };
+  const takeRef = useRef(take);
+  useEffect(() => { takeRef.current = take; });
+  useEffect(() => onPreset((id) => takeRef.current(id)), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,11 +76,13 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
       const w = world.current!, dt = Math.min(0.05, (now - prev) / 1000);
       prev = now;
       if (!visible.current) return;
-      let controls = keys.current;
-      if (auto) controls = autopilot(w.car.truth, w.car.lastScan.ranges, w.moved, w.pilot, dt);
-      if ((controls.throttle || controls.steer) && w.slam.keyframes.length < MAX_KEYFRAMES) {
+      const speedUp = auto && w.slam.closures.length === 0 && w.driven < SLOW_AGAIN_AFTER && knobs.loopClosure ? FAST : 1;
+      for (let sub = 0; sub < speedUp; sub++) {
+        const controls = auto ? autopilot(w.car.truth, w.car.lastScan.ranges, w.moved, w.pilot, dt) : keys.current;
+        if (!(controls.throttle || controls.steer) || w.slam.keyframes.length >= MAX_KEYFRAMES) break;
         const was = w.car.truth, odometry = w.car.step(controls, dt), before = w.slam.pose;
-        w.moved = Math.hypot(w.car.truth.x - was.x, w.car.truth.y - was.y) > 1e-5;
+        const step = Math.hypot(w.car.truth.x - was.x, w.car.truth.y - was.y);
+        w.moved = step > 1e-5; w.driven += step;
         if (w.slam.step(odometry, w.car.lastScan.points, w.car.lastScan.panorama)) {
           const after = w.slam.pose;
           w.lastFix = Math.hypot(after.x - before.x, after.y - before.y);
@@ -72,12 +90,15 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
         }
         w.wheels.push(w.car.deadReckoning);
       }
+      // The wrong link waits until the map is healthy, so that what it destroys is visible.
+      if (knobs.wrong && !w.wrong && w.slam.closures.length >= 3) { w.wrong = w.slam.injectFalseClosure(); if (w.wrong) w.flash = 1; }
       if (auto && w.slam.keyframes.length >= MAX_KEYFRAMES) setAuto(false);
       w.flash *= 0.93;
       view.current?.render({ truth: w.car.truth, scan: w.car.lastScan.points, slam: w.slam, wheels: w.wheels, origin: START, wrong: w.wrong }, !wide.matches);
       if (glow.current) glow.current.style.opacity = String(w.flash > 0.02 ? w.flash * 0.3 : 0);
       if ((since += dt) > 0.3) {
         since = 0;
+        setFast(speedUp > 1);
         const believed = compose(START, w.slam.pose), wheels = compose(START, w.car.deadReckoning), at = w.car.truth;
         setSeen({ error: Math.hypot(believed.x - at.x, believed.y - at.y), wheels: Math.hypot(wheels.x - at.x, wheels.y - at.y), closures: w.slam.closures.length, lastFix: w.lastFix, keyframes: w.slam.keyframes.length, wrong: !!w.wrong });
       }
@@ -88,13 +109,6 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
 
   // Stick right = turn right = clockwise = negative.
   const steer = (x: number, y: number) => { keys.current = { throttle: y, steer: -x }; };
-  const sabotage = () => {
-    const w = world.current;
-    if (!w || w.wrong) return;
-    w.wrong = w.slam.injectFalseClosure();
-    if (w.wrong) w.flash = 1;
-  };
-
   return (
     <div ref={root} className="grid gap-4 text-sm">
       <div className="relative">
@@ -104,7 +118,7 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
           <div className="absolute inset-0 grid place-items-center rounded-md bg-background/70 backdrop-blur-sm" role="status">
             <div className="grid justify-items-center gap-3 text-center">
               <p>{t.full}</p>
-              <Button size="sm" onClick={() => restart(knobs)}>{t.reset}</Button>
+              <Button size="sm" onClick={() => restart({ ...knobs, wrong: PRESETS[preset].wrong })}>{t.reset}</Button>
             </div>
           </div>
         )}
@@ -121,19 +135,16 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setAuto((a) => !a)}>{auto ? t.stopAutopilot : t.autopilot}</Button>
             <Button size="sm" variant="ghost" onClick={() => restart(knobs)}>{t.reset}</Button>
+            {fast && <span className="label self-center text-signal">{t.fastForward}</span>}
+            {preset !== "healthy" && (
+              <span className="flex items-center gap-2 rounded-full border border-border py-0.5 pr-1 pl-3">
+                <span className="label">{t.cards[preset]}</span>
+                <Button size="sm" variant="ghost" onClick={() => { setPreset("healthy"); restart(PRESETS.healthy); }}>{t.backToNormal}</Button>
+              </span>
+            )}
           </div>
         </div>
       </div>
-      {breakable && (
-        <div className="grid gap-4 rounded-md border border-border p-3 sm:grid-cols-2">
-          <Param label={t.drift} shown={`${knobs.drift.toFixed(3)} ${t.driftUnit}`} value={knobs.drift} min={0} max={0.03} step={0.002} onChange={(drift) => restart({ ...knobs, drift })} />
-          <div className="grid content-start gap-2">
-            <label className="flex items-center gap-2"><input type="checkbox" checked={knobs.loopClosure} onChange={(e) => restart({ ...knobs, loopClosure: e.target.checked })} /> {t.loopClosure}</label>
-            <label className="flex items-center gap-2"><input type="checkbox" checked={knobs.camera} onChange={(e) => restart({ ...knobs, camera: e.target.checked })} /> {t.camera}</label>
-            <Button size="sm" variant="outline" className="justify-self-start" disabled={seen.wrong || seen.keyframes < 40} onClick={sabotage}>{seen.wrong ? t.wronged : seen.keyframes < 40 ? t.wrongNeeds : t.wrong}</Button>
-          </div>
-        </div>
-      )}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Readout label={t.error} value={seen.error.toFixed(2)} unit={t.metres} large />
         <Readout label={t.wheelsOnly} value={seen.wheels.toFixed(2)} unit={t.metres} tone="alt" />
