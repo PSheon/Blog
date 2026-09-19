@@ -66,7 +66,7 @@ export function optimise(poses: Pose[], edges: Edge[], passes = 8): number[] {
       p.x -= delta[3 * i]; p.y -= delta[3 * i + 1]; p.theta = wrap(p.theta - delta[3 * i + 2]);
     });
     history.push(graphError(poses, edges));
-    if (Math.abs(history[pass] - history[pass + 1]) < 1e-9 * (1 + history[pass])) break;
+    if (Math.abs(history[pass] - history[pass + 1]) < 1e-4 * (1 + history[pass])) break; // a pass that barely helps is the last one
   }
   return history;
 }

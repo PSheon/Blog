@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
 import { Car, autopilot } from "./car";
 import { useLabels } from "./labels";
-import { PINK, car as drawCar, path, prepare, ringView, walls } from "./paint";
+import { PINK } from "./paint";
 import { Param } from "./param";
 import { type Pose, compose } from "./se2";
+import { CYAN_HEX, PINK_HEX, place, setPoints, useStage3D } from "./stage3d";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
@@ -37,28 +38,28 @@ export function WheelsLab() {
   const laps = useMemo(() => twoLaps(drift), [drift]);
   const end = laps.truth.length - 1, off = Math.hypot(laps.wheels[end].x - laps.truth[end].x, laps.wheels[end].y - laps.truth[end].y);
 
-  useEffect(() => {
-    let frame = 0, shown = still ? end : 0;
-    const loop = () => {
-      frame = requestAnimationFrame(loop);
-      if (!visible.current) return;
-      shown = Math.min(end, shown + 6);
-      const p = prepare(view.current);
-      if (!p) return;
-      const v = ringView(p.w, p.h);
-      walls(p.ctx, v, RING, p.ink, 0.35);
-      path(p.ctx, v, laps.truth.slice(0, shown + 1), p.ink, 2);
-      path(p.ctx, v, laps.wheels.slice(0, shown + 1), PINK, 2);
-      drawCar(p.ctx, v, laps.truth[shown], p.ink);
-      drawCar(p.ctx, v, laps.wheels[shown], PINK);
-    };
-    frame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frame);
-  }, [laps, end, run, still, visible]);
+  const shown = useRef(0);
+  useEffect(() => { shown.current = still ? end : 0; }, [laps, end, run, still]);
+  useStage3D(
+    view, visible,
+    (stage) => {
+      stage.walls(RING, 0.8, 0.22);
+      stage.aim(10, 6.4, 15, 19);
+      return { truth: stage.line(stage.ink), wheels: stage.line(PINK_HEX), carTruth: stage.car(CYAN_HEX), carWheels: stage.car(PINK_HEX) };
+    },
+    (stage, o) => {
+      shown.current = Math.min(end, shown.current + 6);
+      const upTo = (poses: Pose[], z: number) => poses.slice(0, shown.current + 1).flatMap((q) => [q.x, q.y, z]);
+      setPoints(stage.T, o.truth, upTo(laps.truth, 0.05));
+      setPoints(stage.T, o.wheels, upTo(laps.wheels, 0.08));
+      place(o.carTruth, laps.truth[shown.current]);
+      place(o.carWheels, laps.wheels[shown.current]);
+    },
+  );
 
   return (
     <div ref={root} className="grid gap-4 text-sm">
-      <canvas ref={view} className="aspect-[3/2] w-full rounded-md border border-border text-foreground" />
+      <canvas ref={view} className="aspect-[16/10] w-full rounded-md border border-border text-foreground" />
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded bg-foreground" />{t.truePath}</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded" style={{ background: PINK }} />{t.wheelPath}</span>

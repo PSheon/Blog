@@ -7,8 +7,9 @@ import { mulberry32 } from "@/lib/ml";
 import { Car, autopilot } from "./car";
 import { type Edge, diagonal, graphError, optimise } from "./graph";
 import { useLabels } from "./labels";
-import { CYAN, VIOLET, X, Y, prepare, ringView, walls } from "./paint";
+
 import { type Pose, between, compose } from "./se2";
+import { CYAN_HEX, VIOLET_HEX, setPoints, useStage3D } from "./stage3d";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
@@ -63,28 +64,29 @@ export function SpringsLab() {
   const tension = graphError(poses, edges);
   const worst = Math.max(...poses.map((p, i) => { const q = compose(START, p); return Math.hypot(q.x - lap.truth[i].x, q.y - lap.truth[i].y); }));
 
-  useEffect(() => {
-    let frame = 0;
-    const loop = () => {
-      frame = requestAnimationFrame(loop);
-      if (!visible.current) return;
-      const p = prepare(view.current);
-      if (!p) return;
-      const { ctx, ink } = p, v = ringView(p.w, p.h), at = poses.map((q) => compose(START, q));
-      walls(ctx, v, RING, ink, 0.18);
-      ctx.strokeStyle = ink; ctx.globalAlpha = 0.45; ctx.lineWidth = 2; ctx.beginPath();
-      at.forEach((q, i) => (i ? ctx.lineTo(X(v, q.x), Y(v, q.y)) : ctx.moveTo(X(v, q.x), Y(v, q.y))));
-      ctx.stroke(); ctx.globalAlpha = 1;
-      if (closed) { const a = at[0], b = at[at.length - 1]; ctx.strokeStyle = VIOLET; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(X(v, a.x), Y(v, a.y)); ctx.lineTo(X(v, b.x), Y(v, b.y)); ctx.stroke(); }
-      at.forEach((q, i) => { ctx.fillStyle = i === 0 || i === at.length - 1 ? VIOLET : CYAN; ctx.beginPath(); ctx.arc(X(v, q.x), Y(v, q.y), i === 0 || i === at.length - 1 ? 5 : 3.5, 0, 7); ctx.fill(); });
-    };
-    frame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frame);
-  }, [closed, poses, visible]);
+  useStage3D(
+    view, visible,
+    (stage) => {
+      const T = stage.T;
+      stage.walls(RING, 0.8, 0.14);
+      stage.aim(10, 6.4, 15, 19);
+      const node = new T.SphereGeometry(0.16, 14, 10), plain = new T.MeshStandardMaterial({ color: CYAN_HEX }), ends = new T.MeshStandardMaterial({ color: VIOLET_HEX });
+      const nodes = lap.believed.map((_, i) => { const m = new T.Mesh(node, i === 0 || i === lap.believed.length - 1 ? ends : plain); stage.scene.add(m); return m; });
+      return { nodes, chain: stage.line(stage.ink, 0.6), loop: stage.line(VIOLET_HEX) };
+    },
+    (stage, o) => {
+      const at = poses.map((q) => compose(START, q));
+      at.forEach((q, i) => { o.nodes[i].position.set(q.x, q.y, 0.25); o.nodes[i].scale.setScalar(i === 0 || i === at.length - 1 ? 1.5 : 1); });
+      setPoints(stage.T, o.chain, at.flatMap((q) => [q.x, q.y, 0.25]));
+      const a = at[0], b = at[at.length - 1];
+      // The closing spring, drawn as an arch so it stays visible once it has pulled the two ends together.
+      setPoints(stage.T, o.loop, closed ? Array.from({ length: 13 }, (_, k) => { const u = k / 12; return [a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u, 0.25 + Math.sin(u * Math.PI) * 1.2]; }).flat() : []);
+    },
+  );
 
   return (
     <div ref={root} className="grid gap-4 text-sm">
-      <canvas ref={view} className="aspect-[3/2] w-full rounded-md border border-border text-foreground" />
+      <canvas ref={view} className="aspect-[16/10] w-full rounded-md border border-border text-foreground" />
       <p className="text-muted-foreground">{t.springsHint}</p>
       <div className="grid items-end gap-4 sm:grid-cols-[auto_1fr_1fr_1fr]">
         <div className="flex gap-2">
