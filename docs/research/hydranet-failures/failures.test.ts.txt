@@ -1,0 +1,70 @@
+// Where the two-headed HydraNet of article 005 fails: two objects, low contrast. The script that produced the
+// article's first numbers was never saved; this one replaces it, and the article quotes THIS output.
+// Run: copy to tests/ml/zz-hydra-failures.test.ts, `pnpm vitest run tests/ml/zz-hydra-failures --reporter=verbose --silent=false`, delete the copy.
+import { it } from "vitest";
+import { HydraNet } from "@/content/posts/hydranet-fruit/components/model";
+import { boxFromMask } from "@/content/posts/hydranet-fruit/components/paint";
+import { MASK, SIZE, type Scene, background, boxIoU, compose, maskIoU, shapeScene } from "@/content/posts/hydranet-fruit/components/scene";
+import { mulberry32 } from "@/lib/ml";
+
+type Rng = () => number;
+interface Blob { cx: number; cy: number; rx: number; ry: number; kind: number; colour: number[] }
+
+function paint(blobs: Blob[], bg: Float64Array): { rgb: Float64Array; alpha: Float64Array } {
+  const n = SIZE * SIZE, rgb = new Float64Array(3 * n), alpha = new Float64Array(n);
+  for (const b of blobs)
+    for (let y = 0; y < SIZE; y++)
+      for (let x = 0; x < SIZE; x++) {
+        const u = (x + 0.5 - b.cx) / b.rx, v = (y + 0.5 - b.cy) / b.ry;
+        const inside = b.kind === 0 ? u * u + v * v <= 1 : b.kind === 1 ? Math.abs(u) <= 1 && Math.abs(v) <= 1 : Math.abs(v) <= 1 && Math.abs(u) <= (v + 1) / 2;
+        if (!inside) continue;
+        alpha[y * SIZE + x] = 1;
+        for (let c = 0; c < 3; c++) rgb[c * n + y * SIZE + x] = b.colour[c] >= 0 ? b.colour[c] : Math.min(1, bg[c * n + y * SIZE + x] - b.colour[c] - 1); // negative = "background + delta", see lowContrast
+      }
+  return { rgb, alpha };
+}
+const saturated = (rng: Rng) => { const c = [rng(), rng(), rng()]; c[Math.floor(rng() * 3)] = 0.85 + rng() * 0.15; return c; };
+
+/** Two small objects, one in the left half and one in the right, never touching. */
+function twoObjects(rng: Rng): { scene: Scene; boxes: Scene["box"][] } {
+  for (;;) {
+    const blobs = [0, 1].map((side) => { const rx = 3.5 + rng() * 3, ry = rx * (0.8 + rng() * 0.4); return { rx, ry, cx: side * 16 + rx + rng() * (14 - 2 * rx) + 1, cy: ry + rng() * (SIZE - 2 * ry), kind: Math.floor(rng() * 3), colour: saturated(rng) }; });
+    const bg = background(rng), both = paint(blobs, bg), scene = compose(bg, both.rgb, both.alpha);
+    const singles = blobs.map((b) => { const p = paint([b], bg); return compose(bg, p.rgb, p.alpha); });
+    if (scene && singles[0] && singles[1]) return { scene, boxes: singles.map((s) => s!.box) };
+  }
+}
+/** One object whose colour is the background's plus `delta` on every channel. */
+function lowContrast(rng: Rng, delta: number): Scene {
+  for (;;) {
+    const rx = 4 + rng() * 7, ry = rx * (0.7 + rng() * 0.6), blob = { rx, ry, cx: rx + rng() * (SIZE - 2 * rx), cy: ry + rng() * (SIZE - 2 * ry), kind: Math.floor(rng() * 3), colour: [-delta - 1, -delta - 1, -delta - 1] };
+    const bg = background(rng), p = paint([blob], bg), scene = compose(bg, p.rgb, p.alpha);
+    if (scene) return scene;
+  }
+}
+const mean = (v: number[]) => v.reduce((a, b) => a + b, 0) / v.length;
+
+it("where it fails", () => {
+  const rows: Record<string, number[]>[] = [];
+  for (const seed of [1, 2, 3]) {
+    const rng = mulberry32(seed), net = new HydraNet({ heads: "both", skip: "slim", boxWeight: 1 });
+    for (let i = 0; i < 1500; i++) net.step(Array.from({ length: 8 }, () => shapeScene(rng))); // 12,000 images
+    const test = mulberry32(1000 + seed), r: Record<string, number[]> = {};
+    const add = (k: string, v: number) => (r[k] ??= []).push(v);
+    for (let i = 0; i < 300; i++) {
+      const s = shapeScene(test), p = net.predict(s.image);
+      add("normal box", boxIoU(p.box, s.box)); add("normal mask", maskIoU(p.mask, s.mask));
+      const two = twoObjects(test), q = net.predict(two.scene.image), cx = (q.box[0] + q.box[1]) / 2, cy = (q.box[2] + q.box[3]) / 2;
+      const inside = (b: Scene["box"]) => cx >= b[0] && cx <= b[1] && cy >= b[2] && cy <= b[3];
+      add("two: box vs box around both", boxIoU(q.box, two.scene.box));
+      add("two: box vs the better-matching single object", Math.max(boxIoU(q.box, two.boxes[0]), boxIoU(q.box, two.boxes[1])));
+      add("two: box centre inside neither object", inside(two.boxes[0]) || inside(two.boxes[1]) ? 0 : 1);
+      add("two: mask vs both masks", maskIoU(q.mask, two.scene.mask));
+      const derived = boxFromMask(q.mask); add("two: box taken from the mask vs box around both", derived ? boxIoU(derived, two.scene.box) : 0);
+      for (const delta of [0.3, 0.15]) { const l = lowContrast(test, delta), m = net.predict(l.image); add(`contrast +${delta} box`, boxIoU(m.box, l.box)); add(`contrast +${delta} mask`, maskIoU(m.mask, l.mask)); }
+    }
+    rows.push(r);
+  }
+  const out = Object.keys(rows[0]).map((k) => `${k.padEnd(52)} ${rows.map((r) => mean(r[k]).toFixed(2)).join("  ")}   mean ${mean(rows.map((r) => mean(r[k]))).toFixed(2)}`);
+  console.log(`\nHYDRA 12,000 shape images, 300 test scenes per condition, seeds 1 2 3 (mask grid ${MASK})\n` + out.map((l) => "HYDRA " + l).join("\n"));
+}, 900_000);

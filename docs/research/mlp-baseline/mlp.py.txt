@@ -1,0 +1,19 @@
+"""How many parameters does a fully connected network need to match the article's 9,098-parameter CNN (98.6 % on MNIST)?
+Full 60k/10k MNIST, Adam 1e-3, batch 128, 15 epochs, best test accuracy over epochs, 3 seeds per width."""
+import json, sys, torch, torch.nn.functional as F, torchvision
+dev = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+tr, te = torchvision.datasets.MNIST("data", True, download=True), torchvision.datasets.MNIST("data", False, download=True)
+norm = lambda d: ((d.data.float() / 255 - 0.1307) / 0.3081).flatten(1).to(dev)
+xtr, ytr, xte, yte = norm(tr), tr.targets.to(dev), norm(te), te.targets.to(dev)
+for hidden in [11, 115, 256, 512]:
+    for seed in range(3):
+        torch.manual_seed(seed)
+        net = torch.nn.Sequential(torch.nn.Linear(784, hidden), torch.nn.ReLU(), torch.nn.Linear(hidden, 10)).to(dev)
+        params, opt, best = sum(p.numel() for p in net.parameters()), None, 0
+        opt = torch.optim.Adam(net.parameters(), 1e-3)
+        for epoch in range(15):
+            perm = torch.randperm(len(xtr), device=dev)
+            for i in range(0, len(perm), 128):
+                b = perm[i:i + 128]; loss = F.cross_entropy(net(xtr[b]), ytr[b]); opt.zero_grad(); loss.backward(); opt.step()
+            with torch.no_grad(): best = max(best, (net(xte).argmax(1) == yte).float().mean().item())
+        print(json.dumps(dict(hidden=hidden, params=params, times_cnn=round(params / 9098, 1), seed=seed, best_test=round(best * 100, 2))), flush=True)
