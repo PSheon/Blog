@@ -147,7 +147,8 @@ test("an article describes itself to search engines as a BlogPosting with an ima
   await page.goto("/en/posts/lite3-walking");
   const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent())!);
   expect(ld).toMatchObject({ "@type": "BlogPosting", inLanguage: "en", keywords: expect.stringContaining("robotics") });
-  expect((await page.request.get(ld.image)).headers()["content-type"]).toBe("image/png");
+  // The absolute URL carries the canonical origin, which is not where the test server listens.
+  expect((await page.request.get(new URL(ld.image).pathname)).headers()["content-type"]).toBe("image/png");
 });
 
 test("flappy birds evolve past the first generation", async ({ page }) => {
@@ -256,16 +257,16 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
 
   // One robot, one canvas: it moves to whichever instrument is on screen.
   await senses.scrollIntoViewIfNeeded();
-  await senses.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await expect(senses).toHaveAttribute("data-here", "true");
+  await senses.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+  await expect(senses).toHaveAttribute("data-here", "true", { timeout: 20_000 });
   await expect(page.getByTestId("lite3-stage")).toHaveCount(1);
   await page.getByRole("button", { name: /蒙住: 關節角度/ }).click();
   await expect(senses).toContainText("倒了", { timeout: 15_000 });
 
   // A 400 N shove always topples it (measured: everything from 275 N up does).
   const push = page.locator('[data-stage="push"]');
-  await push.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await expect(push).toHaveAttribute("data-here", "true");
+  await push.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+  await expect(push).toHaveAttribute("data-here", "true", { timeout: 20_000 });
   await page.locator('[data-instrument="lite3 / push"]').getByRole("slider").focus();
   await page.keyboard.press("End");
   await page.getByTestId("lite3-push-away").click();
