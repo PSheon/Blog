@@ -3,6 +3,7 @@ import { mulberry32 } from "@/lib/ml";
 import { type Edge, diagonal, graphError, optimise, solveCholesky } from "@/content/posts/slam-2d/components/graph";
 import { icp } from "@/content/posts/slam-2d/components/icp";
 import { type Pose, between, compose, inverse, transformPoints, wrap } from "@/content/posts/slam-2d/components/se2";
+import { resemblance } from "@/content/posts/slam-2d/components/place";
 import { DEFAULTS, Slam } from "@/content/posts/slam-2d/components/slam";
 import { RING, gaussian, scan } from "@/content/posts/slam-2d/components/world";
 
@@ -40,6 +41,16 @@ describe("ICP", () => {
     expect(Math.hypot(m.pose.x - truth.x, m.pose.y - truth.y)).toBeLessThan(0.03);
     expect(Math.abs(wrap(m.pose.theta - truth.theta))).toBeLessThan(0.01);
     expect(m.inliers).toBeGreaterThan(0.8);
+  });
+});
+
+describe("place recognition", () => {
+  it("recognises the same spot facing another way, reads off the turn, and tells it from a different spot", () => {
+    const rng = mulberry32(2), here = scan(RING, { x: 18, y: 2, theta: 0.3 }, rng).panorama;
+    const turned = resemblance(here, scan(RING, { x: 18.2, y: 2.1, theta: 0.3 + 1.2 }, rng).panorama);
+    expect(turned.score).toBeGreaterThan(0.75);
+    expect(Math.abs(wrap(turned.heading - 1.2))).toBeLessThan(0.1);
+    expect(resemblance(here, scan(RING, { x: 2, y: 12, theta: 0.3 }, rng).panorama).score).toBeLessThan(0.6);
   });
 });
 
@@ -87,7 +98,8 @@ function drive(options = DEFAULTS, laps = 2, seed = 1) {
     truth = compose(truth, moved);
     const odo: Pose = { x: v * (1 + 0.02 * gaussian(rng)), y: 0.002 * gaussian(rng), theta: w + bias * v + 0.003 * gaussian(rng) };
     const before = slam.keyframes.length, t0 = performance.now();
-    slam.step(odo, scan(RING, truth, rng).points);
+    const seen = scan(RING, truth, rng);
+    slam.step(odo, seen.points, seen.panorama);
     if (slam.keyframes.length > before) {
       closureMs = Math.max(closureMs, performance.now() - t0);
       start ??= truth;
@@ -117,7 +129,7 @@ describe("SLAM on the ring", () => {
 // SLAM_BENCH=1 pnpm vitest run tests/ml/slam-2d.test.ts -t bench --silent=false --reporter=verbose
 describe.runIf(!!process.env.SLAM_BENCH)("bench", () => {
   it("bench", () => {
-    for (const [name, o] of [["dead reckoning", { ...DEFAULTS, loopClosure: false }], ["scan-matched odometry only", { ...DEFAULTS, loopClosure: false, scanMatchOdometry: true }], ["loop closure", DEFAULTS], ["both", { ...DEFAULTS, scanMatchOdometry: true }]] as const)
+    for (const [name, o] of [["dead reckoning", { ...DEFAULTS, loopClosure: false }], ["scan-matched odometry only", { ...DEFAULTS, loopClosure: false, scanMatchOdometry: true }], ["loop closure", DEFAULTS], ["both", { ...DEFAULTS, scanMatchOdometry: true }], ["appearance candidates", { ...DEFAULTS, candidates: "appearance" }]] as const)
       for (const seed of [1, 2, 3]) {
         const r = drive(o, 2, seed), wrong = r.slam.edges.filter((e) => e.kind === "loop").filter((e) => { const t = between(r.atKeyframe[e.from], r.atKeyframe[e.to]); return Math.hypot(t.x - e.z.x, t.y - e.z.y) > 0.3; }).length;
         console.log(`${name.padEnd(26)} seed ${seed}  keyframes ${r.slam.keyframes.length}  closures ${r.slam.closures.length} (wrong ${wrong})  error mean ${r.mean.toFixed(2)} m  max ${r.max.toFixed(2)} m  final ${r.errors[r.errors.length - 1].toFixed(2)} m  worst step ${r.worstStepMs.toFixed(0)} ms${r.snap ? `  | first closure at keyframe ${r.snap.at}: mean ${r.snap.before.toFixed(2)}→${r.snap.after.toFixed(2)} m, newest pose ${r.snap.endBefore.toFixed(2)}→${r.snap.endAfter.toFixed(2)} m` : ""}`);
