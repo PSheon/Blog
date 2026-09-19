@@ -111,7 +111,7 @@ The price is that the network grew up in a body with $K_p = 30$ and $K_d = 1$, a
   <GainsLab />
 </Instrument>
 
-Pull $K_p$ down to 10 and the solid line cannot keep up with the dashed one; the dog slowly sinks to the floor. Push it to 100 and the solid line hugs the dashed one, and the dog walks faster than you asked. The forward speeds I measured (`docs/research/lite3-spike/sweep-output.txt`, taken before the collision meshes were replaced by convex hulls; the instrument's readout also counts sideways drift, so it reads higher than this table):
+Pull $K_p$ down to 10 and the solid line cannot keep up with the dashed one; the dog slowly sinks to the floor. Push it to 100 and the solid line hugs the dashed one, and the dog walks faster than you asked. The forward speeds I measured (averages over 10 s, `docs/research/lite3-spike/shipped-build-output.txt`; the instrument's readout also counts sideways drift and leaves out the start, so it reads higher than this table):
 
 | $K_p$ | $K_d$ | Actual speed when asked for 0.5 |
 | --- | --- | --- |
@@ -129,7 +129,7 @@ A stiffer spring carries out the same target angles with more force, the strides
 
 Push it and see. Every shove comes from the side and lasts a tenth of a second; 150 newtons is roughly the weight of 15 kg, and the Lite3 itself weighs about 12 kg.
 
-<Instrument fig="04" title="lite3 / push" size="wide" caption="The line is how far the torso is from level. It stays under 3 degrees in a normal walk; past 30 degrees counts as fallen.">
+<Instrument fig="04" title="lite3 / push" size="wide" caption="The line is how far the torso is from level. Walking at 0.5 m/s it is about 2 degrees; past 30 degrees, or with the torso below 0.15 m, it counts as fallen.">
   <PushLab />
 </Instrument>
 
@@ -143,7 +143,7 @@ I swept the force from 100 N to 400 N, and at each force shoved it once from eac
 | 250 N | 7 | 4 |
 | 275 N and above | 8 | 8 |
 
-There is no clean threshold in the middle. At the same 225 N in the same direction, moving the shove by 60 ms turns a recovery into a fall. The two sides are not symmetric either. Try one force several times in the instrument and you will get different outcomes. In the 175 N run the torso tipped by at most 6 degrees before coming back [needs verification].
+There is no clean threshold in the middle. At the same 225 N in the same direction, moving the shove by 60 ms turns a recovery into a fall. The two sides are not symmetric either. Try one force several times in the instrument and you will get different outcomes. In the two 175 N runs (one from each side) the torso tipped by at most 5.5 and 5.8 degrees before coming back.
 
 ## The real world is not this clean
 

@@ -36,7 +36,7 @@ The expensive part of training an object detector was never the compute. It is t
 
 We draw an emoji on a transparent canvas at a random size, position and angle, mirrored or not at random, then paste it over a noisy background. Once it is drawn, the canvas's **alpha channel** already records exactly which pixels are fruit. The mask is the alpha, and the box is the rectangle around the mask:
 
-<Instrument fig="02" title="free labels" caption="One image and its two labels. Nobody annotated anything: the mask comes from the emoji's transparency and the box is the outline of the mask.">
+<Instrument fig="02" title="free labels" caption="One image and its two labels. Nobody annotated anything: the mask comes from the emoji's transparency and the box is the bounding box of the mask.">
   <LabelsFigure />
 </Instrument>
 
@@ -131,15 +131,15 @@ box = t.matmul(t.concatRows([lr, tb]), this.positions); // an expected value is 
 Go back up and train again, this time watching the four small plots. At first all four distributions are flat, the expected values sit in the middle, and the box collapses to a small patch in the centre. Then each distribution grows a peak, the peak sharpens, and it slides to the edge of the fruit. The loss pushes it there.
 
 <Callout type="warn" title="This only works for one object per image">
-Each edge has a single distribution, so the head can describe only one box. I expected that with two pieces of fruit the box would land between them. When I measured it, that turned out to be wrong: it almost always **boxes one of them and ignores the other** (details under "Where it fails"). Either way it isn't the right answer. Real detectors handle any number of objects, so they go back to predicting at every position, as CenterNet and FCOS do: the very family that lost in the table above.
+Each edge has a single distribution, so the head can describe only one box. I expected that with two pieces of fruit the box would land between them. When I measured it, that turned out to be wrong: about seven times in ten it **boxes one of them and ignores the other** (details under "Where it fails"). Either way it isn't the right answer. Real detectors handle any number of objects, so they go back to predicting at every position, as CenterNet and FCOS do: the very family that lost in the table above.
 </Callout>
 
 ## Where it fails
 
-The numbers in this section were measured offline with geometric shapes [needs verification: the measuring script was not kept in `docs/research/`]: one model trained on 12,000 images, then tested on situations it never saw. Under normal conditions it scores 0.82 on boxes and 0.75 on masks.
+The numbers in this section were measured offline with geometric shapes (means over 3 seeds, 300 scenes per condition; script and output in `docs/research/hydranet-failures/`): one model trained on 12,000 images, then tested on situations it never saw. Under normal conditions it scores 0.81 on boxes and 0.74 on masks.
 
-- **Two objects.** Against the correct answer, a box around both, IoU is only 0.32. But the box doesn't land between them: its centre falls in the gap between the two in just 12% of scenes. Nearly always it picks one of them, and its IoU with that one is 0.65. A softmax distribution likes to keep a single peak, and the winner takes all. The mask head has no such problem: mask IoU with two objects is 0.74, almost the same as with one, and the bounding box of that mask scores 0.85.
-- **Foreground close to the background colour.** The model relies mainly on colour contrast. When the object is only 0.3 brighter than the background (colours run from 0 to 1), the mask falls to 0.56; at 0.15 brighter, the mask is down to 0.16 and the box to 0.46. Interestingly the box holds up better than the mask: a box only needs to know roughly where the object is, while a mask has to decide cell by cell.
+- **Two objects.** Against the correct answer, a box around both, IoU is only 0.35. Mostly the box does not land between them: its centre sits on one of the two objects in 69% of scenes and touches neither in 31%; against whichever object it matches better, IoU is 0.53. A softmax distribution likes to keep a single peak, and the winner takes all. The mask head has no such problem: mask IoU with two objects is 0.70, close to the 0.74 it gets with one, and the bounding box of that mask scores 0.80.
+- **Foreground close to the background colour.** The model relies mainly on colour contrast. When the object is only 0.3 brighter than the background (colours run from 0 to 1), the mask falls to 0.50 while the box still gets 0.70; at 0.15 brighter, the mask is down to 0.12 and the box to 0.40. Interestingly the box holds up better than the mask: a box only needs to know roughly where the object is, while a mask has to decide cell by cell.
 - **Emoji it has never seen.** Training uses only ten kinds of fruit. My guess is that it would mostly find unseen fruit too, because the previous point suggests it has learned "a blob that differs from the background" more than "fruit". But I haven't measured that, so it is only a guess.
 - **A different operating system.** The domain shift mentioned earlier. I haven't measured this across devices yet either.
 

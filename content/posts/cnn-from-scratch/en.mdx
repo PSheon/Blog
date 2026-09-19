@@ -44,7 +44,7 @@ $$
 
 The instrument below slows this down. The input is a bright vertical bar (its bottom two rows are shifted one pixel to the left), and the kernel has −1 down its left column and +1 down its right. Press Step and watch each output cell being computed.
 
-<Instrument fig="02" title="conv2d / step" caption="Wherever the kernel rests, the line underneath spells out its nine multiply-adds. The output is positive along the bar's left edge, negative along its right edge, and 0 where the image is flat.">
+<Instrument fig="02" title="conv2d / step" caption="Wherever the kernel rests, the line underneath spells out its nine multiply-adds. The output is positive along the bar's left edge and negative along its right edge.">
   <ConvStepper />
 </Instrument>
 
@@ -105,7 +105,7 @@ The model in this article has two convolutional blocks and one fully connected l
 | flatten → dense | 10 | 7,850 |
 | softmax | 10 | 0 |
 
-That is 9,098 parameters in a weights file of about 66 KB, reaching 98.6% accuracy on the MNIST test set.<Sidenote>Training was done once in PyTorch and the weights exported as JSON. The TypeScript forward pass has unit tests that compare it with PyTorch's output to within $10^{-4}$.</Sidenote> A fully connected network needs roughly ten times as many parameters for similar accuracy [needs verification].
+That is 9,098 parameters in a weights file of about 66 KB, reaching 98.6% accuracy on the MNIST test set.<Sidenote>Training was done once in PyTorch and the weights exported as JSON. The TypeScript forward pass has unit tests that compare it with PyTorch's output to within $10^{-4}$.</Sidenote> A fully connected network spends far more parameters and still does not catch up: on the same MNIST data, one-hidden-layer networks reached 93.6% with about the same number of parameters (8,755), 97.8–98.0% with ten times as many (91,435), and only 98.3% with forty-five times as many (407,050).<Sidenote>Three seeds per width, 15 epochs, best epoch on the test set; script and output are in `docs/research/mlp-baseline/`.</Sidenote>
 
 In TypeScript the model is an array:
 
