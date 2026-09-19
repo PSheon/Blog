@@ -1,0 +1,18 @@
+{"task": "mnist", "model": "pixels", "test": 0.8755, "seconds": 2}
+{"task": "mnist", "model": "cnn", "test": 0.974, "seconds": 4}
+{"task": "mnist", "model": "fly-frozen", "test": 0.595, "seconds": 141}
+{"task": "mnist", "model": "shuffled", "test": 0.807, "seconds": 378}
+{"task": "mnist", "model": "fly", "test": 0.726, "seconds": 568}
+{"task": "catdog", "model": "pixels", "test": 0.554, "seconds": 2}
+{"task": "catdog", "model": "cnn", "test": 0.695, "seconds": 3}
+{"task": "catdog", "model": "fly-frozen", "test": 0.573, "seconds": 127}
+{"task": "catdog", "model": "shuffled", "pool": 4, "test": 0.622, "seconds": 327}
+{"task": "catdog", "model": "fly", "pool": 4, "test": 0.618, "seconds": 327}
+{"task": "mnist", "model": "pixels-pooled", "pool": 4, "test": 0.66, "seconds": 3}
+{"task": "mnist", "model": "pixels-pooled", "pool": 8, "test": 0.849, "seconds": 2}
+{"task": "mnist", "model": "fly", "pool": 8, "test": 0.803, "seconds": 385}
+{"task": "mnist", "model": "shuffled", "pool": 8, "test": 0.8625, "seconds": 385}
+{"task": "catdog", "model": "pixels-pooled", "pool": 4, "test": 0.577, "seconds": 2}
+{"task": "catdog", "model": "pixels-pooled", "pool": 8, "test": 0.576, "seconds": 2}
+{"task": "catdog", "model": "fly", "pool": 8, "test": 0.595, "seconds": 321}
+{"task": "catdog", "model": "shuffled", "pool": 8, "test": 0.5355, "seconds": 326}
