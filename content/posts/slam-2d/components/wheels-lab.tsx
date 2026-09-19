@@ -5,7 +5,7 @@ import { Readout } from "@/components/lab/readout";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
-import { Car, autopilot } from "./car";
+import { Car, driveLaps } from "./car";
 import { useLabels } from "./labels";
 import { PINK } from "./paint";
 import { Param } from "./param";
@@ -14,18 +14,12 @@ import { CYAN_HEX, PINK_HEX, place, setPoints, useStage3D } from "./stage3d";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
-const START: Pose = { x: 2, y: 2, theta: 0 }, ROUTE: [number, number][] = [[18, 2], [18, 12], [2, 12], [2, 2]];
+const START: Pose = { x: 2, y: 2, theta: 0 };
 
 /** Two laps on autopilot: the path really driven, and the path you get by adding up what the wheels report. */
 function twoLaps(drift: number): { truth: Pose[]; wheels: Pose[] } {
   const c = new Car(RING, START, mulberry32(7), drift), truth: Pose[] = [], wheels: Pose[] = [];
-  for (let target = 0, reached = 0, guard = 0; reached < 8 && guard < 20000; guard++) {
-    const a = autopilot(c.truth, ROUTE, target);
-    if (a.target !== target) reached++;
-    target = a.target;
-    c.step(a.controls, 1 / 30);
-    if (guard % 4 === 0) { truth.push(c.truth); wheels.push(compose(START, c.deadReckoning)); }
-  }
+  driveLaps(c, 2, (_, step) => { if (step % 4 === 0) { truth.push(c.truth); wheels.push(compose(START, c.deadReckoning)); } });
   return { truth, wheels };
 }
 

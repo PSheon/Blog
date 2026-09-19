@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
-import { Car, type Controls, autopilot } from "./car";
+import { type Autopilot, Car, type Controls, autopilot, newAutopilot } from "./car";
 import { useLabels } from "./labels";
 import { DriveView } from "./drive-view3d";
 import { CYAN, PINK, VIOLET } from "./paint";
@@ -15,16 +15,16 @@ import { Stick } from "./stick";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
-const START: Pose = { x: 2, y: 2, theta: 0 }, ROUTE: [number, number][] = [[18, 2], [18, 12], [2, 12], [2, 2]];
+const START: Pose = { x: 2, y: 2, theta: 0 };
 const MAX_KEYFRAMES = 320;
 
 interface Knobs { drift: number; loopClosure: boolean; camera: boolean }
-interface World { car: Car; slam: Slam; wheels: Pose[]; target: number; flash: number; lastFix: number; wrong: { from: number; to: number } | null }
+interface World { car: Car; slam: Slam; wheels: Pose[]; pilot: Autopilot; moved: boolean; flash: number; lastFix: number; wrong: { from: number; to: number } | null }
 
 const fresh = (k: Knobs): World => ({
   car: new Car(RING, START, mulberry32(7), k.drift),
   slam: new Slam({ ...DEFAULTS, loopClosure: k.loopClosure, candidates: k.camera ? "appearance" : "position" }),
-  wheels: [], target: 0, flash: 0, lastFix: 0, wrong: null,
+  wheels: [], pilot: newAutopilot(), moved: true, flash: 0, lastFix: 0, wrong: null,
 });
 
 /**
@@ -61,9 +61,10 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
       prev = now;
       if (!visible.current) return;
       let controls = keys.current;
-      if (auto) { const a = autopilot(w.car.truth, ROUTE, w.target); controls = a.controls; w.target = a.target; }
+      if (auto) controls = autopilot(w.car.truth, w.car.lastScan.ranges, w.moved, w.pilot, dt);
       if ((controls.throttle || controls.steer) && w.slam.keyframes.length < MAX_KEYFRAMES) {
-        const odometry = w.car.step(controls, dt), before = w.slam.pose;
+        const was = w.car.truth, odometry = w.car.step(controls, dt), before = w.slam.pose;
+        w.moved = Math.hypot(w.car.truth.x - was.x, w.car.truth.y - was.y) > 1e-5;
         if (w.slam.step(odometry, w.car.lastScan.points, w.car.lastScan.panorama)) {
           const after = w.slam.pose;
           w.lastFix = Math.hypot(after.x - before.x, after.y - before.y);

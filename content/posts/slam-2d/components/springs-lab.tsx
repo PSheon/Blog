@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
-import { Car, autopilot } from "./car";
+import { Car, driveLaps } from "./car";
 import { type Edge, diagonal, graphError, optimise } from "./graph";
 import { useLabels } from "./labels";
 
@@ -13,23 +13,19 @@ import { CYAN_HEX, VIOLET_HEX, setPoints, useStage3D } from "./stage3d";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
-const START: Pose = { x: 2, y: 2, theta: 0 }, ROUTE: [number, number][] = [[18, 2], [18, 12], [2, 12], [2, 2]];
+const START: Pose = { x: 2, y: 2, theta: 0 };
 
 /** One lap, remembered as a chain: a pose every ~1.5 m, and between neighbours what the wheels said the motion was. */
 function oneLap() {
   const c = new Car(RING, START, mulberry32(7), 0.008), truth: Pose[] = [START], believed: Pose[] = [{ x: 0, y: 0, theta: 0 }], edges: Edge[] = [];
   let last = c.deadReckoning, travelled = 0;
-  for (let target = 0, reached = 0, guard = 0; reached < 4 && guard < 20000; guard++) {
-    const a = autopilot(c.truth, ROUTE, target);
-    if (a.target !== target) reached++;
-    target = a.target;
-    travelled += Math.abs(c.step(a.controls, 1 / 30).x);
-    if (travelled < 1.5 && reached < 4) continue;
-    travelled = 0;
+  const remember = () => {
     const z = between(last, c.deadReckoning);
     edges.push({ from: believed.length - 1, to: believed.length, z, information: diagonal(100, 100, 400), kind: "odometry" });
-    believed.push(compose(believed[believed.length - 1], z)); truth.push(c.truth); last = c.deadReckoning;
-  }
+    believed.push(compose(believed[believed.length - 1], z)); truth.push(c.truth); last = c.deadReckoning; travelled = 0;
+  };
+  driveLaps(c, 1, (odometry) => { travelled += Math.abs(odometry.x); if (travelled >= 1.5) remember(); });
+  remember(); // the pose where the lap ends, back at the start line
   // What recognising the start would tell the car: where the last pose really is, seen from the first.
   const loop: Edge = { from: 0, to: believed.length - 1, z: between(truth[0], truth[truth.length - 1]), information: diagonal(2500, 2500, 10000), kind: "loop" };
   return { truth, believed, edges, loop };
