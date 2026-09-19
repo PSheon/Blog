@@ -277,3 +277,27 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
   await expect(page.locator("[data-instrument]")).toHaveCount(5);
   expect(errors).toEqual([]);
 });
+
+test("a diffusion model trains in the page and its instruments share it", async ({ page }) => {
+  const response = await page.goto("/zh/posts/diffusion-points");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "diffusion-points is still a draft");
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(3);
+  await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
+  await page.getByTestId("diffusion-train").click();
+  await expect.poll(async () => Number((await page.getByTestId("diffusion-steps").textContent())!.replace(/,/g, "")), { timeout: 90_000 }).toBeGreaterThan(200);
+  await page.getByTestId("diffusion-train").click();
+
+  // The step-by-step instrument samples from the model trained above, not from one of its own.
+  await page.getByTestId("diffusion-sample").scrollIntoViewIfNeeded();
+  await page.getByTestId("diffusion-sample").click();
+  await expect(page.locator('[data-instrument="diffusion / 40 steps"]')).toContainText(/訓練了 [\d,]{3,} 步/);
+
+  // Choosing another fruit throws the model away: it knows nothing about the new one.
+  await page.locator('[data-instrument="diffusion / train"]').getByRole("button", { name: "葡萄" }).first().click();
+  await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
+  expect(errors).toEqual([]);
+});
