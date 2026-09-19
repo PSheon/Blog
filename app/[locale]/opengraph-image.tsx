@@ -13,5 +13,5 @@ export default async function Image({ params }: { params: Promise<{ locale: stri
   const { locale } = await params;
   const t = getDictionary(isLocale(locale) ? locale : "zh");
   const [title, tagline] = t.meta.title.split(" — ");
-  return renderCard({ title: tagline ?? title, description: t.meta.description, fallbackTitle: "machines that see, agents that act" });
+  return renderCard({ title: tagline ?? title, description: t.meta.description, fallbackTitle: "machine learning models, built from scratch" });
 }

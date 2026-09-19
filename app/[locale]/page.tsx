@@ -14,6 +14,9 @@ import { toRows } from "@/lib/content/rows";
 import { formatDate, getDictionary, htmlLang, isLocale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 
+/** The site gradient, cyan → violet → pink, sampled at the four stops of the rail. */
+const RAIL_COLORS = ["var(--signal)", "var(--signal-3)", "color-mix(in oklab, var(--signal-3), var(--signal-2))", "var(--signal-2)"];
+
 export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
@@ -43,14 +46,12 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
       <section className="relative grid gap-7 pt-10 pb-10 lg:grid-cols-[minmax(0,6fr)_minmax(0,5fr)] lg:items-center lg:gap-16 lg:pt-20 lg:pb-14">
         <div className="hero-grid" aria-hidden />
         <div className="max-lg:contents">
-          <h1 className="triad-text order-1 w-fit font-heading text-[clamp(2.75rem,7vw,5.25rem)] leading-[1.08] font-semibold tracking-tight">
-            {t.hero.tagline.map((word) => (
-              <span key={word} className="block">
-                {word}
-                {locale === "en" && "."}
-              </span>
-            ))}
+          {/* A title that says what is here, and a subtitle that says how: Paul asked for a technical blog's title,
+              not a slogan. The see / think / generate / act words live on in the rail below. */}
+          <h1 className="triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+            {t.hero.title}
           </h1>
+          <p className="order-1 font-heading text-xl leading-snug font-medium text-foreground/90 max-lg:-mt-3 sm:text-2xl lg:mt-5">{t.hero.subtitle}</p>
           <p className="order-3 max-w-[52ch] font-serif text-lg leading-relaxed text-muted-foreground lg:mt-8">{t.hero.intro}</p>
           <div className="order-4 flex flex-wrap gap-3 lg:mt-8">
             {latest && (
@@ -90,11 +91,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
       <TriadRail
         locale={locale}
         label={t.home.topics}
-        stops={[
-          { word: t.hero.tagline[0], tag: "computer-vision", color: "var(--signal)" },
-          { word: t.hero.tagline[1], tag: "llm", color: "var(--signal-3)" },
-          { word: t.hero.tagline[2], tag: "ai-agent", color: "var(--signal-2)" },
-        ].map((s) => ({ ...s, count: posts.filter((p) => p.tags.includes(s.tag)).length }))}
+        stops={t.hero.topics.map((s, i) => ({ ...s, color: RAIL_COLORS[i], count: posts.filter((p) => p.tags.includes(s.tag)).length }))}
       />
 
       {featured && (
