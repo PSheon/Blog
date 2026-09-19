@@ -292,9 +292,14 @@ test("a diffusion model trains in the page and its instruments share it", async 
   await page.getByTestId("diffusion-train").click();
 
   // The step-by-step instrument samples from the model trained above, not from one of its own.
+  // …and it refreshes by itself on scrolling into view: it once showed a run from before Train was pressed.
   await page.getByTestId("diffusion-sample").scrollIntoViewIfNeeded();
-  await page.getByTestId("diffusion-sample").click();
-  await expect(page.locator('[data-instrument="diffusion / steps"]')).toContainText(/訓練了 [\d,]{3,} 步/);
+  await expect(page.getByTestId("diffusion-steps-note")).toContainText(/訓練了 [\d,]{3,} 步/, { timeout: 20_000 });
+  // An early guess of the result is a blob, and the instrument says that this is right.
+  await page.getByTestId("diffusion-guess").click();
+  await page.locator('[data-instrument="diffusion / steps"]').getByRole("slider").focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("diffusion-guess-hint")).toContainText("平均");
 
   // Choosing another fruit throws the model away: it knows nothing about the new one.
   await page.locator('[data-instrument="diffusion / train"]').getByRole("button", { name: "草莓" }).first().click();

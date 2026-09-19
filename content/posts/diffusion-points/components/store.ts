@@ -1,12 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { PointDiffusion } from "./diffusion";
-import { SHAPES, type ShapeName } from "./shapes";
+import type { Reply, Request } from "./protocol";
+import type { ShapeName } from "./shapes";
 
 /**
- * One model for the whole article: the reader picks two fruit and trains it in the first instrument, and the
- * instruments further down look inside that same model.
+ * One model for the whole article, living in a Web Worker: the reader picks two fruit and trains it in the first
+ * instrument, and the instruments further down ask that same model questions.
  */
 export interface LabState {
   pair: [ShapeName, ShapeName];
@@ -18,53 +18,55 @@ export interface LabState {
   generation: number;
 }
 
-/** Milliseconds of training per animation frame; the rest of the frame belongs to sampling and drawing. */
-const TRAIN_BUDGET_MS = 8;
-
-let model = new PointDiffusion(2);
 let state: LabState = { pair: ["apple", "banana"], running: false, steps: 0, loss: 0, perSec: 0, generation: 0 };
-let frame = 0, trainMs = 0, sincePublish = 0;
-const listeners = new Set<() => void>();
+let worker: Worker | null = null, nextId = 1;
+const listeners = new Set<() => void>(), frameListeners = new Set<(cloud: Float32Array) => void>();
+const pending = new Map<number, (reply: Reply) => void>();
 
 function set(patch: Partial<LabState>) {
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
 }
 
-function loop() {
-  frame = requestAnimationFrame(loop);
-  if (document.hidden) return;
-  const shapes = state.pair.map((name) => SHAPES[name]), t0 = performance.now();
-  do model.train(shapes, 256, model.steps < 4000 ? 2e-3 : 5e-4);
-  while (performance.now() - t0 < TRAIN_BUDGET_MS);
-  trainMs += performance.now() - t0;
-  if (++sincePublish >= 10) {
-    sincePublish = 0;
-    set({ steps: model.steps, loss: model.loss, perSec: (model.steps / trainMs) * 1000 });
+function send(request: Request, transfer: Transferable[] = []) {
+  if (!worker) {
+    worker = new Worker(new URL("./model.worker.ts", import.meta.url), { type: "module" });
+    worker.onmessage = ({ data }: MessageEvent<Reply>) => {
+      if (data.type === "stats") set({ steps: data.steps, loss: data.loss, perSec: data.perSec, generation: data.generation });
+      else if (data.type === "frame") frameListeners.forEach((l) => l(data.cloud));
+      else { pending.get(data.id)?.(data); pending.delete(data.id); }
+    };
+    worker.onerror = (e) => console.error("[diffusion] worker failed", e.message);
+    worker.postMessage({ type: "pair", pair: state.pair } satisfies Request);
   }
+  worker.postMessage(request, transfer);
 }
 
-export function setRunning(running: boolean) {
-  cancelAnimationFrame(frame);
-  if (running) frame = requestAnimationFrame(loop);
-  set({ running, steps: model.steps, loss: model.loss });
+type Asked<T extends Reply["type"]> = Extract<Reply, { type: T }>;
+/** Ask the worker something and wait for its answer. */
+function ask<T extends "trajectory" | "guided" | "field">(build: (id: number) => Extract<Request, { type: T }>, transfer: Transferable[] = []): Promise<Asked<T>> {
+  const id = nextId++;
+  return new Promise((resolve) => {
+    pending.set(id, (reply) => resolve(reply as Asked<T>));
+    send(build(id), transfer);
+  });
 }
 
+export const setRunning = (running: boolean) => { set({ running }); send({ type: "run", running }); };
 /** Choose the two fruit. A different pair needs a fresh model: the old one knows nothing about the new fruit. */
-export function setPair(pair: [ShapeName, ShapeName]) {
-  if (pair[0] === state.pair[0] && pair[1] === state.pair[1]) return;
-  resetModel(pair);
-}
+export const setPair = (pair: [ShapeName, ShapeName]) => { set({ pair, running: false, steps: 0, loss: 0, perSec: 0 }); send({ type: "pair", pair }); };
+export const resetModel = () => { set({ running: false, steps: 0, loss: 0, perSec: 0 }); send({ type: "reset" }); };
+export const setLive = (on: boolean, loop: boolean) => send({ type: "live", on, loop });
+export const setBlend = (blend: number) => send({ type: "blend", blend });
+export const sampleAgain = () => send({ type: "again" });
+export const trajectory = (perCloud: number, steps: number) => ask<"trajectory">((id) => ({ type: "trajectory", id, perCloud, steps }));
+export const guided = (perCloud: number, steps: number, guidance: number, start: Float32Array) => ask<"guided">((id) => ({ type: "guided", id, perCloud, steps, guidance, start }));
+export const field = (level: number, points: Float32Array) => ask<"field">((id) => ({ type: "field", id, level, points }));
 
-export function resetModel(pair: [ShapeName, ShapeName] = state.pair) {
-  cancelAnimationFrame(frame);
-  model = new PointDiffusion(2);
-  trainMs = 0;
-  set({ pair, running: false, steps: 0, loss: 0, perSec: 0, generation: state.generation + 1 });
-}
-
-export function getModel(): PointDiffusion {
-  return model;
+/** Frames of the first instrument's clouds, as the worker produces them. */
+export function onFrame(listener: (cloud: Float32Array) => void) {
+  frameListeners.add(listener);
+  return () => void frameListeners.delete(listener);
 }
 
 function subscribe(listener: () => void) {
