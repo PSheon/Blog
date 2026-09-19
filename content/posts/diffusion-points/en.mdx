@@ -1,18 +1,15 @@
 ---
-title: "(Draft) How a cloud of noise becomes an apple: training a 3-D diffusion model in the browser"
+title: "How a cloud of noise becomes an apple: training a 3-D diffusion model in the browser"
 description: "Pick two fruit and press Train. A diffusion model written from scratch learns, in your browser, to pull a cloud of coloured 3-D noise into those two fruit, colours included. Then we take apart what it learned."
 seoTitle: "Train a 3-D diffusion model in your browser"
 seoDescription: "Pick two fruit and press Train: a from-scratch diffusion model learns in your browser to turn coloured 3-D noise into fruit. Then we take apart what it learned."
-date: 2026-09-19
+date: 2026-09-20
 tags: [generative, diffusion, from-scratch]
 no: 7
 interactive: true
-draft: true
 ---
 
 import { FieldLab, GuidanceLab, NoiseLab, StepsLab, TrainLab } from "./components";
-
-{/* Draft. Numbers come from docs/research/2026-09-19-diffusion-spike.md and tests/diffusion/. */}
 
 An image-generating AI starts from a picture that is pure noise and wipes the noise away a little at a time until a picture is left. Everyone has heard that sentence. What "wiping away noise" actually means is impossible to tell from the finished picture.
 
