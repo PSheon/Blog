@@ -1,5 +1,5 @@
 ---
-title: (Draft) SLAM from scratch, and the moment the map snaps straight
+title: (Draft) Drawing the map while finding yourself on it — SLAM from scratch
 description: A small car with no GPS and no map has to draw the map and find itself on it at the same time. Drive it round a loop, watch its map bend, and watch the whole thing snap straight the moment it gets back to where it started.
 date: 2026-09-19
 tags: [ai-agent, robotics, from-scratch]
@@ -54,7 +54,7 @@ At **a corner**, starting two metres and nearly thirty degrees off, it is back w
 
 Now switch to **mid-corridor** and press again. This time the cyan scan has only been slid two metres back along the corridor, yet ICP stops almost a metre from the right answer, looking quite sure of itself: three quarters of the points matched, 3.5 cm from the wall on average. Two parallel walls tell you how far you are from them and nothing about how far along them you are; slide a metre forward and the scan looks almost the same.
 
-The good news is that this kind of doubt **can be computed**. The small equation ICP solves already carries "which directions am I sure about": it is the pink ellipse in the figure, a small circle at the corner and stretched along the corridor in the corridor. The car simply refuses any match whose ellipse is too flat.
+The good news is that this kind of doubt can be computed, so the car can simply refuse such a match.<Sidenote>The small equation ICP solves already carries "which directions am I sure about": it is the pink ellipse in the figure, a small circle at the corner and stretched along the corridor in the corridor. Any match whose ellipse is too flat is thrown away.</Sidenote>
 
 <Sidenote>My first ICP matched point to point, and it never recognised a single place: two scans do not hit the wall at the same points, so even at the right answer the error was five or six centimetres, and good matches could not be told from bad. Matching points to wall segments instead brought the error of a correct match down to the sensor's own 2 cm of noise.</Sidenote>
 
