@@ -84,6 +84,24 @@ export class Slam {
     return o.loopClosure ? this.tryClosure(index) : null;
   }
 
+  /**
+   * Make the mistake a real system dreads: declare that two keyframes far apart are the same spot, facing opposite
+   * ways, and re-optimise. Returns the pair it chose, or null if the path is still too short to have one.
+   */
+  injectFalseClosure(): { from: number; to: number } | null {
+    const n = this.keyframes.length;
+    let pick: { from: number; to: number; d: number } | null = null;
+    for (let i = 0; i < n; i += 3)
+      for (let j = i + 10; j < n; j += 3) {
+        const d = Math.hypot(this.keyframes[i].pose.x - this.keyframes[j].pose.x, this.keyframes[i].pose.y - this.keyframes[j].pose.y);
+        if (d > 6 && (!pick || d > pick.d)) pick = { from: i, to: j, d };
+      }
+    if (!pick) return null;
+    this.edges.push({ from: pick.from, to: pick.to, z: { x: 0, y: 0, theta: Math.PI }, information: diagonal(2500, 2500, 10000), kind: "loop" });
+    optimise(this.keyframes.map((k) => k.pose), this.edges, 15);
+    return pick;
+  }
+
   private tryClosure(index: number): Closure | null {
     const o = this.options, here = this.keyframes[index];
     let best: { at: number; z: Pose; rms: number; information: number[] } | null = null;
