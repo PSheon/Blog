@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # pnpm is handled by the "npm" ecosystem. One grouped PR a week for the routine bumps, so that CI runs once;
+  # majors arrive on their own, because Next, React and Tailwind majors need reading before merging.
+  - package-ecosystem: npm
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: dev
+    schedule:
+      interval: monthly
