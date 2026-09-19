@@ -54,7 +54,7 @@ export function SpikeLab() {
       if (auto) { const a = autopilot(w.car.truth, ROUTE, w.target); controls = a.controls; w.target = a.target; }
       if ((controls.throttle || controls.steer) && w.slam.keyframes.length < MAX_KEYFRAMES) {
         const odometry = w.car.step(controls, dt), t0 = performance.now();
-        const before = w.slam.pose, closure = w.slam.step(odometry, w.car.lastScan.points);
+        const before = w.slam.pose, closure = w.slam.step(odometry, w.car.lastScan.points, w.car.lastScan.panorama);
         worst = Math.max(worst, performance.now() - t0);
         if (closure) { const after = w.slam.pose; w.lastCorrection = Math.hypot(after.x - before.x, after.y - before.y); if (w.lastCorrection > 0.3) w.flash = 1; }
         w.ghost.push(w.car.deadReckoning);
