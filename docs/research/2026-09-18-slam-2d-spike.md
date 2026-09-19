@@ -90,3 +90,11 @@
 - Grisetti, Kümmerle, Stachniss, Burgard, *A Tutorial on Graph-Based SLAM*, IEEE ITS Magazine 2(4):31–43, 2010, doi:10.1109/MITS.2010.939925
 - Hess, Kohler, Rapp, Andor, *Real-Time Loop Closure in 2D LIDAR SLAM*, ICRA 2016, doi:10.1109/ICRA.2016.7487258（Cartographer）
 - 還沒查證、憑記憶：Censi 2008 的 PLICP（point-to-line ICP 的出處）、Besl & McKay 1992（ICP）、Lu & Milios 1997（最早的 pose graph）
+
+## 補充（2026-09-19）：SyncAI-Dog 用的是什麼
+
+Paul 回覆：**3D 光達 + 視覺**。所以文章結尾「和真的系統差在哪」要接的是這兩條線，而不是 2D 的 Cartographer：
+
+- 3D 光達：掃描是點雲而不是一圈距離，位姿是六個自由度；掃描比對的想法相同（ICP 的各種變形），但要處理運動畸變，通常和 IMU 緊耦合。這一類的代表作我記得是 LOAM 系列和 FAST-LIO，**還沒查證**，寫進文章前要確認出處。
+- 視覺：用影像特徵而不是距離；閉環靠外觀辨識（這剛好補上本文最小版本最大的弱點：靠自己的位置估計去找舊地方，漂太遠就找不回來）。
+- 共通的部分就是本文的後半：不管前端是什麼感測器，後端都是一張位姿圖加最小平方。這是文章可以誠實說「你剛剛寫的那一半，和機器狗身上的是同一個東西」的地方。
