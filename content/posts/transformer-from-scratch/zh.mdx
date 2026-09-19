@@ -15,11 +15,11 @@ import { TrainingLab } from "./components";
 
 我們要教它玩一個很簡單的遊戲：**給它六個數字，請它倒過來寫一遍**。看到 `3 1 4 1 5 9`，就要回答 `9 5 1 4 1 3`。
 
-對人來說這不用學，但模型一開始連「倒過來」是什麼意思都不知道。沒有人會告訴它規則，它只會一次又一次看到題目和正確答案，然後自己想辦法。
+對人來說這不用學，但模型一開始連「倒過來」是什麼意思都不知道。它只會一次又一次看到題目和正確答案，然後自己想辦法。
 
-下面的儀器由上到下是三個步驟：先看清楚任務，按「開始訓練」，看最上面「它現在寫出來的」那一行從粉紅色（錯）一位一位變成青色（對），最後往下看注意力圖，那裡畫的是模型寫每一位數字時正在看輸入的哪裡。
+按「開始訓練」，看「它現在寫出來的」那一行從粉紅色（錯）一位一位變成青色（對）。
 
-<Instrument fig="01" title="transformer / train" size="wide" caption="選「慢」可以看清楚變化的過程，選「快」大約一兩秒就訓練完成。按「換一題」可以換一組數字：訓練用的題目每次都是隨機產生的，所以這一題模型幾乎不可能看過。">
+<Instrument fig="01" title="transformer / train" size="wide" caption="最下面的注意力圖，畫的是模型寫每一位數字時正在看輸入的哪裡。選「慢」可以看清楚變化的過程，選「快」大約一兩秒就訓練完成。按「換一題」可以換一組數字：訓練用的題目每次都是隨機產生的，所以這一題模型幾乎不可能看過。">
   <TrainingLab />
 </Instrument>
 
@@ -58,17 +58,7 @@ Transformer 的教學通常拿莎士比亞當訓練資料，訓練個幾十分�
 3 1 4 1 5 9 → 9 5 1 4 1 3
 ```
 
-然後要求模型在每個位置預測下一個 token。不過前半段是隨機的數字，沒有人猜得中，所以只有後半段（答案）會被計分：
-
-```ts title="content/posts/transformer-from-scratch/components/task.ts"
-export function example(digits: number[], task: TaskName) {
-  const full = [...digits, SEP, ...TASKS[task](digits)];
-  const ids = full.slice(0, -1);
-  // −1 表示「這個位置不計分」
-  const targets = full.slice(1).map((t, i) => (i < digits.length ? -1 : t));
-  return { ids, targets };
-}
-```
+然後要求模型在每個位置預測下一個 token。不過前半段是隨機的數字，沒有人猜得中，所以只有後半段（答案）會被計分。
 
 這也是為什麼注意力圖的上半部被蓋上一層灰：那幾列不影響損失，它們長什麼樣子都無所謂。
 
@@ -151,7 +141,7 @@ matmul(a: Mat, b: Mat): Mat {
 }
 ```
 
-整個引擎只有十二種運算：矩陣乘法、加法、加偏置、縮放、轉置、ReLU、LayerNorm、因果 softmax、切開和接回注意力頭、embedding 查表，以及最後的交叉熵損失。前向跑完之後，把記下來的函式**倒著**執行一遍，每個參數的梯度就都算好了。這就是反向傳播。
+這個 Transformer 用到的運算只有十二種：矩陣乘法、加法、加偏置、縮放、轉置、ReLU、LayerNorm、因果 softmax、切開和接回注意力頭、embedding 查表，以及最後的交叉熵損失。前向跑完之後，把記下來的函式**倒著**執行一遍，每個參數的梯度就都算好了。這就是反向傳播。
 
 <Callout type="warn" title="梯度寫錯的時候，模型不會報錯">
 反向傳播最可怕的地方是：公式寫錯了，程式還是跑得動，模型只是莫名其妙學不好。所以這個引擎的每一種運算都有單元測試，用數值微分 $\frac{f(x + \varepsilon) - f(x - \varepsilon)}{2\varepsilon}$ 去對照解析梯度，誤差要在 $10^{-5}$ 以內；整個 Transformer 也用同樣的方法抽查了每一個參數矩陣。
@@ -159,20 +149,7 @@ matmul(a: Mat, b: Mat): Mat {
 
 有了梯度，剩下的就是更新參數。這裡用的是 Adam：它替每個參數各自記錄梯度的移動平均和平方的移動平均，藉此決定每個參數自己的步長。
 
-```ts title="content/posts/transformer-from-scratch/components/task.ts"
-step(batch = 16, lr = 3e-3): number {
-  this.model.zeroGrad();
-  for (let b = 0; b < batch; b++) {
-    const { ids, targets } = example(randomDigits(this.rng), this.task);
-    const tape = new Tape();
-    tape.crossEntropy(this.model.forward(tape, ids).logits, targets, 1 / batch);
-    tape.backward(); // 16 題的梯度加在一起
-  }
-  this.adam.step(lr);
-}
-```
-
-每一步都是 16 題全新的隨機題目。六位數總共有一百萬種組合，模型在一百步裡只看過其中 1,600 種，卻能答對沒看過的題目。它不是把答案背起來，而是學到了規則。
+每一步是 16 題全新的隨機題目，梯度加在一起之後更新一次。六位數總共有一百萬種組合，模型在一百步裡只看過其中 1,600 種，卻能答對沒看過的題目。它不是把答案背起來，而是學到了規則。
 
 ## 這和真正的大型語言模型差在哪裡
 
