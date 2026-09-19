@@ -50,6 +50,9 @@ function features(x: ArrayLike<number>, n: number, level: (i: number) => number,
  * A DDPM over single coloured 3-D points: an MLP that looks at a noisy point, is told which shape it belongs to,
  * and guesses the noise that was added to it.
  */
+/** How often training hides which fruit a point came from, so the model also learns what "any fruit" looks like. */
+const CONDITION_DROPOUT = 0.1;
+
 export class PointDiffusion {
   readonly params: Record<string, Mat>;
   private readonly adam: Adam;
@@ -86,10 +89,12 @@ export class PointDiffusion {
 
   /** One step: take clean points from the shapes, add a random amount of noise to each, ask the network which noise it was. */
   train(shapes: Shape[], batch = 256, lr = 2e-3) {
-    const which = new Uint8Array(batch), hot = shapes.map((_, c) => Float64Array.from(shapes, (__, k) => (k === c ? 1 : 0)));
+    const which = new Uint8Array(batch), hidden = new Uint8Array(batch), none = new Float64Array(shapes.length);
+    const hot = shapes.map((_, c) => Float64Array.from(shapes, (__, k) => (k === c ? 1 : 0)));
     const x = new Float64Array(batch * DIMS), noise = new Float64Array(batch * DIMS), levels = new Float64Array(batch);
     for (let i = 0; i < batch; i++) {
       which[i] = Math.floor(this.rng() * shapes.length);
+      hidden[i] = this.rng() < CONDITION_DROPOUT ? 1 : 0;
       const p = shapes[which[i]](this.rng), t = 1 + Math.floor(this.rng() * T);
       levels[i] = t;
       for (let k = 0; k < DIMS; k++) {
@@ -99,20 +104,39 @@ export class PointDiffusion {
       }
     }
     for (const m of Object.values(this.params)) m.grad.fill(0);
-    const tape = new Tape(), loss = tape.mse(this.predict(tape, features(x, batch, (i) => levels[i], this.classes, (i) => hot[which[i]])), noise);
+    const tape = new Tape(), loss = tape.mse(this.predict(tape, features(x, batch, (i) => levels[i], this.classes, (i) => (hidden[i] ? none : hot[which[i]]))), noise);
     tape.backward();
     this.adam.step(lr);
     this.steps++;
     this.loss = this.loss ? this.loss * 0.98 + loss * 0.02 : loss;
   }
 
+  /**
+   * The noise the model believes is in each point of `x` at this level. With `guidance` other than 1, the answer is
+   * pushed away from what it would say without knowing the fruit (classifier-free guidance, Ho & Salimans 2022).
+   */
+  noiseIn(x: ArrayLike<number>, level: number, wanted: (i: number) => Condition, guidance = 1): Float64Array {
+    const n = x.length / DIMS, told = this.predict(new Tape(), features(x, n, () => level, this.classes, wanted)).data;
+    if (guidance === 1) return told;
+    const none = new Float64Array(this.classes), blind = this.predict(new Tape(), features(x, n, () => level, this.classes, () => none)).data;
+    for (let i = 0; i < told.length; i++) told[i] = blind[i] + guidance * (told[i] - blind[i]);
+    return told;
+  }
+
+  /** Where the model thinks each point will end up, judged from noise level `level`: x̂₀ = (x − √(1−ᾱ)·ε) / √ᾱ. */
+  guess(x: ArrayLike<number>, level: number, wanted: (i: number) => Condition, guidance = 1): Float64Array {
+    const eps = this.noiseIn(x, level, wanted, guidance), a = ALPHA_BAR[level];
+    for (let i = 0; i < eps.length; i++) eps[i] = Math.max(-1.5, Math.min(1.5, (x[i] - Math.sqrt(1 - a) * eps[i]) / Math.sqrt(a)));
+    return eps;
+  }
+
   /** Move every point in `x` (in place) from noise level `from` down to `to`: one deterministic DDIM step. */
-  denoise(x: Float64Array, from: number, to: number, wanted: (i: number) => Condition) {
-    const n = x.length / DIMS, eps = this.predict(new Tape(), features(x, n, () => from, this.classes, wanted)).data;
-    const a = ALPHA_BAR[from], b = ALPHA_BAR[to];
+  denoise(x: Float64Array, from: number, to: number, wanted: (i: number) => Condition, guidance = 1) {
+    const clean = this.guess(x, from, wanted, guidance), a = ALPHA_BAR[from], b = ALPHA_BAR[to];
     for (let i = 0; i < x.length; i++) {
-      const clean = Math.max(-1.5, Math.min(1.5, (x[i] - Math.sqrt(1 - a) * eps[i]) / Math.sqrt(a)));
-      x[i] = Math.sqrt(b) * clean + Math.sqrt(1 - b) * eps[i];
+      // Put back the amount of the same noise that belongs at the lower level.
+      const eps = (x[i] - Math.sqrt(a) * clean[i]) / Math.sqrt(1 - a);
+      x[i] = Math.sqrt(b) * clean[i] + Math.sqrt(1 - b) * eps;
     }
   }
 }

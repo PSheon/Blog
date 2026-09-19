@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import type { ShapeName } from "./shapes";
 
 const zh = {
-  fruit: { apple: "蘋果", banana: "香蕉", grapes: "葡萄", watermelon: "西瓜", orange: "橘子" } satisfies Record<ShapeName, string>,
+  fruit: { apple: "蘋果", banana: "香蕉", watermelon: "西瓜", strawberry: "草莓", cherries: "櫻桃", pear: "西洋梨" } satisfies Record<ShapeName, string>,
   left: "左邊長成",
   right: "右邊長成",
   train: "開始訓練",
@@ -28,12 +28,21 @@ const zh = {
   step: "第幾步",
   stepValue: (k: number, total: number, level: number) => `${k} / ${total}（雜訊等級 ${level}）`,
   stepsStage: "取樣過程中的點雲，拖動滑桿前後看",
+  stepCount: "總共走幾步",
+  show: "畫面上顯示",
+  showPoints: "點現在的位置",
+  showGuess: "模型此刻猜的成品",
+  fieldStage: (fruit: string) => `${fruit}的一個垂直切面，每個格點上的箭頭是模型會把那裡的點往哪邊推`,
+  fieldUntrained: "上面的模型還沒訓練過，所以箭頭是亂指的。訓練之後回來看，它們會轉向水果。",
+  guidance: "引導強度：多聽「要哪一種水果」的話",
+  guidanceValue: (w: number) => (w === 0 ? "0（完全不管要哪一種）" : w === 1 ? "1（照訓練時的樣子）" : w.toFixed(1)),
+  guidanceStage: "兩種水果的點雲，用滑桿上的引導強度取樣",
   needTraining: "上面的模型還沒訓練過，所以這裡怎麼走都是一團雜訊。先回去按「開始訓練」，再回來按一次取樣。",
   trainedFor: (n: number) => `用的是上面那個模型，它目前訓練了 ${n.toLocaleString()} 步。`,
 };
 
 const en: typeof zh = {
-  fruit: { apple: "apple", banana: "banana", grapes: "grapes", watermelon: "watermelon", orange: "orange" },
+  fruit: { apple: "apple", banana: "banana", watermelon: "watermelon", strawberry: "strawberry", cherries: "cherries", pear: "pear" },
   left: "On the left, grow",
   right: "On the right, grow",
   train: "Train",
@@ -57,6 +66,15 @@ const en: typeof zh = {
   step: "step",
   stepValue: (k: number, total: number, level: number) => `${k} / ${total} (noise level ${level})`,
   stepsStage: "The point cloud during sampling; drag the slider back and forth",
+  stepCount: "steps in total",
+  show: "show",
+  showPoints: "where the points are",
+  showGuess: "the model's guess of the result",
+  fieldStage: (fruit: string) => `A vertical slice through the ${fruit}; the arrow at each grid point is where the model would push a point standing there`,
+  fieldUntrained: "The model above has not been trained, so the arrows point anywhere. Train it and come back: they will turn towards the fruit.",
+  guidance: "guidance: how hard to listen to \"which fruit\"",
+  guidanceValue: (w: number) => (w === 0 ? "0 (ignores which fruit)" : w === 1 ? "1 (as trained)" : w.toFixed(1)),
+  guidanceStage: "Point clouds of the two fruit, sampled with the guidance strength on the slider",
   needTraining: "The model above has not been trained, so whatever happens here stays noise. Go back, press Train, then sample again here.",
   trainedFor: (n: number) => `This uses the model above, trained for ${n.toLocaleString()} steps so far.`,
 };

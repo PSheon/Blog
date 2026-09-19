@@ -63,7 +63,24 @@ describe("PointDiffusion", () => {
       expect(nearest(asBanana, truth[1], dims)).toBeLessThan(nearest(asBanana, truth[0], dims));
     }
     // …and far nearer than the noise it started from (a unit Gaussian sits about 1 away from a fruit's surface).
-    expect(nearest(asApple, truth[0], 3)).toBeLessThan(0.2);
-    expect(nearest(asBanana, truth[1], 3)).toBeLessThan(0.2);
+    // (1,500 small steps with a 48-wide network, and one point in ten trained without being told its fruit.)
+    expect(nearest(asApple, truth[0], 3)).toBeLessThan(0.25);
+    expect(nearest(asBanana, truth[1], 3)).toBeLessThan(0.25);
+  }, 120_000);
+
+  it("guesses the finished fruit better from less noise, and guidance of 1 changes nothing", () => {
+    const rng = mulberry32(2), shapes = [SHAPES.strawberry, SHAPES.pear], net = new PointDiffusion(2, 48, rng);
+    for (let i = 0; i < 1200; i++) net.train(shapes, 128);
+    const N = 400, clean = new Float64Array(N * DIMS), noise = Float64Array.from({ length: N * DIMS }, () => gaussian(rng));
+    for (let i = 0; i < N; i++) clean.set(shapes[0](rng), i * DIMS);
+    const error = (level: number) => {
+      const x = clean.map((v, i) => Math.sqrt(ALPHA_BAR[level]) * v + Math.sqrt(1 - ALPHA_BAR[level]) * noise[i]), g = net.guess(x, level, () => [1, 0]);
+      return Math.sqrt(g.reduce((sum, v, i) => sum + (v - clean[i]) ** 2, 0) / g.length);
+    };
+    expect(error(10)).toBeLessThan(error(50));
+    expect(error(50)).toBeLessThan(error(90));
+    const x = Float64Array.from({ length: 60 * DIMS }, () => gaussian(rng));
+    expect(Array.from(net.noiseIn(x, 60, () => [1, 0], 1))).toEqual(Array.from(net.noiseIn(x, 60, () => [1, 0])));
+    expect(Array.from(net.noiseIn(x, 60, () => [1, 0], 3))).not.toEqual(Array.from(net.noiseIn(x, 60, () => [1, 0])));
   }, 120_000);
 });
