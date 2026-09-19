@@ -1,7 +1,7 @@
 import type { ShapeName } from "./shapes";
 
 /** Points per cloud, and how the live view in the first instrument is sampled. */
-export const LIVE = { perCloud: 1100, clouds: 3, steps: 40, holdMs: 1400, frameMs: 50 } as const;
+export const LIVE = { perCloud: 1100, clouds: 3, steps: 40, holdMs: 2500, frameMs: 50 } as const;
 
 /** Main thread → worker. Anything with an `id` is answered by a message carrying the same id. */
 export type Request =
