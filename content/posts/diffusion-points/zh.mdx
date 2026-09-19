@@ -1,0 +1,17 @@
+---
+title: （草稿）看雜訊變成一隻機器狗：在瀏覽器裡訓練 3D 擴散模型
+description: 草稿。一團 3D 雜訊點，經過一個從零寫起、在你瀏覽器裡訓練的擴散模型，一步一步收斂成形狀。
+date: 2026-09-19
+tags: [generative, diffusion, from-scratch]
+no: 7
+interactive: true
+draft: true
+---
+
+import { SpikeLab } from "./components";
+
+{/* Spike：只有一個臨時儀器，還沒有文字。數字在 docs/research/2026-09-19-diffusion-spike.md。 */}
+
+<Instrument fig="00" title="diffusion / spike" size="wide" caption="臨時版本。按 Train 之後，模型一邊訓練，畫面一邊不斷重新取樣：每一輪都從純雜訊開始，走 40 步。">
+  <SpikeLab />
+</Instrument>
