@@ -1,11 +1,11 @@
 """Can a network wired like a fly's optic lobe classify pictures? usage: classify.py <mnist|catdog> <model> [epochs]
 models: fly (gains+readout learned) | fly-frozen (readout only) | shuffled | pixels (logistic regression on what the eye sees) | cnn"""
-import json, math, sys, time
+import json, math, os, sys, time
 import numpy as np, torch, torch.nn.functional as F, torchvision
 task, model_kind, EPOCHS = sys.argv[1], sys.argv[2], int(sys.argv[3]) if len(sys.argv) > 3 else 5
 torch.manual_seed(0); np.random.seed(0)
 dev = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-G, R, DT, T, POOL = 32, 4, 0.02, 12, 4
+G, R, DT, T, POOL = 32, 4, 0.02, 12, int(os.environ.get("POOL", 4))
 
 # ---- the eye: hex columns inside a square field of view, in a 32×32 axial grid
 u, v = np.meshgrid(np.arange(G), np.arange(G), indexing="ij")
@@ -31,7 +31,10 @@ if task == "mnist":
     tr, te = torchvision.datasets.MNIST("data", True, download=True), torchvision.datasets.MNIST("data", False, download=True)
     xtr, ytr, xte, yte = tr.data[:12000, None].float() / 255, tr.targets[:12000], te.data[:2000, None].float() / 255, te.targets[:2000]; CLASSES = 10
 else:
-    tr, te = torchvision.datasets.CIFAR10("data", True, download=True), torchvision.datasets.CIFAR10("data", False, download=True)
+    # cs.toronto.edu serves CIFAR-10 at ~50 KB/s from here; these are the same images from the Hugging Face mirror (uoft-cs/cifar10)
+    class _DS:
+        def __init__(self, f): z = np.load(f); self.data, self.targets = z["x"], z["y"].tolist()
+    tr, te = _DS("data/cifar-train.npz"), _DS("data/cifar-test.npz")
     def pick(ds):
         x, y = torch.tensor(ds.data).float().mean(-1)[:, None] / 255, torch.tensor(ds.targets)
         keep = (y == 3) | (y == 5); return x[keep], (y[keep] == 5).long()
@@ -70,12 +73,15 @@ class Fly(torch.nn.Module):
 class Pixels(torch.nn.Module):
     def __init__(self): super().__init__(); self.lin = torch.nn.Linear(G * G, CLASSES)
     def forward(self, lum): return self.lin(lum.flatten(1) - 0.5)
+class PixelsPooled(torch.nn.Module):   # the eye's brightness averaged over the same POOL×POOL regions the fly readout gets
+    def __init__(self): super().__init__(); self.lin = torch.nn.Linear(POOL * POOL, CLASSES)
+    def forward(self, lum): return self.lin(((lum.flatten(1) - 0.5) @ pool.T) * 5)
 class CNN(torch.nn.Module):   # a small conventional net on the same eye image, for scale
     def __init__(self):
         super().__init__(); self.c1 = torch.nn.Conv2d(1, 16, 3, padding=1); self.c2 = torch.nn.Conv2d(16, 32, 3, padding=1); self.lin = torch.nn.Linear(32 * 8 * 8, CLASSES)
     def forward(self, lum):
         x = F.max_pool2d(F.relu(self.c1(lum[:, None] - 0.5)), 2); x = F.max_pool2d(F.relu(self.c2(x)), 2); return self.lin(x.flatten(1))
-net = {"fly": lambda: Fly(), "fly-frozen": lambda: Fly(frozen=True), "shuffled": lambda: Fly(shuffled=True), "pixels": Pixels, "cnn": CNN}[model_kind]().to(dev)
+net = {"fly": lambda: Fly(), "fly-frozen": lambda: Fly(frozen=True), "shuffled": lambda: Fly(shuffled=True), "pixels": Pixels, "pixels-pooled": PixelsPooled, "cnn": CNN}[model_kind]().to(dev)
 params = [p for p in net.parameters() if p.requires_grad]
 print(model_kind, "learned parameters:", sum(p.numel() for p in params), "| of which wiring-side:", sum(p.numel() for n, p in net.named_parameters() if p.requires_grad and "readout" not in n and "lin" not in n and not n.startswith("c")))
 opt = torch.optim.Adam(params, lr=3e-3)
@@ -88,4 +94,4 @@ for ep in range(1, EPOCHS + 1):
     for i in range(0, len(perm), 64):
         b = perm[i:i + 64]; loss = F.cross_entropy(net(etr[b].to(dev)), ytr[b].to(dev)); opt.zero_grad(); loss.backward(); opt.step()
     print(f"epoch {ep}  loss {loss.item():.3f}  train {accuracy(etr[:2000], ytr[:2000]):.3f}  test {accuracy(ete, yte):.3f}  {time.perf_counter() - t0:.0f}s", flush=True)
-print(json.dumps(dict(task=task, model=model_kind, test=round(accuracy(ete, yte), 4), seconds=round(time.perf_counter() - t0))))
+print(json.dumps(dict(task=task, model=model_kind, pool=POOL, test=round(accuracy(ete, yte), 4), seconds=round(time.perf_counter() - t0))))
