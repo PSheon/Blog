@@ -133,6 +133,23 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
   });
 }
 
+test("a URL that matches nothing gets the site's own 404, not the framework's", async ({ page }) => {
+  const response = await page.goto("/zh/no-such-page/at-all");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+});
+
+test("the home page describes the blog to search engines and has an icon iOS can use", async ({ page }) => {
+  await page.goto("/en");
+  const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').first().textContent())!);
+  expect(ld).toMatchObject({ "@type": "Blog", inLanguage: "en", author: { "@type": "Person" } });
+  expect(ld.blogPost.length).toBeGreaterThan(3);
+  const icon = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+  expect((await page.request.get(icon!)).headers()["content-type"]).toBe("image/png");
+});
+
 test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
   await page.goto("/zh/posts/lite3-walking");
   const hidden = page.locator(".katex-mathml");
