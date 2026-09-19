@@ -55,4 +55,4 @@ Paul 決定只做水果，並選了「選兩種水果一起長」這個點子。
 
 決定：點雲畫面在深淺兩種主題下都用深色底（黃色的點在白底上幾乎看不見）；手機上三團排成三角形而不是一列。測試：`tests/diffusion/diffusion.test.ts`（排程、水果範圍、兩種水果各自長對）和 `e2e/smoke.spec.ts` 裡的一個測試（草稿在 production build 會跳過，對 dev server 跑過，桌機和手機都過）；axe 對草稿單獨掃過，兩種主題都沒有違規。
 
-還沒做：en.mdx、真機手機、`prefers-reduced-motion` 實際看過（已接上：不旋轉，但取樣動畫還是會動）、取樣動畫的暫停鍵。
+`prefers-reduced-motion`：不旋轉、不自動重新取樣，畫面靜止（用 Playwright 模擬驗過，連續兩張截圖逐位元相同），按「重新取樣」才會再長一次。還沒做：en.mdx、真機手機。
