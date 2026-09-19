@@ -133,11 +133,11 @@ export function DriveLab() {
         <div className="grid min-w-0 flex-1 gap-3">
           <p id={hintId} className="text-muted-foreground">{t.driveHint}</p>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => setAuto((a) => !a)}>{auto ? t.stopAutopilot : t.autopilot}</Button>
+            <Button size="sm" data-testid="slam-autopilot" onClick={() => setAuto((a) => !a)}>{auto ? t.stopAutopilot : t.autopilot}</Button>
             <Button size="sm" variant="ghost" onClick={() => restart(knobs)}>{t.reset}</Button>
             {fast && <span className="label self-center text-signal">{t.fastForward}</span>}
             {preset !== "healthy" && (
-              <span className="flex items-center gap-2 rounded-full border border-border py-0.5 pr-1 pl-3">
+              <span className="flex items-center gap-2 rounded-full border border-border py-0.5 pr-1 pl-3" data-testid="slam-preset">
                 <span className="label">{t.cards[preset]}</span>
                 <Button size="sm" variant="ghost" onClick={() => { setPreset("healthy"); restart(PRESETS.healthy); }}>{t.backToNormal}</Button>
               </span>
@@ -146,9 +146,9 @@ export function DriveLab() {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Readout label={t.error} value={seen.error.toFixed(2)} unit={t.metres} large />
+        <div data-testid="slam-error"><Readout label={t.error} value={seen.error.toFixed(2)} unit={t.metres} large /></div>
         <Readout label={t.wheelsOnly} value={seen.wheels.toFixed(2)} unit={t.metres} tone="alt" />
-        <Readout label={t.closures} value={seen.closures} unit={t.times} tone="plain" />
+        <div data-testid="slam-closures"><Readout label={t.closures} value={seen.closures} unit={t.times} tone="plain" /></div>
         <Readout label={t.lastFix} value={seen.lastFix.toFixed(2)} unit={t.metres} tone="plain" />
       </div>
     </div>

@@ -384,4 +384,34 @@ test.describe("navigation progress", () => {
     await expect(page).toHaveURL(/\/en\/posts$/);
     await expect(page.getByTestId("nav-progress")).toHaveCount(0);
   });
+
+test("a car maps a corridor, closes the loop, and takes a failure mode from the comparison below", async ({ page }) => {
+  const response = await page.goto("/zh/posts/slam-2d");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "slam-2d is still a draft");
+  test.setTimeout(240_000);
+  await page.emulateMedia({ reducedMotion: "reduce" }); // the hand-off below scrolls; don't make it a smooth scroll
+  const errors = watchErrors(page);
+  const number = async (id: string) => Number((await page.getByTestId(id).first().textContent())!.match(/[\d.]+/)![0]);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+  await page.getByTestId("slam-autopilot").scrollIntoViewIfNeeded();
+  await page.getByTestId("slam-autopilot").click();
+  // One lap on autopilot: the first loop closure pulls the estimate back onto the truth.
+  await expect.poll(() => number("slam-closures"), { timeout: 150_000 }).toBeGreaterThan(0);
+  await expect.poll(() => number("slam-error"), { timeout: 20_000 }).toBeLessThan(0.5);
+
+  // The four outcomes are worked out in the page once they scroll into view.
+  const cards = page.locator('[data-instrument="slam / four ways to fail"]');
+  await cards.scrollIntoViewIfNeeded();
+  await expect(cards).not.toContainText("計算中", { timeout: 120_000 });
+  const withCamera = Number((await page.getByTestId("slam-outcome-camera").textContent())!.match(/([\d.]+) m/)![1]);
+  const without = Number((await page.getByTestId("slam-outcome-drift").textContent())!.match(/([\d.]+) m/)![1]);
+  expect(withCamera).toBeLessThan(0.5);
+  expect(without).toBeGreaterThan(3);
+
+  // A card hands its setting to the car at the top of the article.
+  await page.getByTestId("slam-outcome-wrong").getByRole("button").click();
+  await expect(page.getByTestId("slam-preset")).toContainText("認錯一次");
+  expect(errors).toEqual([]);
 });
