@@ -33,11 +33,15 @@ export interface SlamOptions {
   /** A match is believed only if this share of points line up, this tightly (m). */
   minInliers: number;
   maxRms: number;
+  /** After a closure, skip this many keyframes before looking again: nearby closures say almost the same thing, and each one costs a re-optimisation. */
+  restAfterClosure: number;
+  /** Scan-match at most this many of the most promising old keyframes. */
+  maxCandidates: number;
   /** …and only if the scans pin the position down in every direction (see `conditioning`); a bare corridor does not. */
   minConditioning: number;
 }
 
-export const DEFAULTS: SlamOptions = { everyMetres: 0.5, everyRadians: 0.35, scanMatchOdometry: false, loopClosure: true, candidates: "position", minResemblance: 0.8, searchRadius: 2.5, minGap: 25, minInliers: 0.9, maxRms: 0.04, minConditioning: 0.15 };
+export const DEFAULTS: SlamOptions = { everyMetres: 0.5, everyRadians: 0.35, scanMatchOdometry: false, loopClosure: true, candidates: "position", minResemblance: 0.8, searchRadius: 2.5, minGap: 25, minInliers: 0.9, maxRms: 0.04, minConditioning: 0.15, restAfterClosure: 4, maxCandidates: 3 };
 
 export interface Closure { from: number; to: number; passes: number; errorBefore: number; errorAfter: number }
 
@@ -49,6 +53,7 @@ export class Slam {
   /** Motion accumulated from odometry since the last keyframe. */
   private since: Pose = { x: 0, y: 0, theta: 0 };
   private travelled = 0;
+  private lastClosureAt = -Infinity;
   private turned = 0;
 
   constructor(readonly options: SlamOptions = DEFAULTS) {}
@@ -104,26 +109,32 @@ export class Slam {
 
   private tryClosure(index: number): Closure | null {
     const o = this.options, here = this.keyframes[index];
-    let best: { at: number; z: Pose; rms: number; information: number[] } | null = null;
+    if (index - this.lastClosureAt <= o.restAfterClosure) return null;
+    // Shortlist first (cheap), scan-match only the best few (expensive).
+    const shortlist: { at: number; rank: number; guess: Pose }[] = [];
     for (let k = 0; k < index - o.minGap; k++) {
       const old = this.keyframes[k];
-      let guess: Pose;
       if (o.candidates === "appearance" && here.panorama && old.panorama) {
         const look = resemblance(old.panorama, here.panorama);
-        if (look.score < o.minResemblance) continue;
-        guess = { x: 0, y: 0, theta: look.heading }; // same view ⇒ about the same spot; the picture's shift gives the heading
+        // same view ⇒ about the same spot; the picture's shift gives the heading
+        if (look.score >= o.minResemblance) shortlist.push({ at: k, rank: -look.score, guess: { x: 0, y: 0, theta: look.heading } });
       } else {
-        if (Math.hypot(old.pose.x - here.pose.x, old.pose.y - here.pose.y) > o.searchRadius) continue;
-        guess = between(old.pose, here.pose);
+        const d = Math.hypot(old.pose.x - here.pose.x, old.pose.y - here.pose.y);
+        if (d <= o.searchRadius) shortlist.push({ at: k, rank: d, guess: between(old.pose, here.pose) });
       }
-      const m = icp(old.points, here.points, guess, { gate: 1.5 });
-      if (m.inliers >= o.minInliers && m.rms <= o.maxRms && conditioning(m.information) >= o.minConditioning && (!best || m.rms < best.rms)) best = { at: k, z: m.pose, rms: m.rms, information: m.information };
+    }
+    shortlist.sort((p, q) => p.rank - q.rank);
+    let best: { at: number; z: Pose; rms: number; information: number[] } | null = null;
+    for (const c of shortlist.slice(0, o.maxCandidates)) {
+      const m = icp(this.keyframes[c.at].points, here.points, c.guess, { gate: 1.5 });
+      if (m.inliers >= o.minInliers && m.rms <= o.maxRms && conditioning(m.information) >= o.minConditioning && (!best || m.rms < best.rms)) best = { at: c.at, z: m.pose, rms: m.rms, information: m.information };
     }
     if (!best) return null;
     // 1/σ² for a 5 cm point error, divided by ten because neighbouring beams hit the same wall and are far from independent.
     this.edges.push({ from: best.at, to: index, z: best.z, information: icpInformation(best.information, best.z, 40), kind: "loop" });
     const poses = this.keyframes.map((k) => k.pose);
-    const history = optimise(poses, this.edges);
+    this.lastClosureAt = index;
+    const history = optimise(poses, this.edges, 4);
     const closure = { from: best.at, to: index, passes: history.length - 1, errorBefore: history[0], errorAfter: history[history.length - 1] };
     this.closures.push(closure);
     return closure;

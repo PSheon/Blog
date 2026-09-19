@@ -71,6 +71,7 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
         }
         w.wheels.push(w.car.deadReckoning);
       }
+      if (auto && w.slam.keyframes.length >= MAX_KEYFRAMES) setAuto(false);
       w.flash *= 0.93;
       view.current?.render({ truth: w.car.truth, scan: w.car.lastScan.points, slam: w.slam, wheels: w.wheels, origin: START, wrong: w.wrong }, !wide.matches);
       if (glow.current) glow.current.style.opacity = String(w.flash > 0.02 ? w.flash * 0.3 : 0);
@@ -98,6 +99,14 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
       <div className="relative">
         <canvas ref={stage} className="aspect-[3/4] w-full rounded-md border border-border text-foreground sm:aspect-[2/1]" />
         <div ref={glow} className="pointer-events-none absolute right-0 bottom-0 h-[calc(50%-5px)] w-full rounded-md opacity-0 sm:h-full sm:w-[calc(50%-5px)]" style={{ background: VIOLET }} aria-hidden />
+        {seen.keyframes >= MAX_KEYFRAMES && (
+          <div className="absolute inset-0 grid place-items-center rounded-md bg-background/70 backdrop-blur-sm" role="status">
+            <div className="grid justify-items-center gap-3 text-center">
+              <p>{t.full}</p>
+              <Button size="sm" onClick={() => restart(knobs)}>{t.reset}</Button>
+            </div>
+          </div>
+        )}
         <span className="label absolute top-2 left-2">{t.real}</span>
         <span className="label absolute top-[calc(50%+0.75rem)] left-2 sm:top-2 sm:left-[calc(50%+0.75rem)]">{t.believed}</span>
       </div>
@@ -107,7 +116,7 @@ export function DriveLab({ breakable = false }: { breakable?: boolean }) {
       <div className="flex flex-wrap items-center gap-4">
         <Stick label={t.stick} hintId={hintId} onChange={steer} testId="slam-stick" />
         <div className="grid min-w-0 flex-1 gap-3">
-          <p id={hintId} className="text-muted-foreground">{seen.keyframes >= MAX_KEYFRAMES ? t.full : t.driveHint}</p>
+          <p id={hintId} className="text-muted-foreground">{t.driveHint}</p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => setAuto((a) => !a)}>{auto ? t.stopAutopilot : t.autopilot}</Button>
             <Button size="sm" variant="ghost" onClick={() => restart(knobs)}>{t.reset}</Button>
