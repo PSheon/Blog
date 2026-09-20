@@ -63,5 +63,7 @@ export function useCity(root: RefObject<HTMLElement | null>, canvas: RefObject<H
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one session per mount; later changes go through the session
   }, []);
 
-  return { session, ready, panel };
+  /** A fresh snapshot now, for anything that changes the world between polls: a rebuild must never be drawn with the old rows. */
+  const publish = () => { if (session.current) setPanel(session.current.panel(eventCount)); };
+  return { session, ready, panel, publish };
 }

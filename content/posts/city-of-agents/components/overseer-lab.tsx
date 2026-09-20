@@ -19,10 +19,10 @@ const MODES: Mode[] = ["utility", "fsm", "random"];
  */
 export function OverseerLab({ seed = 1, n = 8, agents = 300 }: { seed?: number; n?: number; agents?: number }) {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const { session, ready, panel } = useCity(root, canvas, { seed, n, agents }, 9);
+  const { session, ready, panel, publish } = useCity(root, canvas, { seed, n, agents }, 9);
   const [, refresh] = useState(0), [count, setCount] = useState<number | null>(null), s = session.current;
-  const act = (f: () => void) => { f(); s?.touch(); refresh((v) => v + 1); };
-  const running = s?.running ?? true, follow = s?.follow ?? -1, setup = s?.setup ?? { seed, n, agents };
+  const act = (f: () => void) => { f(); s?.touch(); publish(); refresh((v) => v + 1); };
+  const running = s?.running ?? true, follow = panel?.follow ?? -1, setup = s?.setup ?? { seed, n, agents };
 
   return (
     <div ref={root} className="grid gap-4 text-sm lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -49,8 +49,8 @@ export function OverseerLab({ seed = 1, n = 8, agents = 300 }: { seed?: number; 
 
       <div className="grid content-start gap-4">
         <p className="label text-foreground">{t.overseer}</p>
-        {panel && s && <StatusTable t={t} city={s.city} people={panel.people} follow={follow} onFollow={(id) => act(() => s.setFollow(id))} />}
-        {panel && s && <EventStream t={t} city={s.city} events={panel.events} />}
+        {panel && s && <StatusTable t={t} city={panel.city} people={panel.people} follow={follow} onFollow={(id) => act(() => s.setFollow(id))} />}
+        {panel && <EventStream t={t} city={panel.city} events={panel.events} />}
         <div className="grid gap-3 border-t border-border pt-3">
           <p className="label text-foreground">{t.knobs}</p>
           <div className="flex flex-wrap items-center gap-1.5">

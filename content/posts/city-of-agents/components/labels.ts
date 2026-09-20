@@ -77,6 +77,8 @@ const en: typeof zh = {
 };
 
 export type Labels = typeof zh;
+/** Both tables, for tests and anything else that is not a component. */
+export const LABELS = { zh, en };
 
 /** "阿凱", and "阿凱 2" for the forty-first person. */
 export const personName = (t: Labels, id: number): string => t.names[id % t.names.length] + (id >= t.names.length ? ` ${Math.floor(id / t.names.length) + 1}` : "");

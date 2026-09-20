@@ -7,8 +7,12 @@ import {
 export type Setup = { seed: number; n: number; agents: number };
 export type PersonRow = { id: number; state: AgentState; action: Action | null; place: number; needs: Needs };
 export type PanelState = {
+  /** The city these rows and events belong to. Place ids mean nothing in any other city, so the panel never reads the session's. */
+  city: City;
   t: number; from: number; now: number; replaying: boolean; mode: Mode; duty: boolean; people: PersonRow[]; events: SimEvent[]; marks: number[];
   histogram: number[]; peak: number; sync: number; frame: number; calls: number;
+  /** Who the camera follows, or −1; never past the end of `people`. */
+  follow: number;
 };
 
 /** At most this many simulated minutes per frame: a slow frame drops simulated time instead of snowballing. */
@@ -118,7 +122,7 @@ export class CitySession {
     const events: SimEvent[] = [];
     for (let k = cursor - 1; k >= 0 && events.length < eventCount; k--) if (log.events[k].type !== "arrived") events.push(log.events[k]);
     const histogram = departureHistogram(log.events, t - 1440, t + 1e-9);
-    return { t, from: log.base.t, now: world.t, replaying: !live, mode, duty, people, events, marks: log.events.filter((e) => e.type === "config").map((e) => e.t), histogram,
+    return { city: this.city, follow: Math.min(this.follow, people.length - 1), t, from: log.base.t, now: world.t, replaying: !live, mode, duty, people, events, marks: log.events.filter((e) => e.type === "config").map((e) => e.t), histogram,
       peak: peakDepartureShare(histogram, people.length), sync, frame: this.frameMs, calls: this.view?.calls ?? 0 };
   }
 
