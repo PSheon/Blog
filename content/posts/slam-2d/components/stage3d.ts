@@ -5,7 +5,7 @@ import type * as THREE from "three";
 import type { Pose } from "./se2";
 import type { Segment } from "./world";
 
-type Three = typeof THREE;
+type Three = typeof import("@/lib/three");
 export const CYAN_HEX = 0x79dafa, PINK_HEX = 0xff6e96, VIOLET_HEX = 0xb9a5ff;
 
 /**
@@ -161,7 +161,7 @@ export function useStage3D<S>(canvas: RefObject<HTMLCanvasElement | null>, visib
       if (!live.current) {
         if (loading || !canvas.current) return;
         loading = true;
-        void import("three").then((T) => {
+        void import("@/lib/three").then((T) => {
           if (cancelled || !canvas.current) return;
           const stage = new Stage3D(T, canvas.current, options);
           live.current = { stage, built: build(stage) };

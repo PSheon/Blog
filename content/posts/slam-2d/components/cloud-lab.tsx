@@ -10,7 +10,7 @@ import { type Cloud, type Pose3, ROOM, apply, compose3, fromEuler, icp3, inverse
 import { useVisible } from "./use-visible";
 
 const KEEP = 14; // sweeps kept in the drawn map
-type Three = typeof import("three");
+type Three = typeof import("@/lib/three");
 
 /** The sensor's true motion for sweep k: mostly forward, a slow sway, and a quarter turn now and then — a lap of the room. */
 const motion = (k: number): Pose3 => {
@@ -27,7 +27,7 @@ export function CloudLab() {
   const [seen, setSeen] = useState({ sweeps: 0, drift: 0, turn: 0, ms: 0 });
   const three = useRef<Three | null>(null);
 
-  const load = async () => { setStatus("loading"); three.current = await import("three"); setStatus("ready"); setPlaying(true); };
+  const load = async () => { setStatus("loading"); three.current = await import("@/lib/three"); setStatus("ready"); setPlaying(true); };
 
   useEffect(() => {
     const T = three.current, canvas = stage.current;

@@ -533,3 +533,16 @@ test("a 3D figure follows the theme: switching to light re-inks a scene that was
   await expect.poll(drawn, { timeout: 10_000 }).not.toBe(dark);
   expect(await drawn()).toBe(await page_ink());
 });
+
+test("pages are served with a content security policy, and nothing on an article trips it", async ({ page }) => {
+  const violations: string[] = [];
+  await page.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP ${e.violatedDirective} ${e.blockedURI}`)));
+  page.on("console", (m) => m.text().startsWith("CSP ") && violations.push(m.text()));
+  const response = await page.goto("/zh/posts/diffusion-points"); // KaTeX, a module worker, three.js
+  const policy = response!.headers()["content-security-policy"];
+  for (const part of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'self'"]) expect(policy).toContain(part);
+  expect(response!.headers()["cross-origin-opener-policy"]).toBe("same-origin");
+  await page.getByTestId("diffusion-train").first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1500);
+  expect(violations).toEqual([]);
+});

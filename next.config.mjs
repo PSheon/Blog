@@ -1,5 +1,31 @@
 import createMDX from "@next/mdx";
 
+/*
+ * Content-Security-Policy. What it can honestly promise here:
+ *  - script-src needs 'unsafe-inline' (pages are prerendered, so there are no nonces: next-themes' script, JSON-LD and
+ *    Next's own data pushes are inline) and 'unsafe-eval' (MuJoCo's Emscripten glue builds functions with
+ *    `new Function`; per-route would not do, a client-side navigation keeps the first document's policy). So it does
+ *    not stop an injected script. There is no user input on this site to inject one through.
+ *  - What it does do: everything loads from this origin only, nothing can be framed elsewhere or post a form away,
+ *    no plugins, no <base> hijack.
+ * Production only: `next dev` needs eval and a websocket, and a Vercel preview loads its toolbar from vercel.live.
+ */
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'", // KaTeX and React style props
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'",
+].join("; ");
+const enforceCsp = process.env.NODE_ENV === "production" && process.env.VERCEL_ENV !== "preview";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
@@ -14,6 +40,9 @@ const nextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          // No window we open, and none that opens us, gets a handle on this page.
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+          ...(enforceCsp ? [{ key: "Content-Security-Policy", value: CSP }] : []),
           // Nothing here needs these (the camera stays available to our own pages for a future instrument); deny them to anything embedded.
           { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
         ],

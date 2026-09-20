@@ -16,7 +16,7 @@ export interface Pose {
 /** A chase-camera WebGL view of the robot. MuJoCo is z-up, so the whole scene is too. */
 export class Lite3View {
   private constructor(
-    private readonly three: typeof import("three"),
+    private readonly three: typeof import("@/lib/three"),
     private readonly renderer: import("three").WebGLRenderer,
     private readonly scene: import("three").Scene,
     private readonly camera: import("three").PerspectiveCamera,
@@ -41,7 +41,7 @@ export class Lite3View {
   }
 
   static async create(canvas: HTMLCanvasElement): Promise<Lite3View> {
-    const [three, { STLLoader }] = await Promise.all([import("three"), import("three/examples/jsm/loaders/STLLoader.js")]);
+    const [three, { STLLoader }] = await Promise.all([import("@/lib/three"), import("three/examples/jsm/loaders/STLLoader.js")]);
     const loader = new STLLoader();
     const names = ["torso", "hip", "thigh", "shank"];
     const loaded = await Promise.all(names.map((n) => loader.loadAsync(`${ASSETS}/${n}.bin?v=${ASSET_VERSION}`)));
