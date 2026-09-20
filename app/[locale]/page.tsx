@@ -121,7 +121,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             <div className="spotlight grid overflow-hidden rounded-md border border-border bg-panel transition-colors group-hover:border-foreground/25 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-cols-[minmax(0,1fr)_30rem]">
               <div className="p-6 sm:p-8 lg:p-10">
                 <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                  <EntryNo no={latest.no} className="text-signal" />
+                  <EntryNo no={latest.no} draft={latest.draft} className="text-signal" />
                   <time dateTime={latest.date} className="label">
                     {formatDate(latest.date, locale)}
                   </time>

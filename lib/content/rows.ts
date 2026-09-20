@@ -15,6 +15,7 @@ export function toRows(posts: PostMeta[], locale: Locale): IndexRow[] {
     minutesLabel: t.post.minutes(p.readingMinutes),
     tags: p.tags,
     interactive: p.interactive,
+    draft: p.draft,
     langNote: p.isFallback ? localeLabel.zh : undefined,
   }));
 }

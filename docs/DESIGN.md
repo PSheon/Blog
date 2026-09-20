@@ -126,6 +126,10 @@ Rules inside an instrument:
   share one route, and Next gives a route the client code of everything it can render, so plain re-exports ship every
   article's instruments with every article (measured: 292 KB gzip of page scripts, 203 KB after the split). A
   `dynamic()` in a server file does not split; it has to be a client file.
+- `draft: true` in the front matter of both language files while it is being written. A draft is left out of
+  production builds and shown only by `next dev`, where it wears a "草稿 DRAFT" mark beside its number on every
+  surface (`EntryNo`) and a banner on its own page. Publishing is removing the flag from both files, adding the
+  article to the page list in `e2e/a11y.spec.ts`, and a row in the README.
 - A cover drawing in `components/site/post-cover.tsx` (`viewBox="0 0 160 100"`, the three signal variables only,
   deterministic — no `Math.random()`; it is hydrated). Until it has one, it gets the generic constellation.
 - Optionally a live preview for the "latest" card: a component registered in `components/site/post-previews.tsx`
