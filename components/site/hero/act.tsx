@@ -32,16 +32,23 @@ export default function HeroAct({ t }: { t: { generation: string; alive: string;
   }, [still]);
 
   return (
-    <div className="grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-5">
-      <canvas ref={canvas} aria-hidden className="mx-auto h-full max-h-full min-h-0 w-auto max-w-full rounded-sm border border-border bg-background text-foreground" style={{ aspectRatio: `${WORLD.width} / ${WORLD.height}` }} />
-      <dl className="grid gap-4 font-mono">
-        {([[t.generation, seen.generation], [t.alive, seen.alive], [t.best, seen.best]] as const).map(([label, value], i) => (
-          <div key={label} className="flex items-baseline justify-between gap-2 border-b border-border pb-2">
-            <dt className="label">{label}</dt>
-            <dd className={`tabular leading-none ${i === 0 ? "text-4xl text-signal-2" : "text-2xl"}`}>{value}</dd>
-          </div>
-        ))}
-      </dl>
+    // Sized by the panel (a container query). Narrow (every phone): the flock on top at full width, the three numbers
+    // in a row under it. Wide: side by side, like the other stations.
+    <div className="@container h-full">
+      <div className="grid h-full grid-rows-[minmax(0,1fr)_auto] gap-3 @[26rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[26rem]:grid-rows-1 @[26rem]:items-center @[26rem]:gap-5">
+        {/* As large as fits both ways, at the world's own shape. */}
+        <div className="grid h-full min-h-0 place-items-center [container-type:size]">
+          <canvas ref={canvas} aria-hidden className="rounded-sm border border-border bg-background text-foreground" style={{ width: `min(100cqw, 100cqh * ${WORLD.width} / ${WORLD.height})`, aspectRatio: `${WORLD.width} / ${WORLD.height}` }} />
+        </div>
+        <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 font-mono @[26rem]:grid-cols-1 @[26rem]:gap-4 @[26rem]:border-t-0 @[26rem]:pt-0">
+          {([[t.generation, seen.generation], [t.alive, seen.alive], [t.best, seen.best]] as const).map(([label, value], i) => (
+            <div key={label} className="flex flex-col gap-1 @[26rem]:flex-row @[26rem]:items-baseline @[26rem]:justify-between @[26rem]:gap-2 @[26rem]:border-b @[26rem]:border-border @[26rem]:pb-2">
+              <dt className="label">{label}</dt>
+              <dd className={`tabular leading-none ${i === 0 ? "text-2xl text-signal-2 @[26rem]:text-4xl" : "text-2xl"}`}>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
     </div>
   );
 }

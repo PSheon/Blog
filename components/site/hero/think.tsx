@@ -56,9 +56,11 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
     return () => cancelAnimationFrame(frame);
   }, [run]);
 
-  const box = "grid size-5 place-items-center rounded-sm border bg-background text-sm sm:size-7 sm:text-xl";
+  // Six boxes share whatever width the column has (it is narrow on a phone and on a small laptop alike), up to 1.75rem each.
+  const box = "grid aspect-square w-full place-items-center rounded-sm border bg-background text-[clamp(0.75rem,4.2cqw,1.25rem)] leading-none";
+  const row = "grid max-w-[12.5rem] grid-cols-6 gap-1";
   return (
-    <div className="grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
+    <div className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
       <div className="mx-auto w-full max-w-[15rem]">
         {/* Input digits along the top, the answer down the side: a trained model lights the anti-diagonal. */}
         <div className="grid grid-cols-[1rem_1fr] gap-1 font-mono text-[0.7rem] text-muted-foreground">
@@ -72,11 +74,11 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
       <div className="grid min-w-0 gap-3 font-mono sm:gap-4">
         <div>
           <p className="label mb-1.5">{t.input}</p>
-          <p className="flex gap-1 sm:gap-1.5">{PROBLEM.map((d, i) => <span key={i} className={`${box} border-border`}>{d}</span>)}</p>
+          <p className={row}>{PROBLEM.map((d, i) => <span key={i} className={`${box} border-border`}>{d}</span>)}</p>
         </div>
         <div>
           <p className="label mb-1.5">{t.output}</p>
-          <p className="flex gap-1 sm:gap-1.5" data-testid="hero-think-output">
+          <p className={row} data-testid="hero-think-output">
             {WANT.map((want, i) => {
               const got = view.output[i];
               return <span key={i} className={`${box} ${got === want ? "border-signal text-signal" : "border-border text-muted-foreground"}`}>{got ?? "·"}</span>;
