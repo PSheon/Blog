@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import { type Building, type City, hourOf, PARAMS, type Rect, sunAltitude, windowsLit } from "./sim";
+import { type Action, type Building, type City, hourOf, PARAMS, type Rect, sunAltitude, windowsLit, type World } from "./sim";
 
 type Three = typeof THREE;
 
@@ -13,6 +13,10 @@ const C = {
   night: 0x070918, dusk: 0xf08a5d, day: 0x9ccff2, sunLow: 0xffb070, sunHigh: 0xfff4e0, moon: 0x8fa8ff,
 };
 
+/** People are drawn about twice life size: at the distance the whole city is seen from, life size is two pixels. */
+const PERSON = 2.2;
+export type PeopleColors = Record<Action | "idle", string>;
+
 const hash01 = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const smooth = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
 
@@ -20,7 +24,7 @@ type Box = { x: number; y: number; z: number; sx: number; sy: number; sz: number
 
 /**
  * The city as a handful of instanced meshes: every box (ground, blocks, zebra stripes, buildings, awnings, posts, benches)
- * is one draw call, tree crowns one, windows one, lamp heads and their pools of light one each. Light, sky, fog, lamps
+ * is one draw call, tree crowns one, windows one, lamp heads and their pools of light one each, people two. Light, sky, fog, lamps
  * and windows are functions of the simulated hour; the view keeps no state of its own about the time of day.
  */
 export class CityView {
@@ -42,8 +46,15 @@ export class CityView {
   private readonly windowHash: Float32Array = new Float32Array(0);
   private readonly windowLit: Uint8Array = new Uint8Array(0);
   private windowStamp = -1;
+  private people: { bodies: THREE.InstancedMesh; heads: THREE.InstancedMesh; colors: Record<string, THREE.Color>; stride: Float32Array; shown: (string | null)[] } | null = null;
   private readonly tmp: { a: THREE.Color; b: THREE.Color };
   private readonly lightDir: THREE.Vector3;
+  private readonly up: THREE.Vector3;
+  private readonly personMatrix: THREE.Matrix4;
+  private readonly personTurn: THREE.Quaternion;
+  private readonly personLean: THREE.Quaternion;
+  private readonly personScale: THREE.Vector3;
+  private readonly personAt: THREE.Vector3;
   private readonly disposables: { dispose(): void }[] = [];
 
   constructor(private readonly T: Three, readonly canvas: HTMLCanvasElement, readonly city: City) {
@@ -61,6 +72,10 @@ export class CityView {
     this.camera.up.set(0, 0, 1);
     this.tmp = { a: new T.Color(), b: new T.Color() };
     this.lightDir = new T.Vector3(0, 0, 1);
+    this.up = new T.Vector3(0, 0, 1);
+    this.personMatrix = new T.Matrix4(); this.personTurn = new T.Quaternion(); this.personAt = new T.Vector3();
+    this.personLean = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), 0.16);
+    this.personScale = new T.Vector3(PERSON, PERSON, PERSON);
 
     this.hemi = new T.HemisphereLight(0xcfe3ff, 0x4a4a3a, 1);
     this.hemi.position.set(0, 0, 1);
@@ -181,6 +196,47 @@ export class CityView {
     this.root.add(mesh);
     this.disposables.push(geometry, material, mesh);
     return { mesh, hash: Float32Array.from(panes, (p) => p.hash) };
+  }
+
+  // ── people ────────────────────────────────────────────────────────────────
+
+  /** Two instanced meshes for everyone: a body that takes the light and a head that glows a little, so people read at night. */
+  setPeople(count: number, colors: PeopleColors): void {
+    if (this.people) { this.root.remove(this.people.bodies, this.people.heads); this.people.bodies.dispose(); this.people.heads.dispose(); }
+    const T = this.T, body = new T.BoxGeometry(0.62, 0.42, 1), head = new T.SphereGeometry(0.3, 10, 8);
+    const bodies = new T.InstancedMesh(body, new T.MeshStandardMaterial({ roughness: 0.8 }), count), heads = new T.InstancedMesh(head, new T.MeshBasicMaterial(), count);
+    bodies.castShadow = true; bodies.frustumCulled = false; heads.frustumCulled = false;
+    const white = new T.Color(colors.idle);
+    for (let i = 0; i < count; i++) { bodies.setColorAt(i, white); heads.setColorAt(i, white); }
+    this.root.add(bodies, heads);
+    this.disposables.push(body, head, bodies.material as THREE.Material, heads.material as THREE.Material);
+    this.people = { bodies, heads, colors: Object.fromEntries(Object.entries(colors).map(([k, v]) => [k, new T.Color(v)])), stride: new Float32Array(count), shown: new Array<string | null>(count).fill(null) };
+  }
+
+  /**
+   * Places everyone between their position one tick ago (`px`, `py`) and now, `alpha` of the way. Walking is drawn, not
+   * simulated: the body bobs once per stride and leans into the walk.
+   */
+  updatePeople(world: World, px: Float64Array, py: Float64Array, alpha: number): void {
+    const people = this.people;
+    if (!people) return;
+    const m = this.personMatrix, q = this.personTurn, lean = this.personLean, s = this.personScale, at = this.personAt;
+    let recolored = false;
+    for (const a of world.agents) {
+      const i = a.id, x = px[i] + (world.x[i] - px[i]) * alpha, y = py[i] + (world.y[i] - py[i]) * alpha, walking = a.state === "traveling";
+      if (walking) people.stride[i] += Math.hypot(world.x[i] - px[i], world.y[i] - py[i]) * 0.02 + 0.12;
+      const bob = walking ? Math.abs(Math.sin(people.stride[i])) * 0.22 * PERSON : 0;
+      q.setFromAxisAngle(this.up, world.heading[i]);
+      if (walking) q.multiply(lean);
+      m.compose(at.set(x, y, 0.26 + 0.55 * PERSON + bob), q, s);
+      people.bodies.setMatrixAt(i, m);
+      m.compose(at.set(x + (walking ? Math.cos(world.heading[i]) * 0.12 * PERSON : 0), y + (walking ? Math.sin(world.heading[i]) * 0.12 * PERSON : 0), 0.26 + 1.38 * PERSON + bob), q, s);
+      people.heads.setMatrixAt(i, m);
+      const key = a.action ?? "idle";
+      if (people.shown[i] !== key) { people.shown[i] = key; people.bodies.setColorAt(i, people.colors[key]); people.heads.setColorAt(i, people.colors[key]); recolored = true; }
+    }
+    people.bodies.instanceMatrix.needsUpdate = true; people.heads.instanceMatrix.needsUpdate = true;
+    if (recolored) { (people.bodies.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true; (people.heads.instanceColor as THREE.InstancedBufferAttribute).needsUpdate = true; }
   }
 
   // ── time of day ───────────────────────────────────────────────────────────
