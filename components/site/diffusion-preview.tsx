@@ -38,6 +38,11 @@ export default function DiffusionPreview({ className = "block aspect-[8/5] w-ful
     const gauss = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
     const clean = new Float32Array(N * 6), noise = new Float32Array(N * 6);
     for (let i = 0; i < N; i++) clean.set(apple(rng), i * 6);
+    // The apple is not centred on its own origin: the body hangs below it and the stem and leaf stand above. Put the
+    // middle of what is actually drawn in the middle of the picture (it sat about a tenth of the height too low).
+    let low = Infinity, high = -Infinity;
+    for (let i = 0; i < N; i++) { const z = clean[i * 6 + 2]; if (z < low) low = z; if (z > high) high = z; }
+    const middle = (low + high) / 2;
     const renoise = () => { for (let i = 0; i < N * 6; i++) noise[i] = gauss(); };
     renoise();
 
@@ -69,7 +74,7 @@ export default function DiffusionPreview({ className = "block aspect-[8/5] w-ful
         const o = i * 6;
         const x = sa * clean[o] + sn * noise[o] * 0.9, y = sa * clean[o + 1] + sn * noise[o + 1] * 0.9, z = sa * clean[o + 2] + sn * noise[o + 2] * 0.9;
         px[i * 2] = w / 2 + (x * c - y * s) * scale;
-        px[i * 2 + 1] = h * 0.52 - z * scale;
+        px[i * 2 + 1] = h / 2 - (z - middle) * scale;
         depth[i] = x * s + y * c;
       }
       order.sort((a, b) => depth[b] - depth[a]);
