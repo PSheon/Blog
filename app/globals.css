@@ -109,6 +109,18 @@
   --sidebar-ring: var(--ring);
 }
 
+/* Navigation progress: creeps towards 90 % and waits there; the page arriving removes it. */
+@keyframes nav-progress {
+  from { transform: scaleX(0.05); }
+  to { transform: scaleX(0.9); }
+}
+.nav-progress-bar {
+  animation: nav-progress 8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress-bar { animation: none; transform: scaleX(0.6); }
+}
+
 /*
  * Greyscale antialiasing thins every stroke. On a dark page that is what you want; on a light one it makes the
  * system CJK serif, already hairline-thin, hard to read. Light theme gets the platform's default smoothing back.

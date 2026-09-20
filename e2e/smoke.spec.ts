@@ -340,3 +340,48 @@ test("a diffusion model trains in the page and its instruments share it", async 
   await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
   expect(errors).toEqual([]);
 });
+
+test("an article that has been opened once works offline, and its model still trains", async ({ page, context }) => {
+  test.setTimeout(120_000);
+  await page.goto("/en/posts/transformer-from-scratch");
+  // Wait for the worker to take control, then load once more through it so that the page's assets are cached.
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })); });
+  await page.reload({ waitUntil: "networkidle" });
+
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
+  await page.getByTestId("tf-train").click();
+  await expect.poll(async () => Number((await page.getByTestId("tf-steps").textContent())!.replace(/,/g, "")), { timeout: 60_000 }).toBeGreaterThan(20);
+
+  // A page never visited has nothing cached: the reader gets the offline page, not the browser's error.
+  await page.goto("/en/posts/ai-flappy-bird");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("offline");
+  await context.setOffline(false);
+});
+
+test("the site can be installed: a manifest with icons, and a worker script that is never cached", async ({ request }) => {
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/" });
+  for (const icon of manifest.icons) expect((await request.get(icon.src)).headers()["content-type"]).toBe("image/png");
+  expect((await request.get("/sw.js")).headers()["cache-control"]).toContain("no-cache");
+});
+
+test.describe("navigation progress", () => {
+  // Requests answered by the service worker never reach page.route, so this one test runs without it.
+  test.use({ serviceWorkers: "block" });
+
+  test("a slow navigation shows a progress bar, which goes away on arrival", async ({ page }) => {
+    // Hold back everything about the posts page, prefetches included, until the bar has been seen. A navigation
+    // that is already prefetched is instant and, rightly, never shows it.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/en\/posts(\?|$)/, async (route) => { await gate; await route.continue(); });
+    await page.goto("/en");
+    await page.locator('main a[href="/en/posts"]').first().click();
+    await expect(page.getByTestId("nav-progress")).toBeVisible();
+    release();
+    await expect(page).toHaveURL(/\/en\/posts$/);
+    await expect(page.getByTestId("nav-progress")).toHaveCount(0);
+  });
+});

@@ -16,6 +16,8 @@ const nextConfig = {
           { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()" },
         ],
       },
+      // The worker script must never be served stale: a cached sw.js is how a bad worker becomes permanent.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Service-Worker-Allowed", value: "/" }] },
       // Requested as /lite3/…?v=N (ASSET_VERSION in the article's sim.ts), so a year is safe.
       { source: "/lite3/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
     ];
