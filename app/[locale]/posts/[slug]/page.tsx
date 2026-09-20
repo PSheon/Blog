@@ -144,7 +144,8 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
             </p>
           )}
 
-          <div className="mt-6 xl:hidden">
+          {/* Sticks just under the site header (h-14) for the whole article. */}
+          <div className="sticky top-14 z-30 mt-6 xl:hidden">
             <TocDisclosure items={toc} label={t.post.toc} />
           </div>
 

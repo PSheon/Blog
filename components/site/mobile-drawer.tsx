@@ -8,6 +8,7 @@ import type { Dictionary, Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { KernelMark } from "./kernel-mark";
+import { InstallButton } from "./install";
 import { LocaleSwitch } from "./locale-switch";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -15,7 +16,7 @@ export interface DrawerProps {
   locale: Locale;
   links: { href: string; label: string }[];
   /** Only what the drawer prints: everything here is serialised into the page for the client. */
-  t: Pick<Dictionary, "nav" | "locale" | "theme"> & { footer: Pick<Dictionary["footer"], "preferences"> };
+  t: Pick<Dictionary, "nav" | "locale" | "theme" | "install"> & { footer: Pick<Dictionary["footer"], "preferences"> };
   open: boolean;
   onOpenChange(open: boolean): void;
 }
@@ -70,6 +71,7 @@ export default function MobileDrawer({ locale, links, t, open, onOpenChange }: D
             <span className="text-sm text-muted-foreground">{t.theme.label}</span>
             <ThemeToggle t={t.theme} />
           </div>
+          <InstallButton label={t.install.action} className="justify-self-start" />
         </div>
       </SheetContent>
     </Sheet>

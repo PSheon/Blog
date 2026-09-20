@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { InstallHint } from "@/components/site/install";
 import { NavProgress } from "@/components/site/nav-progress";
 import { ServiceWorker } from "@/components/site/service-worker";
 import { Spotlight } from "@/components/site/spotlight";
@@ -70,7 +71,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             </a>
             <SiteHeader
               locale={locale}
-              t={{ nav: t.nav, search: t.search, locale: t.locale, theme: t.theme, footer: t.footer }}
+              t={{ nav: t.nav, search: t.search, locale: t.locale, theme: t.theme, footer: t.footer, install: t.install }}
               tags={getAllTags(locale).map((x) => x.tag)}
             />
             {/* Decorative glows may be wider than the viewport. Clip them at the full-width level, never at the
@@ -92,6 +93,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
         <NavProgress label={locale === "zh" ? "頁面載入中" : "Loading page"} />
         <ServiceWorker enabled={SERVICE_WORKER} />
         <Spotlight />
+        <InstallHint text={t.install.hint} action={t.install.action} dismiss={t.install.dismiss} />
         {process.env.VERCEL && <Analytics />}
         {process.env.VERCEL && <SpeedInsights />}
       </body>

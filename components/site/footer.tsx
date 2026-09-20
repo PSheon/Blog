@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
+import { InstallButton } from "./install";
 import { KernelField } from "./kernel-field";
 import { KernelMark } from "./kernel-mark";
 import { LocaleSwitch } from "./locale-switch";
@@ -43,6 +44,7 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
             <span>{t.footer.builtWith}</span>
           </p>
           <div role="group" aria-label={t.footer.preferences} className="flex items-center gap-2">
+            <InstallButton label={t.install.action} />
             <LocaleSwitch locale={locale} label={t.locale.switch} />
             <ThemeToggle t={t.theme} />
           </div>

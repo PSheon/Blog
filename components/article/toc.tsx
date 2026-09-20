@@ -14,7 +14,8 @@ function useActiveHeading(ids: string[]): string | null {
     const update = () => {
       let current: string | null = null;
       for (const h of headings) {
-        if (h.getBoundingClientRect().top <= 120) current = h.id;
+        // A little below where a jump lands (scroll-padding-top is 8rem = 128 px), so the target counts as current.
+        if (h.getBoundingClientRect().top <= 140) current = h.id;
         else break;
       }
       setActive(current ?? headings[0].id);
@@ -63,20 +64,31 @@ export function Toc({ items, label }: { items: TocItem[]; label: string }) {
   );
 }
 
-/** Collapsed outline for screens without room for a side column. */
+/**
+ * The outline for screens without room for a side column: a bar that sticks under the header and names the section
+ * being read. Opening it shows the whole list; choosing a section closes it again.
+ */
 export function TocDisclosure({ items, label }: { items: TocItem[]; label: string }) {
   const active = useActiveHeading(items.map((i) => i.id));
+  const [open, setOpen] = useState(false);
   if (items.length === 0) return null;
+  const current = items.find((i) => i.id === active);
   return (
-    <details className="group rounded-md border border-border bg-panel">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-        {label}
+    <details
+      open={open}
+      onToggle={(e) => setOpen(e.currentTarget.open)}
+      className="group rounded-md border border-border bg-panel/85 backdrop-blur-md supports-[backdrop-filter]:bg-panel/70"
+      data-testid="toc-bar"
+    >
+      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 text-sm [&::-webkit-details-marker]:hidden">
+        <span className="label shrink-0">{label}</span>
+        <span className="min-w-0 flex-1 truncate font-medium" aria-live="off">{current?.text}</span>
         <span className="font-mono text-muted-foreground transition-transform group-open:rotate-45" aria-hidden>
           +
         </span>
       </summary>
-      <div className="px-4 pb-4">
-        <TocList items={items} active={active} />
+      <div className="max-h-[60dvh] overflow-y-auto overscroll-contain px-4 pb-4">
+        <TocList items={items} active={active} onNavigate={() => setOpen(false)} />
       </div>
     </details>
   );
