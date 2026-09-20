@@ -228,8 +228,12 @@ html:not(.dark) {
   html {
     @apply font-sans;
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
+    /* The sticky header, plus the outline bar that sits under it below the xl breakpoint. */
+    scroll-padding-top: 8rem;
     text-size-adjust: 100%;
+  }
+  @media (min-width: 80rem) {
+    html { scroll-padding-top: 5rem; }
   }
   body {
     @apply bg-background text-foreground;

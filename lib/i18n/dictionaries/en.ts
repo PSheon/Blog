@@ -92,6 +92,7 @@ const en: Dictionary = {
       { key: "EDGE", title: "Edge", body: "RTSP, GStreamer, WebRTC; Rust and Kotlin Multiplatform where Python is too slow." },
     ],
   },
+  install: { action: "Install", hint: "Add this notebook to your home screen; it reads offline too.", dismiss: "No thanks" },
   footer: {
     rss: "RSS",
     source: "Source for this site",

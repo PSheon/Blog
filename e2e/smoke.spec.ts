@@ -178,6 +178,22 @@ test("on a phone the hero instrument is on the first screen and small controls a
   expect(control!.height).toBeGreaterThanOrEqual(24);
 });
 
+test("on a phone the outline sticks under the header, names the section being read, and closes after a jump", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the outline is a side column on wide screens");
+  await page.goto("/zh/posts/lite3-walking");
+  const bar = page.getByTestId("toc-bar");
+  await page.evaluate(() => window.scrollTo({ top: 2600, behavior: "instant" }));
+  await expect.poll(async () => Math.round((await bar.boundingBox())!.y)).toBe(56); // right under the 56 px header
+  await expect(bar.locator("summary")).not.toHaveText(/^本頁目錄\s*\+?$/);
+  await bar.locator("summary").click();
+  await bar.getByRole("link", { name: "推它" }).click();
+  await expect(bar).not.toHaveAttribute("open", "");
+  await expect(bar.locator("summary")).toContainText("推它", { timeout: 10_000 });
+  // The heading lands below the bar, not underneath it.
+  const heading = (await page.getByRole("heading", { name: "推它" }).boundingBox())!, box = (await bar.boundingBox())!;
+  expect(heading.y).toBeGreaterThan(box.y + box.height);
+});
+
 test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
   await page.goto("/zh/posts/lite3-walking");
   const hidden = page.locator(".katex-mathml");

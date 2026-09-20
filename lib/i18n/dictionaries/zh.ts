@@ -84,6 +84,7 @@ const zh = {
       { key: "EDGE", title: "邊緣運算", body: "RTSP、GStreamer、WebRTC；Python 太慢的地方用 Rust 與 Kotlin Multiplatform。" },
     ],
   },
+  install: { action: "安裝", hint: "把這本筆記加到主畫面，離線也能讀。", dismiss: "不用了" },
   footer: {
     rss: "RSS",
     source: "本站原始碼",

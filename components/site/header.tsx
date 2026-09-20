@@ -9,7 +9,7 @@ import { Search, SearchIconButton } from "./search";
 
 interface Props {
   locale: Locale;
-  t: Pick<Dictionary, "nav" | "search" | "locale" | "theme" | "footer">;
+  t: Pick<Dictionary, "nav" | "search" | "locale" | "theme" | "footer" | "install">;
   tags: string[];
 }
 
@@ -31,7 +31,7 @@ export function SiteHeader({ locale, t, tags }: Props) {
 
       {/* Phone: menu on the left, the mark centred, search on the right. Equal side columns keep the mark centred. */}
       <div className="grid h-14 grid-cols-[2.5rem_1fr_2.5rem] items-center px-3 md:hidden">
-        <MobileNav locale={locale} links={links} t={{ nav: t.nav, locale: t.locale, theme: t.theme, footer: { preferences: t.footer.preferences } }} />
+        <MobileNav locale={locale} links={links} t={{ nav: t.nav, locale: t.locale, theme: t.theme, install: t.install, footer: { preferences: t.footer.preferences } }} />
         <div className="justify-self-center">{logo}</div>
         <SearchIconButton label={t.search.open} />
       </div>
