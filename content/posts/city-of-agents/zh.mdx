@@ -8,7 +8,7 @@ interactive: true
 draft: true
 ---
 
-import { CityLab, OverseerLab } from "./components";
+import { CityLab, ModesLab, NeedsLab, OverseerLab, UtilityLab } from "./components";
 
 {/* 骨架：內文由作者寫。每個 Instrument 是一個掛載點。 */}
 
@@ -20,12 +20,20 @@ import { CityLab, OverseerLab } from "./components";
 
 ## 四條需求
 
+<Instrument fig="02" title="city / needs" caption="（待寫）一個人、三天、四條需求。由你的瀏覽器即時算出，數值在 sim/params.ts。">
+  <NeedsLab />
+</Instrument>
+
 ## 怎麼挑下一件事
+
+<Instrument fig="03" title="city / utility" caption="（待寫）效用 = 需求² − 0.1 × 路程（小時）。城市裡的每個人用的就是這個函數。">
+  <UtilityLab />
+</Instrument>
 
 ## 三種腦袋，同一雙腳
 
-<Instrument fig="04" title="city / modes" size="wide" caption="（待寫）同一座城市、同一雙腳，換一個腦袋。">
-  <CityLab modes />
+<Instrument fig="04" title="city / modes" size="wide" caption="（待寫）同樣 300 個人跑兩天，由你的瀏覽器無頭算出；圖是第二天每 10 分鐘，各有多少比例的人在做什麼。">
+  <ModesLab />
 </Instrument>
 
 ## 誰在看著所有人

@@ -62,7 +62,7 @@ population; "modal" is the mean share of people doing the most common thing.
 for a quarter to a third of the time, 13 trips a day, and the median start of work is 14:06 because duty only passes 0.5
 at 11:20. Nothing ties sleep to the night either: by two-hour slot the share asleep only moves between 16 % and 37 %.
 
-**Proposed rates (now `PARAMS`; the first draft is kept as `SPEC_PARAMS`).** Waiting for Paul's OK — the article quotes these.
+**The rates in use (`PARAMS`; the first draft is kept as `SPEC_PARAMS`).** Paul looked at this comparison on 2026-09-20 and said to go on with them.
 
 | | first draft | proposed | why |
 | --- | --- | --- | --- |
@@ -150,3 +150,27 @@ referenced chunk for `WebGLShadowMap`): it is fetched when the figure first come
 
 The city scene without people is 7 draw calls a frame including the shadow pass (read from `renderer.info` in the page).
 three r186 has removed `PCFSoftShadowMap` (asking for it logs a warning and falls back); `PCFShadowMap` is now the soft one.
+
+## 4. What the article adds to the page (stage 5)
+
+Production build with the draft flag removed locally (not committed); gzip -9 of each emitted chunk; "first load" means
+the chunk is referenced by the article's HTML.
+
+| chunk | gzip | when |
+| --- | --- | --- |
+| the five labs, the panel and the whole simulation | 18.1 KB | first load |
+| `city-view3d` (the scene) | 4.6 KB | when a 3-D figure first comes on screen |
+| three.js, the two chunks SLAM and Lite3 already use | 188.3 KB | same moment; from cache for a reader who has opened either |
+
+So 22.7 KB of the article's own code, and 211 KB if three.js has never been fetched — 11 KB over a 200 KB budget in
+that cold case, all of it the library. No first-load chunk contains three.js.
+One thing this measurement showed about the site, not about this article: the set of first-load chunks is identical
+for every article page (316 KB here for both this page and SLAM), so each article's lab code rides along on the others.
+
+Checked against `next dev` because a draft is a 404 in the production build: axe (wcag2a/aa, 21a/aa) in both themes on
+desktop and phone, at page load and again with every figure mounted and the Overseer following someone; the control
+checks of `e2e/a11y.spec.ts`; and the smoke test added to `e2e/smoke.spec.ts` (which skips in CI until publication).
+axe found one real fault on the way: the timeline slider's range input had no name. It has one now.
+
+Frame time in headless Chromium on the M4 Pro (CPU work inside the animation-frame callback: ticks, panel, three's
+render call; GPU time is not in it): 0.3–0.5 ms with 300 people at N = 8, 10 draw calls including the shadow pass.
