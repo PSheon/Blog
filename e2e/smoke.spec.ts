@@ -384,6 +384,7 @@ test.describe("navigation progress", () => {
     await expect(page).toHaveURL(/\/en\/posts$/);
     await expect(page.getByTestId("nav-progress")).toHaveCount(0);
   });
+});
 
 test("a car maps a corridor, closes the loop, and takes a failure mode from the comparison below", async ({ page }) => {
   const response = await page.goto("/zh/posts/slam-2d");
