@@ -1,7 +1,7 @@
 import type * as THREE from "three";
 import { type Action, type Building, type City, hourOf, PARAMS, type Rect, sunAltitude, windowsLit } from "./sim";
 
-type Three = typeof THREE;
+type Three = typeof import("@/lib/three");
 
 /** Scene colours. These are materials of a little world with its own sky, not UI: the page's tokens colour the people. */
 const C = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 
 const zh = {
   scene: "一座程序化生成的城市，從 45 度角往下看，鏡頭緩緩繞行；光線、天色、路燈和窗戶的燈跟著城市裡的時間變化。",
@@ -84,5 +84,5 @@ export const LABELS = { zh, en };
 export const personName = (t: Labels, id: number): string => t.names[id % t.names.length] + (id >= t.names.length ? ` ${Math.floor(id / t.names.length) + 1}` : "");
 
 export function useLabels() {
-  return usePathname()?.startsWith("/en") ? en : zh;
+  return useLocaleLabels(zh, en);
 }

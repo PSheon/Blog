@@ -36,7 +36,7 @@ export function useCity(root: RefObject<HTMLElement | null>, canvas: RefObject<H
       if (!s.view) {
         if (loading || !canvas.current) return;
         loading = true;
-        void Promise.all([import("three"), import("./city-view3d")]).then(([T, { CityView }]) => {
+        void Promise.all([import("@/lib/three"), import("./city-view3d")]).then(([T, { CityView }]) => {
           if (cancelled || !canvas.current) return;
           const style = getComputedStyle(canvas.current), colors = Object.fromEntries(Object.entries(TOKEN).map(([k, v]) => [k, style.getPropertyValue(v).trim()])) as PeopleColors;
           s.view = new CityView(T, canvas.current, s.city);
