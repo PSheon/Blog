@@ -17,13 +17,21 @@ export function ServiceWorker({ enabled }: { enabled: boolean }) {
   useEffect(() => {
     if (!enabled || !("serviceWorker" in navigator)) return undefined;
     let cancelled = false;
+    const timers: number[] = [];
     const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 1500));
-    void navigator.serviceWorker.ready.then((registration) => idle(() => {
+    const hand = (registration: ServiceWorkerRegistration) => {
       if (cancelled || !registration.active) return;
       const loaded = performance.getEntriesByType("resource").map((entry) => entry.name).filter((url) => url.startsWith(location.origin) && /\/_next\/static\/|\/icons\//.test(url));
       registration.active.postMessage({ type: "warm", urls: [location.pathname, ...new Set(loaded)] });
-    }));
-    return () => { cancelled = true; };
+    };
+    // Once when idle, then twice more. A chunk that was requested before the worker took control but arrived after
+    // the first list (the home page's lazy classifier does this) is on neither side's books otherwise. The worker
+    // skips what it already holds, so a repeat costs nothing.
+    void navigator.serviceWorker.ready.then((registration) => {
+      idle(() => hand(registration));
+      for (const ms of [4000, 12000]) timers.push(window.setTimeout(() => hand(registration), ms));
+    });
+    return () => { cancelled = true; timers.forEach((id) => window.clearTimeout(id)); };
   }, [enabled, pathname]);
 
   useEffect(() => {
