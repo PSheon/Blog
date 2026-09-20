@@ -14,6 +14,8 @@ interface Props {
   rows: IndexRow[];
   tags: string[];
   labels: { all: string; empty: string; interactive: string; filter: string };
+  /** How many tiles at most. Six fills the desktop grid exactly (4+2 / 2 / 2·2·2); the full list lives on /posts. */
+  limit?: number;
 }
 
 /**
@@ -22,17 +24,19 @@ interface Props {
  */
 function span(i: number, count: number): string {
   if (i === 0) return "md:col-span-2 lg:col-span-4 lg:row-span-2";
-  if (i <= 2) return "lg:col-span-2";
+  if (i <= 2) return (i === count - 1 && count % 2 === 0 ? "md:max-lg:col-span-2 " : "") + "lg:col-span-2";
   const k = (i - 3) % 5;
   // A lone last tile would leave a hole: let it run the full width.
   if (i === count - 1 && (k === 0 || k === 3)) return "md:col-span-2 lg:col-span-6";
-  return k < 3 ? "lg:col-span-2" : "lg:col-span-3";
+  // On the two-column tablet grid the big tile takes a whole row, so an even count leaves the last tile alone.
+  const tablet = i === count - 1 && count % 2 === 0 ? "md:max-lg:col-span-2 " : "";
+  return tablet + (k < 3 ? "lg:col-span-2" : "lg:col-span-3");
 }
 
-/** The home page's index as a bento grid: every article is a tile with its drawing, the newest one the largest. */
-export function PostBento({ locale, rows, tags, labels }: Props) {
+/** The home page's index as a bento grid: the most recent articles as tiles with their drawings, the newest one the largest. */
+export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
   const [tag, setTag] = useState<string | null>(null);
-  const visible = tag ? rows.filter((r) => r.tags.includes(tag)) : rows;
+  const visible = (tag ? rows.filter((r) => r.tags.includes(tag)) : rows).slice(0, limit);
 
   return (
     <div>
@@ -58,7 +62,7 @@ export function PostBento({ locale, rows, tags, labels }: Props) {
       {visible.length === 0 ? (
         <p className="border-t border-rule py-10 text-muted-foreground">{labels.empty}</p>
       ) : (
-        <ol className="grid auto-rows-fr gap-3 md:grid-cols-2 lg:grid-cols-6" data-testid="post-bento">
+        <ol className="grid gap-3 md:grid-cols-2 lg:auto-rows-fr lg:grid-cols-6" data-testid="post-bento">
           {visible.map((row, i) => {
             const big = i === 0, wide = !big && span(i, visible.length).includes("col-span-3");
             return (
@@ -85,7 +89,8 @@ export function PostBento({ locale, rows, tags, labels }: Props) {
                         {row.title}
                       </h3>
                     </ViewTransition>
-                    {(big || wide) && <p className="max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted-foreground">{row.description}</p>}
+                    {/* Every tile says what the article is about while tiles are stacked; on the desktop grid only the roomy ones do. */}
+                    <p className={cn("max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted-foreground", !big && "line-clamp-2", !(big || wide) && "lg:hidden")}>{row.description}</p>
                     <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-xs text-muted-foreground">
                       {row.interactive && <InteractiveBadge label={labels.interactive} />}
                       {row.tags.map((name) => <span key={name}>#{name}</span>)}

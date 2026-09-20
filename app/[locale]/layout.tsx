@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import { ViewTransition } from "react";
 import "../globals.css";
 import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
@@ -9,6 +8,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { InstallHint } from "@/components/site/install";
 import { NavProgress } from "@/components/site/nav-progress";
+import { PageSwap } from "@/components/site/page-swap";
 import { ServiceWorker } from "@/components/site/service-worker";
 import { Spotlight } from "@/components/site/spotlight";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -77,13 +77,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             {/* Decorative glows may be wider than the viewport. Clip them at the full-width level, never at the
                 content container (that cuts them off mid-fade). `clip`, unlike `hidden`, keeps sticky children working. */}
             <main id="content" className="flex-1 overflow-x-clip">
-              {/*
-                This boundary lives in the layout and never remounts, so a navigation is an *update* of its
-                content (enter/exit would only fire if the boundary itself appeared or disappeared).
-              */}
-              <ViewTransition update="page-swap" default="none">
-                {children}
-              </ViewTransition>
+              <PageSwap>{children}</PageSwap>
             </main>
             <SiteFooter locale={locale} t={t} />
         </ThemeProvider>
