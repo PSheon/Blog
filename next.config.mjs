@@ -32,6 +32,10 @@ const nextConfig = {
   poweredByHeader: false,
   // app/global-not-found.tsx: the 404 for URLs that match no route. Needed because the root layout sits under [locale].
   experimental: { globalNotFound: true },
+  // Where a feed reader looks first. The feeds are per language; the original one answers.
+  async redirects() {
+    return ["/feed.xml", "/rss.xml", "/feed", "/rss", "/atom.xml"].map((source) => ({ source, destination: "/zh/feed.xml", permanent: false }));
+  },
   async headers() {
     return [
       {

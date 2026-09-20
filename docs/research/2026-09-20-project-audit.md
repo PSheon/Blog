@@ -164,3 +164,47 @@ the XSS value is small; the gain is `base-uri`, `object-src` and `frame-ancestor
 - **Code hygiene:** no `any` and no `@ts-` comments. No unused classes or keyframes in `globals.css`. Nothing unused
   in `public/`.
 - **Repo size:** the largest tracked file is 740 KB.
+
+## What was done afterwards (dev, 2026-09-20)
+
+Item numbers are the ones above.
+
+- 1 bundle split
+- 2 SLAM re-ink
+- 3 SLAM cover
+- 4 and 5 offline first visit and start URL. A later fix: the list of loaded files is handed to the worker three
+  times, because a chunk requested before the worker took control could arrive after the first list.
+- 7 HydraNet
+- 8 share card on index and tag pages
+- 9 canvas names
+- 10 arrow keys in the align figure
+- 11 only SLAM's two papers linked (DOIs checked)
+- 12 thin tags
+- 13 description length
+- 14 drawer and progress labels
+- 15 `lastBuildDate`, permalink guids, `/feed.xml` and four other guesses redirect to the zh feed
+- 16 no footer prefetch, page cache trimmed at 150
+- 18 HANDOFF
+- 20 stale skip
+- 21 shadcn CLI out of production dependencies
+- 23 `useLocaleLabels`, pixel ratio capped
+- 24 dead code
+- 27 five strict flags
+- 28 `vite-tsconfig-paths` gone, `@types/node` 22
+- CSP and COOP
+- three.js trimmed through `lib/three.ts`: 184 → 136 KB gzip
+
+Left, with the reason:
+
+- 6 the 404 shell: structural, see the item.
+- 11 sources for trading, transformer and cnn: the article prose is Paul's, and the provenance of `aapl-2024.json`
+  is not recorded anywhere I can read.
+- 17 cross-links between articles: prose.
+- 19 the 30 s autopilot test: 40 starts is already the reduced run; fewer would stop testing what it claims.
+- 22 the `toml` advisories: build-time only, on our own YAML.
+- 23 the six three.js stages and the four frame-budget loops: a refactor with no reader-visible gain, so it is
+  better done when one of them next needs changing.
+- 26 E2E gaps.
+- Full-content RSS: instruments cannot go in a feed, and a half-article is worse than a summary.
+- The locale switch keeping the hash: needs a heading-index map.
+- TypeScript 7 and ESLint 10: majors, in their own PR.
