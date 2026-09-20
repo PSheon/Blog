@@ -1,0 +1,47 @@
+---
+title: A city nobody schedules — 300 people, each minding their own needs
+description: A procedurally generated 3-D city where every person picks the next thing to do from four needs of their own. Swap the deciding for dice or a fixed timetable and watch the rhythm of the whole city change.
+seoTitle: "A city nobody schedules: utility AI in 3-D"
+seoDescription: "A procedurally generated 3-D city: each person picks what to do next from four needs. Swap in dice or a timetable and watch the city's rhythm change."
+date: 2026-09-20
+tags: [ai-agent, from-scratch]
+no: 9
+interactive: true
+draft: true
+---
+
+import { CityLab, ModesLab, NeedsLab, OverseerLab, UtilityLab } from "./components";
+
+{/* Skeleton: the prose is the author's. Every Instrument is a mounting point; keep them in step with zh.mdx. */}
+
+<Instrument fig="01" title="city / day" size="wide" caption="(to be written) A city grown from a seed, and one of its days.">
+  <CityLab />
+</Instrument>
+
+## How the city grows
+
+## Four needs
+
+<Instrument fig="02" title="city / needs" caption="(to be written) One person, three days, four needs. Worked out by your browser; the numbers live in sim/params.ts.">
+  <NeedsLab />
+</Instrument>
+
+## Picking the next thing to do
+
+<Instrument fig="03" title="city / utility" caption="(to be written) utility = need² − 0.1 × walk (hours). It is the function every person in the city uses.">
+  <UtilityLab />
+</Instrument>
+
+## Three heads, the same legs
+
+<Instrument fig="04" title="city / modes" size="wide" caption="(to be written) The same 300 people run for two days, headless, by your browser; the chart is day two, the share of people doing each thing in every ten minutes.">
+  <ModesLab />
+</Instrument>
+
+## Who is watching everyone
+
+<Instrument fig="05" title="city / overseer" size="wide" caption="(to be written) Everyone's state, the events as sentences, every knob, and a timeline you can drag back.">
+  <OverseerLab />
+</Instrument>
+
+## What differs from the real thing, and how the numbers were measured
