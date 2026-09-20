@@ -101,19 +101,35 @@ export class HydraNet {
 
   /** One optimiser step on a batch. Returns the mean losses. */
   step(batch: Scene[], lr = 3e-3): { box: number; mask: number } {
-    for (const p of Object.values(this.params)) p.grad.fill(0);
-    const scale = 1 / batch.length;
-    let boxLoss = 0, maskLoss = 0;
-    for (const scene of batch) {
-      const t = new Tape();
-      const out = this.forward(t, scene.image);
-      if (out.box) boxLoss += t.l1(out.box, scene.box, scale * this.config.boxWeight * 10);
-      if (out.mask) maskLoss += t.bceWithLogits(out.mask, scene.mask, undefined, scale);
-      t.backward();
+    let last = { box: 0, mask: 0 };
+    for (const scene of batch) last = this.feed(scene, batch.length, lr) ?? last;
+    return last;
+  }
+
+  private fed = 0;
+  private boxLoss = 0;
+  private maskLoss = 0;
+
+  /**
+   * The same optimiser step, one image at a time: gradients pile up until `batchSize` images have gone in, then Adam
+   * steps and the mean losses come back (null before that). A whole batch of 8 takes about 15 ms, more than a
+   * frame's worth of budget; one image takes about 2 ms, so a training loop can stop between images when its time
+   * is up and pick the batch up again next frame. The numbers are identical to `step`.
+   */
+  feed(scene: Scene, batchSize: number, lr = 3e-3): { box: number; mask: number } | null {
+    if (this.fed === 0) {
+      for (const p of Object.values(this.params)) p.grad.fill(0);
+      this.boxLoss = this.maskLoss = 0;
     }
+    const scale = 1 / batchSize, t = new Tape(), out = this.forward(t, scene.image);
+    if (out.box) this.boxLoss += t.l1(out.box, scene.box, scale * this.config.boxWeight * 10);
+    if (out.mask) this.maskLoss += t.bceWithLogits(out.mask, scene.mask, undefined, scale);
+    t.backward();
+    if (++this.fed < batchSize) return null;
     this.adam.step(lr);
-    this.seen += batch.length;
-    return { box: boxLoss * scale, mask: maskLoss * scale };
+    this.seen += batchSize;
+    this.fed = 0;
+    return { box: this.boxLoss * scale, mask: this.maskLoss * scale };
   }
 
   predict(image: Float64Array): Prediction {
