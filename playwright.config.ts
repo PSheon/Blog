@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const PORT = 3210;
+// Several worktrees share this machine; E2E_PORT lets two suites run at once.
+const PORT = Number(process.env.E2E_PORT ?? 3210);
 
 export default defineConfig({
   testDir: "e2e",

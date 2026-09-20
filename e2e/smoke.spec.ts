@@ -398,8 +398,7 @@ test.describe("navigation progress", () => {
 
 test("a car maps a corridor, closes the loop, and takes a failure mode from the comparison below", async ({ page }) => {
   const response = await page.goto("/zh/posts/slam-2d");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "slam-2d is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(240_000);
   await page.emulateMedia({ reducedMotion: "reduce" }); // the hand-off below scrolls; don't make it a smooth scroll
   const errors = watchErrors(page);
