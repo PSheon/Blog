@@ -1,0 +1,19 @@
+// How often the scripted expert finishes the job, by slip rate, and what happened on the way. 1000 seeds each.
+// Run: cp docs/research/pcb-flip-vla/expert-probe.test.ts.txt tests/vla/expert-probe.test.ts
+//      pnpm exec vitest run tests/vla/expert-probe.test.ts --disable-console-intercept ; rm tests/vla/expert-probe.test.ts
+import { it } from "vitest";
+import { expert, render, World } from "@/content/posts/pcb-flip-vla/components/sim";
+it("expert probe", () => {
+  for (const slip of [0, 0.01, 0.02, 0.05, 0.1]) {
+    let ok = 0, steps = 0, lost = 0, timeout = 0; const N = 1000, ev: Record<string, number> = {};
+    for (let seed = 1; seed <= N; seed++) {
+      const w = new World(seed); w.slipRate = slip;
+      while (!w.success && !w.failed) { w.step(expert(w).action); for (const e of w.events) ev[e] = (ev[e] ?? 0) + 1; }
+      if (w.success) { ok++; steps += w.t; } else if (w.boards[w.task.nest].lost) lost++; else timeout++;
+    }
+    console.log(`slip ${slip}: success ${((100 * ok) / N).toFixed(1)}%, mean steps ${(steps / ok).toFixed(1)}, lost ${lost}, timeout ${timeout}, events ${JSON.stringify(ev)}`);
+  }
+  const w = new World(7), t0 = performance.now();
+  for (let i = 0; i < 3000; i++) render(w);
+  console.log(`rasteriser: ${Math.round(3000 / ((performance.now() - t0) / 1000))} frames/s (48x48, 2x2 supersampled, one thread)`);
+}, 300_000);
