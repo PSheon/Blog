@@ -1,22 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
-import { Car, driveLaps } from "./car";
+import { Car, driveLapsSliced } from "./car";
 import { type Edge, diagonal, graphError, optimise } from "./graph";
 import { useLabels } from "./labels";
 
 import { type Pose, between, compose } from "./se2";
 import { CYAN_HEX, VIOLET_HEX, setPoints, useStage3D } from "./stage3d";
+import { useReplay } from "./use-replay";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
 const START: Pose = { x: 2, y: 2, theta: 0 };
 
 /** One lap, remembered as a chain: a pose every ~1.5 m, and between neighbours what the wheels said the motion was. */
-function oneLap() {
+interface Lap { truth: Pose[]; believed: Pose[]; edges: Edge[]; loop: Edge }
+async function oneLap(cancelled: () => boolean): Promise<Lap | null> {
   const c = new Car(RING, START, mulberry32(7), 0.008), truth: Pose[] = [START], believed: Pose[] = [{ x: 0, y: 0, theta: 0 }], edges: Edge[] = [];
   let last = c.deadReckoning, travelled = 0;
   const remember = () => {
@@ -24,7 +26,8 @@ function oneLap() {
     edges.push({ from: believed.length - 1, to: believed.length, z, information: diagonal(100, 100, 400), kind: "odometry" });
     believed.push(compose(believed[believed.length - 1], z)); truth.push(c.truth); last = c.deadReckoning; travelled = 0;
   };
-  driveLaps(c, 1, (odometry) => { travelled += Math.abs(odometry.x); if (travelled >= 1.5) remember(); });
+  const done = await driveLapsSliced(c, 1, (odometry) => { travelled += Math.abs(odometry.x); if (travelled >= 1.5) remember(); }, cancelled);
+  if (!done) return null;
   remember(); // the pose where the lap ends, back at the start line
   // What recognising the start would tell the car: where the last pose really is, seen from the first.
   const loop: Edge = { from: 0, to: believed.length - 1, z: between(truth[0], truth[truth.length - 1]), information: diagonal(2500, 2500, 10000), kind: "loop" };
@@ -33,9 +36,18 @@ function oneLap() {
 
 /** Fig. 04: the pose graph as springs. Add the one spring that says "I am back", and let the chain relax pass by pass. */
 export function SpringsLab() {
+  const shell = useRef<HTMLDivElement>(null);
+  const lap = useReplay(shell, 0, oneLap);
+  return (
+    <div ref={shell}>
+      {lap ? <Springs lap={lap} /> : <div className="aspect-[16/10] w-full animate-pulse rounded-md border border-border bg-muted/40" aria-busy />}
+    </div>
+  );
+}
+
+function Springs({ lap }: { lap: Lap }) {
   const t = useLabels();
   const root = useRef<HTMLDivElement>(null), view = useRef<HTMLCanvasElement>(null), visible = useVisible(root);
-  const lap = useMemo(() => oneLap(), []);
   const [poses, setPoses] = useState<Pose[]>(() => lap.believed.map((p) => ({ ...p })));
   const [closed, setClosed] = useState(false);
   const [pass, setPass] = useState(0);

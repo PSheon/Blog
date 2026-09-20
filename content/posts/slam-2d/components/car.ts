@@ -114,3 +114,26 @@ export function driveLaps(car: Car, laps: number, each: (odometry: Pose, step: n
     each(odometry, step);
   }
 }
+
+/**
+ * The same drive as `driveLaps`, but in slices of a few milliseconds with the event loop in between. A lap costs
+ * about 270 ms of lidar sweeps; run in one go during hydration, the two replay figures froze the page for 0.8 s
+ * (3.4 s of blocking time under Lighthouse's phone throttling). Resolves to false if `cancelled()` turned true.
+ */
+export async function driveLapsSliced(car: Car, laps: number, each: (odometry: Pose, step: number) => void, cancelled: () => boolean, dt = 1 / 30): Promise<boolean> {
+  const pilot = newAutopilot();
+  let moved = true, swept = 0, prev = Math.atan2(car.truth.y - 7, car.truth.x - 10), sliceStart = performance.now();
+  for (let step = 0; swept < laps * 2 * Math.PI && step < 40000; step++) {
+    const before = car.truth, odometry = car.step(autopilot(car.truth, car.lastScan.ranges, moved, pilot, dt), dt);
+    moved = Math.hypot(car.truth.x - before.x, car.truth.y - before.y) > 1e-5;
+    const angle = Math.atan2(car.truth.y - 7, car.truth.x - 10);
+    swept += wrap(angle - prev); prev = angle;
+    each(odometry, step);
+    if (performance.now() - sliceStart > 6) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      if (cancelled()) return false;
+      sliceStart = performance.now();
+    }
+  }
+  return !cancelled();
+}

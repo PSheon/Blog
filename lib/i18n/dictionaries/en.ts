@@ -96,6 +96,7 @@ const en: Dictionary = {
     rss: "RSS",
     source: "Source for this site",
     about: "Paul's lab notebook. Every article comes with instruments you can operate right in the browser.",
+    colophon: "Every model in this notebook is written from scratch and runs right here, in your browser.",
     browse: "Browse",
     elsewhere: "Elsewhere",
     preferences: "Preferences",

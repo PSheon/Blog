@@ -88,6 +88,7 @@ const zh = {
     rss: "RSS",
     source: "本站原始碼",
     about: "Paul 的實驗筆記。每篇文章都附上可以在瀏覽器裡直接操作的儀器。",
+    colophon: "這本筆記裡的每個模型都是從零寫的，就在你的瀏覽器裡執行。",
     browse: "瀏覽",
     elsewhere: "其他地方",
     preferences: "偏好設定",
