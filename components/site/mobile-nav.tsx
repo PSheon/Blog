@@ -27,7 +27,7 @@ export function MobileNav(props: Omit<DrawerProps, "open" | "onOpenChange">) {
           setWanted(true);
           setOpen(true);
         }}
-        className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "cursor-pointer")}
+        className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "cursor-pointer transition-transform active:scale-90")}
       >
         <Menu />
       </button>

@@ -71,8 +71,8 @@ export function PostBento({ locale, rows, tags, labels }: Props) {
                     wide && "sm:flex-row",
                   )}
                 >
-                  <div className={cn("dot-grid grid place-items-center border-border p-4", wide ? "border-b sm:w-2/5 sm:border-r sm:border-b-0" : "border-b", big && "lg:flex-1 lg:p-8")}>
-                    <PostCover slug={row.slug} no={row.no} className={cn("opacity-85 transition-opacity group-hover:opacity-100", big ? "max-w-md" : "max-w-[15rem]")} />
+                  <div className={cn("bento-cover dot-grid relative grid place-items-center overflow-hidden border-border p-4", wide ? "border-b sm:w-2/5 sm:border-r sm:border-b-0" : "border-b", big && "lg:flex-1 lg:p-8")}>
+                    <PostCover slug={row.slug} no={row.no} className={cn("bento-art opacity-85", big ? "max-w-md" : "max-w-[15rem]")} />
                   </div>
                   <div className={cn("flex flex-1 flex-col gap-2 p-4", big && "lg:flex-none lg:p-6")}>
                     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
