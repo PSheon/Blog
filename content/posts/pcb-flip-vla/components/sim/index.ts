@@ -5,3 +5,4 @@ export * from "./params";
 export * from "./tokens";
 export * from "./world";
 export * from "./raster";
+export * from "./data";

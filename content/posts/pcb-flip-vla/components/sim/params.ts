@@ -28,12 +28,16 @@ export const PARAMS = {
   /** Dropped further than this from the tray's centre, the board misses the tray and is lost. */
   trayReach: 0.08,
 
-  /** A grasp holds only this close to the middle of the edge, this deep onto it, this level and this square. */
-  grasp: { tangential: 0.01, biteMin: 0, biteMax: 0.025, height: 0.012, yaw: 0.21, rollSin: 0.2 },
+  /**
+   * A grasp holds this close to the middle of the edge, this deep onto it, this level and this square. The first values
+   * (10 mm, 25 mm) were finer than one pixel of the 48 × 48 view (about 12 mm on the bench): a model trained from those
+   * pixels closed 10–30 mm off and held 1 board in 23. See docs/research/pcb-flip-vla/RESULTS.md.
+   */
+  grasp: { tangential: 0.03, biteMin: 0, biteMax: 0.04, height: 0.015, yaw: 0.21, rollSin: 0.2 },
   /** Where the expert aims its bite, measured in from the board's near edge. */
   bite: 0.012,
   /** A release places the board only this close to the tray's centre, this low and this level; otherwise it is a drop. */
-  place: { offset: 0.015, height: 0.02, rollSin: 0.26 },
+  place: { offset: 0.03, height: 0.02, rollSin: 0.26 },
   /** The expert lifts to here before rolling; below the board's half length plus the rails, a roll jams. */
   liftZ: 0.1,
   hoverZ: 0.1,

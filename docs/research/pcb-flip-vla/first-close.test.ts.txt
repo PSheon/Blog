@@ -1,0 +1,34 @@
+// Where is the tip when a checkpoint first closes its gripper, and how often does it agree with the expert on the way there?
+// Run: cp docs/research/pcb-flip-vla/first-close.test.ts.txt tests/vla/first-close.test.ts
+//      VLA_MODEL=/path/model.pt pnpm exec vitest run tests/vla/first-close.test.ts --disable-console-intercept ; rm tests/vla/first-close.test.ts
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { it } from "vitest";
+import { type Action, encode, proprioOf, expert, PARAMS, render, STILL, tipOf, World } from "@/content/posts/pcb-flip-vla/components/sim";
+it("where does the model close its gripper", async () => {
+  const child = spawn("uv", ["run", "--with", "torch", "--with", "numpy", "python", "serve.py", process.env.VLA_MODEL as string], { cwd: "scripts/train-vla", stdio: ["pipe", "pipe", "inherit"] });
+  const lines = createInterface({ input: child.stdout }), queue: ((l: string) => void)[] = []; lines.on("line", (l) => queue.shift()?.(l));
+  const next = () => new Promise<string>((r) => queue.push(r)); await next();
+  const BINS = PARAMS.bins, IDLE = [STILL, STILL, STILL, STILL, BINS], rows: string[] = []; let agree = 0, total = 0;
+  for (let e = 0; e < Number(process.env.VLA_EPISODES ?? 30); e++) {
+    const w = new World(100001 + e); w.slipRate = 0;
+    if (w.boards[w.task.nest].up === w.wanted) continue;
+    const frames: Uint8Array[] = [], history: number[][] = [IDLE, IDLE, IDLE];
+    for (let step = 0; step < 40 && !w.success; step++) {
+      frames.push(render(w));
+      const k = Number(process.env.VLA_FRAMES ?? 4), window = Array.from({ length: k }, (_, i) => frames[Math.max(0, frames.length - k + i)]);
+      child.stdin.write(`${JSON.stringify({ frames: Buffer.concat(window).toString("base64"), words: encode(w.task), history: history.slice(-3), proprio: proprioOf(w) })}\n`);
+      const tokens = JSON.parse(await next()) as number[], want = expert(w), wasOpen = !w.closed;
+      total++; if (tokens.slice(0, 4).every((t, j) => Math.abs(t - want.action[j]) <= 1) && tokens[4] - BINS === want.action[4]) agree++;
+      let row = "";
+      if (wasOpen && tokens[4] - BINS === 1) {
+        const { centre, heading } = w.pose(w.task.nest), tip = tipOf(w.q), dx = tip[0] - centre[0], dy = tip[1] - centre[1];
+        row = `ep ${e} step ${step}: along ${(1000 * (dx * Math.cos(heading) + dy * Math.sin(heading) + PARAMS.board.depth / 2)).toFixed(0)} mm (holds 0..25), off ${(1000 * (-dx * Math.sin(heading) + dy * Math.cos(heading))).toFixed(0)} mm (holds within 10), height ${(1000 * (tip[2] - centre[2])).toFixed(0)} mm (holds within 12); the expert was at "${want.state}"`;
+      }
+      w.step([tokens[0], tokens[1], tokens[2], tokens[3], tokens[4] - BINS] as Action); history.push(tokens);
+      if (row) { rows.push(`${row} -> ${w.events.join(",") || "closed on air"}`); if (!w.hold) break; }
+    }
+  }
+  console.log(rows.join("\n")); console.log(`within one bin of the expert on every joint and the same grip: ${agree}/${total} steps`);
+  child.stdin.end();
+}, 3_600_000);
