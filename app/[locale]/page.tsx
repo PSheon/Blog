@@ -74,9 +74,9 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </Link>
           </div>
           {/* Three numbers lettered like an instrument's readouts; counted from the posts, not typed in. */}
-          <dl className="order-5 flex gap-8 border-t border-rule pt-5 lg:mt-10 lg:max-w-md">
+          <dl className="order-5 flex gap-6 sm:gap-8 border-t border-rule pt-5 lg:mt-10 lg:max-w-md">
             {readouts.map((r, i) => (
-              <div key={r.label} className="flex flex-col-reverse gap-1">
+              <div key={r.label} className="flex flex-col-reverse justify-end gap-1">
                 <dt className="label">{r.label}</dt>
                 <dd className="font-mono text-2xl leading-none tabular" style={{ color: RAIL_COLORS[i === 2 ? 3 : i] }}>
                   {r.value}

@@ -44,7 +44,7 @@ const en: Dictionary = {
   },
   home: {
     latest: "Latest",
-    readouts: { posts: "articles", interactive: "you can play with", libraries: "ML libraries" },
+    readouts: { posts: "articles", interactive: "you can play with", libraries: "third-party ML packages: all hand-written" },
     topics: "Browse by theme: see, think, generate, act",
     index: "Notebook index",
     indexLead: "Newest first.",
