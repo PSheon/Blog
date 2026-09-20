@@ -84,7 +84,7 @@ export class PolicyNet {
     /** Runs rows [from, to) through every layer, filling the caches, and returns the last row's final hidden state. */
     const run = (from: number, to: number): Float32Array => {
       const rows = to - from;
-      let h = x.slice(from * d, to * d);
+      const h = x.slice(from * d, to * d);
       for (let l = 0; l < this.layers; l++) {
         const name = `blocks.${l}`, qkv = this.linear(this.norm(h, rows, `${name}.ln1`), rows, d, 3 * d, `${name}.qkv`, false), mixed = new Float32Array(rows * d), seen = l === this.layers - 1 && rows === 1 ? new Float32Array(to) : null;
         for (let r = 0; r < rows; r++) { keys[l].set(qkv.subarray(r * 3 * d + d, r * 3 * d + 2 * d), (from + r) * d); values[l].set(qkv.subarray(r * 3 * d + 2 * d, r * 3 * d + 3 * d), (from + r) * d); }
