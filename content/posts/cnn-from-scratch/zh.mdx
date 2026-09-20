@@ -3,6 +3,7 @@ title: 從零開始的 CNN：在瀏覽器裡看見卷積神經網路怎麼「看
 description: 不用任何機器學習函式庫，只用 TypeScript 寫出一個能辨識手寫數字的卷積神經網路，然後把它每一層的輸出攤開來看。
 seoTitle: "從零開始的 CNN：看卷積網路怎麼「看」"
 date: 2024-12-09
+updated: 2026-09-20
 tags: [computer-vision, cnn, from-scratch]
 no: 1
 featured: true
@@ -28,7 +29,7 @@ import { ConvStepper, DrawPredict, FeatureMaps, KernelPlayground, OcclusionMap }
 CNN 的出發點是兩個對影像幾乎永遠成立的假設：
 
 - **局部性**：有意義的特徵（邊緣、轉角、筆畫端點）只牽涉一小塊相鄰的像素。
-- **平移不變性**：一條垂直邊緣出現在左上角或右下角，都是同一種東西，應該用同一組參數去偵測。
+- **平移等變性**：一條垂直邊緣出現在左上角或右下角，都是同一種東西，應該用同一組參數去偵測。卷積做到的是「輸入往右移一格，輸出也跟著往右移一格」（等變）；要讓答案真的不隨位置改變（不變），靠的是後面的池化，而且只是近似。
 
 把這兩個假設直接寫進模型的結構裡，就得到了卷積。
 
@@ -52,7 +53,7 @@ $$
 
 寫成程式碼就是幾層迴圈。下面是單通道的簡化版；`lib/ml/ops.ts` 裡的版本外面多了批次和通道的迴圈，最裡面這幾層是一樣的：
 
-```ts title="lib/ml/ops.ts" {6-8}
+```ts title="簡化自 lib/ml/ops.ts" {6-8}
 for (let oy = 0; oy < oH; oy++) {
   for (let ox = 0; ox < oW; ox++) {
     let sum = bias;

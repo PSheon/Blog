@@ -4,6 +4,7 @@ description: 不用 PyTorch，也不用任何函式庫。用 TypeScript 寫一�
 seoTitle: "在瀏覽器裡從零訓練 Transformer"
 seoDescription: "不用 PyTorch 也不用函式庫。用 TypeScript 寫自動微分引擎和一萬多個參數的 Transformer，看它幾秒內學會把數字反過來。"
 date: 2025-07-03
+updated: 2026-09-20
 tags: [llm, transformer, from-scratch]
 no: 4
 interactive: true
@@ -126,7 +127,7 @@ x = tape.add(x, tape.addRow(tape.matmul(hidden, P[p + "w2"]), P[p + "b2"]));
 
 手算當然不可能，所以我寫了一個很小的自動微分引擎。想法是：每做一個運算，就順手記下「如果有人告訴我輸出的梯度，我該怎麼把它傳回輸入」。以矩陣乘法 $C = AB$ 為例，反向的規則是 $\partial A = \partial C \, B^{\top}$ 和 $\partial B = A^{\top} \partial C$：
 
-```ts title="lib/ml/autograd.ts" {7-8}
+```ts title="簡化自 lib/ml/autograd.ts" {7-8}
 matmul(a: Mat, b: Mat): Mat {
   const out = /* … 前向：照常計算 a·b … */;
   this.record(() => {

@@ -1,9 +1,10 @@
 ---
 title: "One body, two heads: training a HydraNet that draws boxes and masks, in the browser"
 description: Emoji fruit as training data, and a small network with one shared trunk and two output heads, trained from scratch in your browser. It finds the fruit within ten seconds. Then we measure honestly what multi-task learning bought us and what it cost.
-seoTitle: "A two-headed HydraNet, trained in the browser"
+seoTitle: "One body, two heads: a HydraNet in the browser"
 seoDescription: "Train a small network with one shared trunk and two heads on emoji fruit, in your browser, then measure what multi-task learning bought and what it cost."
 date: 2025-11-28
+updated: 2026-09-20
 tags: [computer-vision, multi-task, from-scratch]
 no: 5
 interactive: true
@@ -121,7 +122,7 @@ $x_i$ is the centre of bin $i$. This is called integral regression, or soft-argm
 - **The answer can fall between two bins.** Half the probability on each of two neighbours puts the expected value midway, so there is no quantisation error. The one exception is at the image border: the expected value cannot go beyond the centres of the first and last bins, so an edge flush with the border is off by up to 1 pixel.
 - **It can be drawn directly.** The four small plots at the lower right of the instrument are these four distributions. Violet bars are probabilities, the solid cyan line is the expected value, and the dashed pink line is the right answer.
 
-```ts title="content/posts/hydranet-fruit/components/model.ts"
+```ts title="simplified from content/posts/hydranet-fruit/components/model.ts"
 const maps = t.conv2d(d, P.boxK, P.boxB, { h: HALF, w: HALF, k: 1 });
 const lr = t.softmax(t.marginal(t.sliceRows(maps, 0, 2), { h: HALF, w: HALF, axis: "x" }));
 const tb = t.softmax(t.marginal(t.sliceRows(maps, 2, 2), { h: HALF, w: HALF, axis: "y" }));

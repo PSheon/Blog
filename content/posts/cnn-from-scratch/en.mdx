@@ -1,8 +1,9 @@
 ---
 title: "A CNN from scratch: watching a convolutional network see, in your browser"
 description: A handwritten-digit classifier written in plain TypeScript with no machine-learning library, then opened up so you can look at the output of every layer.
-seoTitle: "A CNN from scratch, in your browser"
+seoTitle: "A CNN from scratch: watch a conv net see"
 date: 2024-12-09
+updated: 2026-09-20
 tags: [computer-vision, cnn, from-scratch]
 no: 1
 featured: true
@@ -28,7 +29,7 @@ The obvious approach is to flatten those 784 numbers and feed them into a fully 
 A CNN starts from two assumptions that hold for almost every image:
 
 - **Locality.** Meaningful features such as edges, corners and stroke ends involve only a small patch of neighbouring pixels.
-- **Translation invariance.** A vertical edge is the same thing in the top-left corner as in the bottom-right, and the same parameters should detect it in both places.
+- **Translation equivariance.** A vertical edge is the same thing in the top-left corner as in the bottom-right, and the same parameters should detect it in both places. What convolution gives is "shift the input one cell right and the output shifts one cell right" (equivariance); an answer that truly does not change with position (invariance) comes from the pooling that follows, and only approximately.
 
 Build those two assumptions into the structure of the model and you get convolution.
 
@@ -52,7 +53,7 @@ What this kernel computes is "right minus left". Over a uniform region that diff
 
 In code it is a handful of nested loops. Below is a simplified single-channel version; the one in `lib/ml/ops.ts` wraps it in loops over the batch and the channels, and the innermost loops are the same:
 
-```ts title="lib/ml/ops.ts" {6-8}
+```ts title="simplified from lib/ml/ops.ts" {6-8}
 for (let oy = 0; oy < oH; oy++) {
   for (let ox = 0; ox < oW; ox++) {
     let sum = bias;

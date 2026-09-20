@@ -4,6 +4,7 @@ description: 用 emoji 水果當訓練資料，在瀏覽器裡從零訓練一個
 seoTitle: "一個身體兩個頭：瀏覽器裡的 HydraNet"
 seoDescription: "用 emoji 水果在瀏覽器裡從零訓練一個共用主幹、兩個輸出頭的小網路，再誠實地量一次：多任務學習幫了什麼忙，又付出什麼代價。"
 date: 2025-11-28
+updated: 2026-09-20
 tags: [computer-vision, multi-task, from-scratch]
 no: 5
 interactive: true
@@ -121,7 +122,7 @@ $x_i$ 是第 $i$ 格的中心位置。這個做法叫 integral regression，也�
 - **答案可以落在兩格之間**。兩格各佔一半機率，期望值就在中間，所以沒有量化誤差。唯一的例外在圖的邊緣：期望值出不了第一格和最後一格的中心，貼著圖邊的邊界會差最多 1 個像素。
 - **可以直接畫出來**。儀器右下方的四張小圖就是這四個分佈。紫色長條是機率，青色實線是期望值，粉紅色虛線是正確答案。
 
-```ts title="content/posts/hydranet-fruit/components/model.ts"
+```ts title="簡化自 content/posts/hydranet-fruit/components/model.ts"
 const maps = t.conv2d(d, P.boxK, P.boxB, { h: HALF, w: HALF, k: 1 });
 const lr = t.softmax(t.marginal(t.sliceRows(maps, 0, 2), { h: HALF, w: HALF, axis: "x" }));
 const tb = t.softmax(t.marginal(t.sliceRows(maps, 2, 2), { h: HALF, w: HALF, axis: "y" }));
