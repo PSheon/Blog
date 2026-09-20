@@ -69,7 +69,7 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
             <li key={row.slug} className="border-b border-rule">
               <Link
                 href={`/${locale}/posts/${row.slug}`}
-                className="spotlight group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline lg:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_9rem]"
+                className="spotlight spotlight-row group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline lg:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_9rem]"
               >
                 <EntryNo no={row.no} className="text-xs text-signal" />
                 <time dateTime={row.date} className="label">
