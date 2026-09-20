@@ -1,35 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
-import { Car, driveLaps } from "./car";
+import { Car, driveLapsSliced } from "./car";
 import { useLabels } from "./labels";
 import { PINK } from "./paint";
 import { Param } from "./param";
 import { type Pose, compose } from "./se2";
 import { CYAN_HEX, PINK_HEX, place, setPoints, useStage3D } from "./stage3d";
+import { useReplay } from "./use-replay";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 
 const START: Pose = { x: 2, y: 2, theta: 0 };
 
 /** Two laps on autopilot: the path really driven, and the path you get by adding up what the wheels report. */
-function twoLaps(drift: number): { truth: Pose[]; wheels: Pose[] } {
+interface Laps { truth: Pose[]; wheels: Pose[] }
+async function twoLaps(drift: number, cancelled: () => boolean): Promise<Laps | null> {
   const c = new Car(RING, START, mulberry32(7), drift), truth: Pose[] = [], wheels: Pose[] = [];
-  driveLaps(c, 2, (_, step) => { if (step % 4 === 0) { truth.push(c.truth); wheels.push(compose(START, c.deadReckoning)); } });
-  return { truth, wheels };
+  const done = await driveLapsSliced(c, 2, (_, step) => { if (step % 4 === 0) { truth.push(c.truth); wheels.push(compose(START, c.deadReckoning)); } }, cancelled);
+  return done ? { truth, wheels } : null;
 }
 
 /** Fig. 02: what happens if the car trusts its wheels and nothing else. */
 export function WheelsLab() {
+  const shell = useRef<HTMLDivElement>(null);
+  const [drift, setDrift] = useState(0.006);
+  const laps = useReplay(shell, drift, (cancelled) => twoLaps(drift, cancelled));
+  return (
+    <div ref={shell}>
+      {laps ? <Wheels laps={laps} drift={drift} setDrift={setDrift} /> : <div className="aspect-[16/10] w-full animate-pulse rounded-md border border-border bg-muted/40" aria-busy />}
+    </div>
+  );
+}
+
+function Wheels({ laps, drift, setDrift }: { laps: Laps; drift: number; setDrift(v: number): void }) {
   const t = useLabels(), still = useReducedMotion();
   const root = useRef<HTMLDivElement>(null), view = useRef<HTMLCanvasElement>(null), visible = useVisible(root);
-  const [drift, setDrift] = useState(0.006);
   const [run, setRun] = useState(0);
-  const laps = useMemo(() => twoLaps(drift), [drift]);
   const end = laps.truth.length - 1, off = Math.hypot(laps.wheels[end].x - laps.truth[end].x, laps.wheels[end].y - laps.truth[end].y);
 
   const shown = useRef(0);
