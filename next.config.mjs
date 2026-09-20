@@ -4,6 +4,8 @@ import createMDX from "@next/mdx";
 const nextConfig = {
   pageExtensions: ["ts", "tsx", "md", "mdx"],
   poweredByHeader: false,
+  // app/global-not-found.tsx: the 404 for URLs that match no route. Needed because the root layout sits under [locale].
+  experimental: { globalNotFound: true },
   async headers() {
     return [
       {

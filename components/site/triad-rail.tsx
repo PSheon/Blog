@@ -15,8 +15,12 @@ interface Stop {
  */
 export function TriadRail({ locale, stops, label }: { locale: Locale; stops: Stop[]; label: string }) {
   return (
-    <nav aria-label={label} className="relative py-10">
+    <nav aria-label={label} className="relative py-10 [container-type:inline-size]">
       <div className="triad-gradient absolute inset-x-0 top-1/2 h-px opacity-40 [mask-image:repeating-linear-gradient(90deg,#000_0_4px,transparent_4px_10px)]" aria-hidden />
+      {/* Hidden where the stops wrap into two rows: a line through the gap between them carries nothing. */}
+      <div className="absolute inset-x-0 top-1/2 hidden h-px overflow-hidden sm:block" aria-hidden>
+        <span className="rail-pulse [--rail-w:100cqw]" />
+      </div>
       <ol className="relative grid grid-cols-2 gap-y-3 sm:grid-cols-4">
         {stops.map((stop, i) => (
           <li key={stop.tag} className={cn(i % 2 === 0 ? "justify-self-start" : "justify-self-end", i === 0 ? "sm:justify-self-start" : i === stops.length - 1 ? "sm:justify-self-end" : "sm:justify-self-center")}>

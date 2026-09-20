@@ -3,7 +3,7 @@ const zh = {
     title: "paul.notebook — 從零實作機器學習模型",
     description: "Paul 的實驗筆記：從零實作機器學習模型，每一篇都能在瀏覽器裡訓練、拆開、弄壞。電腦視覺、強化學習、Transformer、擴散模型與機器人。",
   },
-  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁" },
+  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁", skip: "跳到主要內容" },
   search: {
     open: "搜尋",
     placeholder: "搜尋全文：試試「池化」或「突變」…",
@@ -42,7 +42,8 @@ const zh = {
     instrumentMore: "它是怎麼做到的？",
   },
   home: {
-    featured: "精選",
+    latest: "最新文章",
+    readouts: { posts: "篇文章", interactive: "篇可以動手玩", libraries: "個機器學習函式庫" },
     topics: "依主題瀏覽：看見、思考、生成、行動",
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
@@ -56,6 +57,8 @@ const zh = {
     minutes: (n: number) => `${n} 分鐘`,
     published: "發布",
     updated: "更新",
+    readingTime: "閱讀時間",
+    mathLabel: "數學式，可左右捲動",
     toc: "本頁目錄",
     backToTop: "回到頂端",
     fallback: "這篇文章目前只有中文版。",

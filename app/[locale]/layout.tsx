@@ -65,7 +65,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
               href="#content"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
             >
-              {locale === "zh" ? "跳到主要內容" : "Skip to content"}
+              {t.nav.skip}
             </a>
             <SiteHeader
               locale={locale}

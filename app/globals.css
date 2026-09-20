@@ -283,6 +283,39 @@ html:not(.dark) {
     font-variant-numeric: tabular-nums;
   }
 
+  /* Light behind the latest-article card: the hero's glow again, flatter and in the gradient's other end. */
+  .card-glow {
+    position: absolute;
+    inset: -18% -6%;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse closest-side, color-mix(in oklab, var(--signal-2) 16%, transparent) 0%, color-mix(in oklab, var(--signal-3) 9%, transparent) 45%, transparent 100%);
+    opacity: 0.8;
+  }
+  :root:not(.dark) .card-glow {
+    opacity: 0.35;
+  }
+
+  /* A packet travelling the see → act rail. Transform only, so it never touches layout; still for reduced motion. */
+  .rail-pulse {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 7rem;
+    height: 1px;
+    translate: 0 -50%;
+    background: linear-gradient(90deg, transparent, var(--signal-3), transparent);
+    animation: rail-pulse 7s linear infinite;
+  }
+  @keyframes rail-pulse {
+    from { transform: translateX(-7rem); opacity: 0; }
+    8%, 92% { opacity: 1; }
+    to { transform: translateX(var(--rail-w, 80rem)); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-pulse { display: none; }
+  }
+
   /* ---------- Long-form prose ----------
    * Figures and instruments opt out with .not-prose, so list and link rules stop at their border.
    */
