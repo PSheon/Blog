@@ -13,6 +13,8 @@ const pages = [
   "/en/posts/lite3-walking",
   "/zh/posts/diffusion-points",
   "/en/posts/diffusion-points",
+  "/zh/posts/slam-2d",
+  "/en/posts/slam-2d",
 ];
 
 for (const theme of ["dark", "light"] as const) {

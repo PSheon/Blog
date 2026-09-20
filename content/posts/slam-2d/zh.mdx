@@ -1,16 +1,13 @@
 ---
-title: （草稿）一邊畫地圖，一邊找自己：從零寫一個 SLAM
+title: 一邊畫地圖，一邊找自己：從零寫一個 SLAM
 description: 一台沒有 GPS、沒有地圖的小車，怎麼一邊畫地圖、一邊知道自己在地圖上的哪裡。開著它繞一圈，看地圖慢慢歪掉，再在回到起點的那一刻整張彈正。
-date: 2026-09-19
+date: 2026-09-20
 tags: [ai-agent, robotics, from-scratch]
 no: 8
 interactive: true
-draft: true
 ---
 
 import { AlignLab, CloudLab, DriveLab, OutcomesLab, SpringsLab, WheelsLab } from "./components";
-
-{/* 草稿：文字第二版（2026-09-19 去重複）。所有數字都來自 docs/research/2026-09-18-slam-2d-spike.md。 */}
 
 [上一篇](/zh/posts/lite3-walking)的機器狗會走路了，但牠不知道自己走到哪裡。牠沒有 GPS（室內收不到），也沒有人給牠地圖。
 
