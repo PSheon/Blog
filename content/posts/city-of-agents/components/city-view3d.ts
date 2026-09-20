@@ -47,6 +47,14 @@ export class CityView {
   private readonly lampHeads: THREE.MeshBasicMaterial;
   private readonly lampPools: THREE.MeshBasicMaterial;
   private readonly windows: THREE.InstancedMesh | null = null;
+  private boxMesh: THREE.InstancedMesh | null = null;
+  /** For the cutaway: each building's box (and awning) among the boxes, its windows among the panes, and how far it is lowered (1 = standing). */
+  private readonly boxOf: number[] = [];
+  private readonly awningOf: number[] = [];
+  private readonly boxes: Box[] = [];
+  private readonly panesOf: [number, number][] = [];
+  private paneMatrices: THREE.Matrix4[] = [];
+  private stand: Float32Array = new Float32Array(0);
   private readonly windowHash: Float32Array = new Float32Array(0);
   private readonly windowLit: Uint8Array = new Uint8Array(0);
   private windowStamp = -1;
@@ -133,8 +141,10 @@ export class CityView {
     }
     for (const b of city.buildings) {
       const palette = C[b.kind], { rect } = b;
+      this.boxOf[b.id] = boxes.length; this.awningOf[b.id] = -1;
       boxes.push({ x: rect.x, y: rect.y, z: 0.26 + b.height / 2, sx: rect.w, sy: rect.d, sz: b.height, color: palette[b.id % palette.length] });
       if (b.kind === "shop") {
+        this.awningOf[b.id] = boxes.length;
         const [dx, dy] = this.facing(b);
         boxes.push({ x: rect.x + dx * (rect.w / 2 + 0.6), y: rect.y + dy * (rect.d / 2 + 0.6), z: 2.7, sx: dx ? 1.4 : rect.w * 0.9, sy: dy ? 1.4 : rect.d * 0.9, sz: 0.18, color: C.awning[b.id % C.awning.length] });
       }
@@ -160,6 +170,7 @@ export class CityView {
     mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
     this.root.add(mesh);
     this.disposables.push(geometry, material, mesh);
+    this.boxMesh = mesh; this.boxes.push(...boxes); this.stand = new Float32Array(this.city.buildings.length).fill(1);
   }
 
   private addCrowns(crowns: [number, number, number][]): void {
@@ -185,6 +196,7 @@ export class CityView {
   private addWindows(): { mesh: THREE.InstancedMesh; hash: Float32Array } | null {
     const T = this.T, panes: { m: THREE.Matrix4; hash: number }[] = [], right = new T.Vector3(), up = new T.Vector3(0, 0, 1), normal = new T.Vector3();
     for (const b of this.city.buildings) {
+      const first = panes.length;
       const { rect } = b, shop = b.kind === "shop", floors = shop ? 1 : Math.min(24, Math.floor((b.height - 1) / 3.2)), bHash = hash01(b.id + 0.5);
       for (const [nx, ny] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const width = nx ? rect.d : rect.w, cols = shop ? 1 : Math.min(6, Math.max(1, Math.floor(width / 2.6))), cell = width / cols;
@@ -198,6 +210,7 @@ export class CityView {
           panes.push({ m, hash: own < 0.25 ? -1 : Math.min(0.999, bHash * 0.75 + own * 0.25) });
         }
       }
+      this.panesOf[b.id] = [first, panes.length];
     }
     if (!panes.length) return null;
     const geometry = new T.PlaneGeometry(1, 1), material = new T.MeshBasicMaterial(), mesh = new T.InstancedMesh(geometry, material, panes.length), glass = new T.Color(C.glass);
@@ -205,6 +218,7 @@ export class CityView {
     mesh.frustumCulled = false;
     this.root.add(mesh);
     this.disposables.push(geometry, material, mesh);
+    this.paneMatrices = panes.map((p) => p.m);
     return { mesh, hash: Float32Array.from(panes, (p) => p.hash) };
   }
 
@@ -288,7 +302,7 @@ export class CityView {
   // ── camera and frame ──────────────────────────────────────────────────────
 
   /** True while the camera is still easing towards where it should be, so a paused scene keeps drawing until it gets there. */
-  get settling(): boolean { return this.camera.position.distanceToSquared(this.cameraAt) > 0.01; }
+  get settling(): boolean { return this.camera.position.distanceToSquared(this.cameraAt) > 0.01 || this.cutting; }
 
   /**
    * The person nearest to a point of the canvas (client coordinates), within `tolerance` CSS pixels, or −1. People are a
@@ -325,10 +339,55 @@ export class CityView {
     this.camera.position.lerp(this.cameraAt, ease);
     this.camera.lookAt(this.lookAt.x, this.lookAt.y, following ? 2 : 0);
     this.eased = true;
+    this.cutaway(following, dt);
     this.aimLight(this.lookAt.x, this.lookAt.y, Math.min(this.city.size * 0.75, Math.max(70, this.camera.position.distanceTo(this.lookAt) * 0.8)));
     this.renderer.render(this.scene, this.camera);
     this.calls = this.renderer.info.render.calls;
   }
+
+  /**
+   * While following someone, any building standing between the camera and that person is lowered to a stub (and its
+   * windows put away), then raised again once it is out of the way: the person is never hidden behind a tower.
+   * A building is in the way if the sight line crosses its footprint below its roof.
+   */
+  private cutaway(following: boolean, dt: number): void {
+    const mesh = this.boxMesh;
+    if (!mesh) return;
+    const half = this.city.size / 2, cx = this.camera.position.x + half, cy = this.camera.position.y + half, cz = this.camera.position.z;
+    const tx = this.lookAt.x + half, ty = this.lookAt.y + half, tz = 3, ease = 1 - Math.exp(-dt * 8), m = this.personMatrix;
+    let moved = false, panesMoved = false;
+    for (const b of this.city.buildings) {
+      let target = 1;
+      if (following && b.height > 3) {
+        // Liang–Barsky: the part of the sight line over the footprint, grown by a margin so walls beside the person go too.
+        const { rect } = b, margin = 2.5, dx = tx - cx, dy = ty - cy;
+        let t0 = 0, t1 = 1, hit = true;
+        for (const [pp, q] of [[-dx, cx - (rect.x - rect.w / 2 - margin)], [dx, rect.x + rect.w / 2 + margin - cx], [-dy, cy - (rect.y - rect.d / 2 - margin)], [dy, rect.y + rect.d / 2 + margin - cy]]) {
+          if (pp === 0) { if (q < 0) { hit = false; break; } } else { const t = q / pp; if (pp < 0) t0 = Math.max(t0, t); else t1 = Math.min(t1, t); }
+        }
+        // The sight line descends towards the person, so it is lowest where it leaves the footprint.
+        if (hit && t0 < t1 && cz + (tz - cz) * t1 < 0.26 + b.height) target = Math.min(1, 1.6 / b.height);
+      }
+      const now = this.stand[b.id];
+      if (Math.abs(now - target) < 0.002) continue;
+      const next = Math.abs(now - target) < 0.01 ? target : now + (target - now) * ease, box = this.boxes[this.boxOf[b.id]];
+      this.stand[b.id] = next; moved = true;
+      mesh.setMatrixAt(this.boxOf[b.id], m.makeScale(box.sx, box.sy, box.sz * next).setPosition(box.x, box.y, 0.26 + (box.sz * next) / 2));
+      if (this.awningOf[b.id] >= 0) { const a = this.boxes[this.awningOf[b.id]], s = next < 0.999 ? 0 : 1; mesh.setMatrixAt(this.awningOf[b.id], m.makeScale(a.sx * s, a.sy * s, a.sz * s).setPosition(a.x, a.y, a.z)); }
+      // Windows go the moment a building starts to sink and come back when it stands again.
+      const wasWhole = now >= 0.999, isWhole = next >= 0.999;
+      if (this.windows && wasWhole !== isWhole) {
+        const [from, to] = this.panesOf[b.id];
+        for (let k = from; k < to; k++) this.windows.setMatrixAt(k, isWhole ? this.paneMatrices[k] : m.makeScale(0, 0, 0));
+        panesMoved = true;
+      }
+    }
+    if (moved) mesh.instanceMatrix.needsUpdate = true;
+    if (panesMoved && this.windows) this.windows.instanceMatrix.needsUpdate = true;
+  }
+
+  /** True while a building is still sinking or rising, so a paused scene keeps drawing until it is done. */
+  private get cutting(): boolean { for (let i = 0; i < this.stand.length; i++) { const v = this.stand[i]; if (v !== 1 && Math.abs(v - Math.min(1, 1.6 / this.city.buildings[i].height)) > 0.002) return true; } return false; }
 
   /** The shadow map covers `reach` around the point being looked at, not the whole map. */
   private aimLight(x: number, y: number, wanted: number): void {
