@@ -30,9 +30,9 @@ export function Legend() {
  */
 export function CityLab({ seed = 1, n = 8, agents = 300, modes = false }: { seed?: number; n?: number; agents?: number; modes?: boolean }) {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const { session, ready, panel } = useCity(root, canvas, { seed, n, agents }, 0);
-  const [, refresh] = useState(0), s = session.current, running = s?.running ?? true, rate = s?.rate ?? 1, follow = s?.follow ?? -1;
-  const act = (f: () => void) => { f(); s?.touch(); refresh((v) => v + 1); };
+  const { session, ready, panel, publish } = useCity(root, canvas, { seed, n, agents }, 0);
+  const [, refresh] = useState(0), s = session.current, running = s?.running ?? true, rate = s?.rate ?? 1, follow = panel?.follow ?? -1;
+  const act = (f: () => void) => { f(); s?.touch(); publish(); refresh((v) => v + 1); };
 
   return (
     <div ref={root} className="grid gap-3 text-sm">
