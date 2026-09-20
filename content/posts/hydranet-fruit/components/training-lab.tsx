@@ -4,6 +4,7 @@ import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Sparkline } from "@/components/lab/sparkline";
+import { useNear } from "@/components/lab/use-near";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EdgePlots } from "./edge-plots";
@@ -36,7 +37,9 @@ interface Session {
   key: string;
   source: SceneSource;
   net: HydraNet;
+  /** The fixed test images, drawn a few per frame the first time they are scored. */
   test: Scene[];
+  testRng: () => number;
   rng: () => number;
   trainMs: number;
   boxCurve: number[];
@@ -46,27 +49,40 @@ interface Session {
 /** Images per optimiser step. */
 const BATCH = 8;
 
-function measure(s: Session): View {
-  let box = 0, mask = 0, fromMask = 0;
-  const predictions: Prediction[] = [];
-  s.test.forEach((scene, i) => {
+/** A scoring pass over the test images, carried across frames. */
+interface Scoring { i: number; box: number; mask: number; fromMask: number; predictions: Prediction[] }
+
+/**
+ * Score test images until `budgetMs` runs out; true once the pass is complete. Scoring all 48 at once is a 70 ms
+ * task (four times that on a phone), and the first pass also has to draw the images. In slices, no frame is lost
+ * to it: not at page load, and not once a second while training.
+ */
+function scoreSome(s: Session, pass: Scoring, budgetMs: number): boolean {
+  const end = performance.now() + budgetMs;
+  do {
+    const scene = (s.test[pass.i] ??= s.source.next(s.testRng));
     const p = s.net.predict(scene.image);
-    if (i < SHOWN) predictions.push(p);
-    box += boxIoU(p.box, scene.box);
-    mask += maskIoU(p.mask, scene.mask);
+    if (pass.i < SHOWN) pass.predictions.push(p);
+    pass.box += boxIoU(p.box, scene.box);
+    pass.mask += maskIoU(p.mask, scene.mask);
     const derived = boxFromMask(p.mask);
-    fromMask += derived ? boxIoU(derived, scene.box) : 0;
-  });
-  const n = s.test.length;
+    pass.fromMask += derived ? boxIoU(derived, scene.box) : 0;
+    pass.i++;
+  } while (pass.i < TEST_SIZE && performance.now() < end);
+  return pass.i >= TEST_SIZE;
+}
+
+function summary(s: Session, pass: Scoring): View {
+  const n = TEST_SIZE;
   return {
     seen: s.net.seen,
-    box: box / n,
-    mask: mask / n,
-    fromMask: fromMask / n,
+    box: pass.box / n,
+    mask: pass.mask / n,
+    fromMask: pass.fromMask / n,
     perSec: s.trainMs ? (s.net.seen / s.trainMs) * 1000 : 0,
     boxCurve: s.boxCurve,
     maskCurve: s.maskCurve,
-    predictions,
+    predictions: pass.predictions,
     shown: s.test.slice(0, SHOWN),
   };
 }
@@ -81,20 +97,24 @@ export function TrainingLab() {
   const [view, setView] = useState<View | null>(null);
   const [kind, setKind] = useState<SceneSource["kind"]>("emoji");
   const session = useRef<Session | null>(null);
+  const near = useNear(rootRef);
 
   useEffect(() => {
+    // Not at page load: drawing the emoji set and building the network wait until the figure is a screen away.
+    if (!near) return;
     const key = `${heads}:${epoch}`;
     if (session.current?.key !== key) {
       // Same test images across resets and head choices, so numbers are comparable.
       const source = session.current?.source ?? createSceneSource();
-      const test = session.current?.test ?? Array.from({ length: TEST_SIZE }, ((r) => () => source.next(r))(mulberry32(4242)));
-      session.current = { key, source, test, net: new HydraNet({ heads, skip: "slim", boxWeight: 1 }), rng: Math.random, trainMs: 0, boxCurve: [], maskCurve: [] };
+      const test = session.current?.test ?? [], testRng = session.current?.testRng ?? mulberry32(4242);
+      session.current = { key, source, test, testRng, net: new HydraNet({ heads, skip: "slim", boxWeight: 1 }), rng: Math.random, trainMs: 0, boxCurve: [], maskCurve: [] };
     }
     const s = session.current;
-    let frame = 0, visible = true, lastEval = 0;
+    // A pass is owed straight away: the first picture of an untrained network, or the final score after a pause.
+    let frame = 0, visible = true, nextEval = 0, passStarted = 0, pass: Scoring | null = { i: 0, box: 0, mask: 0, fromMask: 0, predictions: [] };
 
-    const evaluate = () => {
-      const v = measure(s);
+    const publish = (done: Scoring) => {
+      const v = summary(s, done);
       if (s.net.seen > 0) {
         s.boxCurve = [...s.boxCurve, v.box];
         s.maskCurve = [...s.maskCurve, v.mask];
@@ -104,15 +124,22 @@ export function TrainingLab() {
     };
 
     const loop = (now: number) => {
-      frame = requestAnimationFrame(loop);
-      if (!visible) return;
-      // Scoring 48 images costs about as much as training 48: do it once a second, and give it the frame to
-      // itself. Training in the same frame made a 70 ms task once a second, which shows when you scroll.
-      if (now - lastEval > EVAL_EVERY_MS) {
-        lastEval = now;
-        evaluate();
+      // Paused, the loop only lives until the pass that is owed has been shown.
+      if (running || pass) frame = requestAnimationFrame(loop);
+      if (!visible && running) return;
+      // Once a second the network is scored instead of trained, a slice per frame. While a pass is under way the
+      // weights must not move, so those frames do no training.
+      if (!pass && running && now > nextEval) { pass = { i: 0, box: 0, mask: 0, fromMask: 0, predictions: [] }; passStarted = now; }
+      if (pass) {
+        if (scoreSome(s, pass, 11)) {
+          publish(pass);
+          pass = null;
+          // A second between scores, or longer on a slow device: scoring never takes more than a quarter of the time.
+          nextEval = now + Math.max(EVAL_EVERY_MS, 3 * (now - passStarted));
+        }
         return;
       }
+      if (!running) return;
       const t0 = performance.now(), deadline = t0 + 11;
       // One image at a time: a whole batch of 8 is ~15 ms, which overran this 11 ms budget on every single frame.
       do s.net.feed(s.source.next(s.rng), BATCH);
@@ -122,14 +149,12 @@ export function TrainingLab() {
 
     const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
     if (rootRef.current) io.observe(rootRef.current);
-    const first = window.setTimeout(evaluate, 0);
-    if (running) frame = requestAnimationFrame(loop);
+    frame = requestAnimationFrame(loop);
     return () => {
-      window.clearTimeout(first);
       cancelAnimationFrame(frame);
       io.disconnect();
     };
-  }, [heads, epoch, running]);
+  }, [heads, epoch, running, near]);
 
   const shown = view?.shown ?? [];
   const scene = shown[selected];
