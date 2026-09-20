@@ -73,3 +73,50 @@ camera 5 degrees off: success 44.0% (44/100), mean steps 18.2, nothing-to-do 19/
 - "within one bin of the expert on every joint" is rare in closed loop (44 of 320 steps) even when the episode succeeds:
   the model is not tracking the expert, it is doing the job its own way. Token accuracy is not the metric.
 - Decision recorded: proprioception stays (real VLAs have it), the grasp window stays at pixel scale, 48 × 48 stays.
+
+## Stage 0.3 — WebGPU: are the kernels right, and is "minutes in the page" real? (`gpu-parity.test.ts.txt`)
+
+`components/gpu/kernels.ts`: tiled matmul with both transposed forms and a batch dimension, layer norm, prefix-masked
+softmax, ReLU, add, Adam — forward and backward, f32. Run in Playwright's headless Chromium with `--enable-unsafe-webgpu`
+on the M4 Pro (adapter "apple metal-3"). Reference: `lib/ml`'s Tape in f64. Worst error relative to max(1, |reference|):
+
+```
+matmul 37x29x23: forward 4.2e-7, dA 5.4e-7, dB 7.3e-7
+batched q·kT: 1.9e-7
+layer norm 19x24: forward 1.8e-7, dx 2.3e-7, dgain 3.4e-7, dbias 2.5e-7
+softmax 13x13: causal forward 4.5e-8, backward 2.2e-8, prefix-5 forward 2.9e-8
+```
+
+That is f32 rounding and nothing else. The prefix mask has no counterpart in `lib/ml` yet, so it is checked against a
+plain loop in the script.
+
+One training step's worth of kernels (every matmul, layer norm, softmax, element-wise op and Adam update of the forward
+and backward pass, on tensors of the right sizes, five steps timed after a warm-up):
+
+```
+the model as trained in stage 0.2: 4 frames, 170 tokens: 206 ms per step, 365 GFLOP/s effective; 3000 steps = 10.3 min
+2 frames, 98 tokens: 105 ms per step, 372 GFLOP/s effective; 3000 steps = 5.3 min
+4 frames, batch 32: 48 ms per step, 395 GFLOP/s effective; 3000 steps = 2.4 min
+```
+
+- **The recipe that reached 84 % in stage 0.2 (3 000 steps of batch 128) is about ten minutes in the page on this GPU**,
+  five with two frames instead of four. PyTorch on the same GPU took 244 s, so a first, untuned WGSL backend is within
+  2.5× of it. The plan's gate ("offer training when the estimate is ≤ 10 minutes") is where this machine sits; whether two
+  frames cost success has to be measured in stage 1.
+- The first timing was 2 197 ms a step. One kernel did it: the layer-norm gain/bias gradient re-derived every row's mean
+  and variance inside each of its 96 threads. Reading the normalised input the dx kernel had just written took the step
+  to 206 ms. Isolated matmuls run at 480–1 030 GFLOP/s; the whole step is at 365, so the memory-bound kernels still cost
+  about half. Not tuned further at this stage.
+- This measures the machine, not a trained model: the tensors hold noise and there is no data loading. Not included
+  yet: the embedding gather/scatter, cross-entropy, and feeding frames (6 200 frames/s from one rasteriser thread
+  against about 2 500 distinct frames/s needed at this step rate — one worker is enough).
+- CI has no GPU. The script prints "NO WEBGPU ADAPTER" and stops rather than pass silently; the numbers above exist only
+  where someone ran it on real hardware.
+
+## Stage 0 verdict
+
+1. Simulation, expert, rasteriser: done, tested. 2. 48 × 48 oblique pixels are enough once the grasp window is at pixel
+scale: 84 % unperturbed, and the failure table the article is about is already there. 3. WebGPU training of that model
+is ten minutes on a laptop GPU with a first-draft backend. 4. MuJoCo edge-grasp spike: not done; it does not block.
+Nothing in the plan has to change except two parameters, recorded in `params.ts` (grasp window, 1 % default slip) and one
+addition (a proprioception token).
