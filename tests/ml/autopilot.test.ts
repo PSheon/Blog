@@ -18,16 +18,20 @@ function drive(start: Pose, seconds: number, seed: number) {
   return { worstStandstill: worst, laps: swept / (2 * Math.PI), start, end: car.truth };
 }
 
+// 200 random starts take two and a half minutes here and far longer on CI; 40 keep the everyday run short.
+// PILOT_FULL=1 runs them all.
+const STARTS = process.env.PILOT_FULL ? 200 : 40;
+
 describe("autopilot", () => {
   it("keeps lapping from the start line", () => {
     const r = drive({ x: 2, y: 2, theta: 0 }, 240, 1);
     expect(r.laps).toBeGreaterThan(5);
     expect(r.worstStandstill).toBeLessThan(1.5);
-  });
+  }, 60_000); // 2 s here, 5.6 s on a GitHub runner: over the 5 s default
 
   it("gets going from wherever a reader left the car, facing any way", () => {
     const rng = mulberry32(9), results: ReturnType<typeof drive>[] = [];
-    while (results.length < 200) {
+    while (results.length < STARTS) {
       const p = { x: 0.6 + rng() * 18.8, y: 0.6 + rng() * 12.8, theta: rng() * 6.28 };
       // Not inside the central block or one of the boxes along the corridor: a reader cannot drive in there.
       const solids = [[4, 4, 16, 10], [7, 0, 8, 1.2], [13, 2.8, 14, 4], [18.6, 5, 20, 6.5], [16, 8, 17, 9], [11, 12.6, 12.5, 14], [5.5, 10, 6.5, 11.2], [0, 7.5, 1.3, 8.5], [2.8, 3, 4, 4]];
@@ -39,6 +43,6 @@ describe("autopilot", () => {
     }
     const failed = results.filter((r) => r.laps < 1 || r.worstStandstill > 3);
     if (process.env.PILOT_DEBUG) failed.forEach((f) => console.log(`FAILED start (${f.start.x.toFixed(1)}, ${f.start.y.toFixed(1)}, ${f.start.theta.toFixed(1)}) end (${f.end.x.toFixed(1)}, ${f.end.y.toFixed(1)}, ${f.end.theta.toFixed(1)}) laps ${f.laps.toFixed(2)} standstill ${f.worstStandstill.toFixed(1)}`));
-    expect(failed.length, `failed ${failed.length} of 200; worst standstill ${Math.max(...results.map((r) => r.worstStandstill)).toFixed(1)} s, fewest laps ${Math.min(...results.map((r) => r.laps)).toFixed(2)}`).toBe(0);
+    expect(failed.length, `failed ${failed.length} of ${STARTS}; worst standstill ${Math.max(...results.map((r) => r.worstStandstill)).toFixed(1)} s, fewest laps ${Math.min(...results.map((r) => r.laps)).toFixed(2)}`).toBe(0);
   }, 300_000);
 });
