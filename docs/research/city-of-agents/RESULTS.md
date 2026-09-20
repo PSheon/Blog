@@ -133,3 +133,20 @@ With the proposed rates two thirds of the city is asleep at 01:00, two thirds is
 08–10, and about 11 % of the day is free. Switching duty off frees 40 % of the day. The fixed timetable sends 100 % of
 people out in the same ten minutes; utility 11 %; random 9 %. The "modal" read-out separates the modes less clearly
 (0.99 / 0.53 / 0.46) because at night most people are asleep in every mode — departures are the better synchrony measure.
+
+## 3. three.js: shared chunk or named imports (stage 2)
+
+Production build (`pnpm build`, draft flag removed locally and not committed), gzip -9 of the emitted chunks.
+
+| how the scene gets three.js | chunks containing the renderer | gzip |
+| --- | --- | --- |
+| `import("three")`, the whole namespace, as SLAM and Lite3 do | `1uew_oe3lwo7a.js` + `35_-pqd2crq59.js` — the same two files those articles already load | 88.1 KB + 100.2 KB = 188.3 KB |
+| a module re-exporting only the 23 names the scene uses | `13ffalr2qqay4.js` (new) + `35_-pqd2crq59.js` | 84.7 KB + 100.2 KB = 184.9 KB |
+
+Named imports save 3.4 KB and cost a reader who has already opened SLAM or Lite3 a second 85 KB download, because the
+renderer pulls in most of the library whatever is named. The scene keeps the shared namespace import.
+None of the JavaScript the article's HTML references on first load contains three.js (checked by searching every
+referenced chunk for `WebGLShadowMap`): it is fetched when the figure first comes on screen.
+
+The city scene without people is 7 draw calls a frame including the shadow pass (read from `renderer.info` in the page).
+three r186 has removed `PCFSoftShadowMap` (asking for it logs a warning and falls back); `PCFShadowMap` is now the soft one.
