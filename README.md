@@ -70,6 +70,9 @@ draft: true                    # optional — built in `pnpm dev` only, never in
 ---
 ```
 
+**Read [`docs/DESIGN.md`](docs/DESIGN.md) first**: the design system — tokens, components, interaction and
+accessibility rules, content rules and the publishing checklist.
+
 `Figure`, `Instrument`, `Sidenote` and `Callout` are available in every article without an
 import. `content/posts/cnn-from-scratch` is a full example.
 
