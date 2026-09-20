@@ -78,6 +78,14 @@ is no real-user data, because Speed Insights is not switched on in the Vercel da
 7. **HydraNet (77) and CNN (81) are the slow pages.** The largest element is the lead paragraph, held back 2–3 s by
    script work during hydration. HydraNet has 208 ms and 115 ms long tasks in the shared chunk. Item 1 removes part of
    that. The rest is their own demos starting before anyone scrolls to them; SLAM's lazy start fixed the same problem.
+   - Done the same day for HydraNet. Its first figure sits at the fold on a phone (892 px down an 800 px viewport),
+     so a lazy start cannot help it; what helped is slicing. Drawing the 48 test images and scoring them now runs a
+     slice per frame (`scoreSome` in `training-lab.tsx`), at load and once a second while training. Measured on the
+     local production build at 4× CPU throttle: long tasks in the first 3 s went from 56 + 87 + 255 ms to 61 + 79 ms
+     (what is left is the page's own hydration), and there are none while training, where a 70 ms one came every
+     second. The second figure waits until it is a screen away (`components/lab/use-near.ts`).
+   - CNN left alone. Its one long task (130 ms at 4×) is at 43 ms, during the first layout of a 1,300-element page,
+     not in a demo.
 
 ## Tier 2: search, sharing and accessibility
 
