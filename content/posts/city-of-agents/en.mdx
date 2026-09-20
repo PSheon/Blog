@@ -46,17 +46,17 @@ Each person carries four numbers from 0 to 1, where 0 is content and 1 is unbear
 | fatigue | {PARAMS.decay[0]} | {PARAMS.threshold[0]} | their own home | {PARAMS.recovery[0]} |
 | hunger | {PARAMS.decay[1]} | {PARAMS.threshold[1]} | any place on a restaurant street | {PARAMS.recovery[1]} |
 | social | {PARAMS.decay[2]} | {PARAMS.threshold[2]} | a park or the riverside | {PARAMS.recovery[2]} |
-| duty | {PARAMS.decay[3]} (only from {PARAMS.dutyHours[0]}:00 to {PARAMS.dutyHours[1]}:00) | {PARAMS.threshold[3]} | their own office | {PARAMS.recovery[3]} |
+| backlog | {PARAMS.decay[3]} (only from {PARAMS.dutyHours[0]}:00 to {PARAMS.dutyHours[1]}:00) | {PARAMS.threshold[3]} | their own office | {PARAMS.recovery[3]} |
 
 When a person is created, each growth rate is shifted by up to {PARAMS.rateJitter * 100}%, and the first three needs start at random levels. No two people are alike.
 
 Here are three days of one of them, worked out by your browser just now.
 
-<Instrument fig="02" title="city / needs" caption="Four lines for four needs, the dashed line the threshold; the darker spans are night. The strip at the bottom is what the person was doing. Untick duty and see how much of the day comes free.">
+<Instrument fig="02" title="city / needs" caption="Four lines for four needs, the dashed line the threshold; the darker spans are night. The strip at the bottom is what the person was doing. Untick the backlog and see how much of the day comes free.">
   <NeedsLab />
 </Instrument>
 
-Hunger is the most regular: eight hours to reach 0.6, forty minutes to eat, three meals a day. **Duty** is the one need that is not bodily: it is the pull of work. By day work keeps coming in, so it keeps rising, and only being at the office brings it down; after {PARAMS.dutyHours[1]}:00 nothing new arrives, so whoever has cleared it can leave. Switching it off means nobody in this city has a job to go to.
+Hunger is the most regular: eight hours to reach 0.6, forty minutes to eat, three meals a day. **The backlog** is the one need that is not bodily: it is the work waiting on the desk. By day work keeps coming in, so it keeps rising, and only being at the office brings it down; after {PARAMS.dutyHours[1]}:00 nothing new arrives, so whoever has cleared it can leave. Switching it off means nobody in this city has a job to go to.
 
 Fatigue has one thing the others do not: **it grows faster at night.** Its rate is multiplied by (1 − {PARAMS.circadian} × the sun's height), so the lower the sun, the sooner people tire. I measured what happens without it: the sleep of 300 people spreads evenly over the day, with a fifth to almost half of them asleep at any hour, and the city has no night. With it, two thirds are asleep at one in the morning and 2% at noon.
 
@@ -100,13 +100,13 @@ The random day is flat: three in the morning looks like three in the afternoon.
 
 The one in the middle keeps hours: most people asleep at night, the cyan of work rising through the morning and ebbing through the evening, meals and company scattered across the day. Nobody drew up that rota; it is what three hundred slightly different sets of numbers work out separately. In its busiest ten minutes only 12% of people set off together, much like random's 10% — but random has no shape.
 
-Switch duty off and measure again (offline: 300 people, seed 1, the last of five days): sleeping, eating and company barely change, and free time goes from 11% to 40%. People do not find themselves something to do, and that is the most honest thing about this model: **it only answers the needs you give it.** If you want them to shop or exercise, that is another number.
+Switch the backlog off and measure again (offline: 300 people, seed 1, the last of five days): sleeping, eating and company barely change, and free time goes from 11% to 40%. People do not find themselves something to do, and that is the most honest thing about this model: **it only answers the needs you give it.** If you want them to shop or exercise, that is another number.
 
 ## Who is watching everyone
 
 With three hundred people each minding their own business, how do you know who is doing what? The simulation writes a record of every event: who, when, departed / arrived / started / finished / idle, and where. Three hundred people make about eleven thousand of them a day.
 
-Below is the whole bench. On the right is the overseer: a row per person with what they are doing, where, and how high each need is; choose a row and the camera goes to follow them. Under it the record is written out as sentences. Every knob is here: how many people, the seed, the size of the city, the three heads, duty on or off, how hard people avoid each other.
+Below is the whole bench. On the right is the overseer: a row per person with what they are doing, where, and how high each need is; choose a row and the camera goes to follow them. Under it the record is written out as sentences. Every knob is here: how many people, the seed, the size of the city, the three heads, the backlog on or off, how hard people avoid each other.
 
 <Instrument fig="05" title="city / overseer" size="wide" caption="The timeline can be dragged back. The replayed picture, everyone's state and their need bars are worked out from the event record alone; nothing is re-simulated. The small pink ticks mark where you changed the rules.">
   <OverseerLab />
@@ -124,7 +124,7 @@ The "frame time" under the scene is measured on your machine as you watch: the m
 
 ## What differs from the real thing, and how the numbers were measured
 
-**This does not simulate people.** I chose the four needs and tuned their rates until it looked like a day. Duty starts to build at {PARAMS.dutyHours[0]} in the morning so that it passes its threshold around half past eight; that is not how an office worker works. The model can claim one thing only: without a timetable, a few numbers that rise and fall and one scoring formula are enough for a crowd to find a rhythm.
+**This does not simulate people.** I chose the four needs and tuned their rates until it looked like a day. The backlog starts to build at {PARAMS.dutyHours[0]} in the morning so that it passes its threshold around half past eight; that is not how an office worker works. The model can claim one thing only: without a timetable, a few numbers that rise and fall and one scoring formula are enough for a crowd to find a rhythm.
 
 **The walking is drawn.** A position moves along its route, steps aside a little and is kept within the pavement; the bobbing and the lean are only drawing. No cars, no traffic lights, no interiors: people doing something stand at the door, twice life size, or from the air they would be two pixels.
 
