@@ -429,8 +429,14 @@ test("a car maps a corridor, closes the loop, and takes a failure mode from the 
   const number = async (id: string) => Number((await page.getByTestId(id).first().textContent())!.match(/[\d.]+/)![0]);
 
   await expect(page.locator("[data-instrument]")).toHaveCount(6);
-  await page.getByTestId("slam-autopilot").scrollIntoViewIfNeeded();
-  await page.getByTestId("slam-autopilot").click();
+  const autopilot = page.getByTestId("slam-autopilot"), idle = await autopilot.textContent();
+  await autopilot.scrollIntoViewIfNeeded();
+  // A click that lands before the lab has hydrated is lost (seen once on a slow CI runner: no lap in 150 s).
+  // The label flips when autopilot is on, so click until it has.
+  await expect(async () => {
+    if ((await autopilot.textContent()) === idle) await autopilot.click();
+    await expect(autopilot).not.toHaveText(idle!, { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
   // One lap on autopilot: the first loop closure pulls the estimate back onto the truth.
   await expect.poll(() => number("slam-closures"), { timeout: 150_000 }).toBeGreaterThan(0);
   await expect.poll(() => number("slam-error"), { timeout: 20_000 }).toBeLessThan(0.5);
