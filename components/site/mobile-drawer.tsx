@@ -31,7 +31,7 @@ export default function MobileDrawer({ locale, links, t, open, onOpenChange }: D
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" initialFocus={titleRef} className="w-[19rem] max-w-[85vw] gap-0 border-rule bg-background/95 p-0 backdrop-blur-xl">
+      <SheetContent side="left" initialFocus={titleRef} className="w-[19rem] max-w-[85vw] gap-0 border-rule bg-background/95 p-0 backdrop-blur-xl duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] data-[side=left]:data-starting-style:-translate-x-full data-[side=left]:data-ending-style:-translate-x-full data-starting-style:opacity-100 data-ending-style:opacity-100 motion-reduce:duration-0">
         <SheetHeader className="border-b border-rule px-5 py-4">
           <SheetTitle ref={titleRef} tabIndex={-1} className="flex items-center gap-2.5 font-mono text-sm font-medium outline-none">
             <KernelMark className="size-4" />
@@ -41,7 +41,7 @@ export default function MobileDrawer({ locale, links, t, open, onOpenChange }: D
         </SheetHeader>
 
         <nav className="flex flex-col gap-0.5 px-2 py-4" aria-label={t.nav.menu}>
-          {all.map((l) => {
+          {all.map((l, i) => {
             const active = l.href === home ? pathname === home : pathname.startsWith(l.href);
             return (
               <Link
@@ -49,8 +49,9 @@ export default function MobileDrawer({ locale, links, t, open, onOpenChange }: D
                 href={l.href}
                 onClick={() => onOpenChange(false)}
                 aria-current={active ? "page" : undefined}
+                style={{ "--i": i } as React.CSSProperties}
                 className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2.5 font-heading text-lg transition-colors",
+                  "drawer-row flex items-center gap-3 rounded-md px-3 py-2.5 font-heading text-lg transition-colors",
                   active ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
                 )}
               >
@@ -61,7 +62,7 @@ export default function MobileDrawer({ locale, links, t, open, onOpenChange }: D
           })}
         </nav>
 
-        <div className="mt-auto grid gap-3 border-t border-rule px-5 py-5">
+        <div className="drawer-row mt-auto grid gap-3 border-t border-rule px-5 py-5" style={{ "--i": all.length + 1 } as React.CSSProperties}>
           <p className="text-sm font-medium">{t.footer.preferences}</p>
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">{t.locale.label}</span>

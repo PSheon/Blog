@@ -209,3 +209,11 @@ and the site's budget is ~0.5 MB a page). Each one has to say something, as in s
 
 Rules: every one of them stands still under `prefers-reduced-motion`; none may move layout (CLS stays 0); do not
 add entrance animations to sections or cards, and do not add a second beam, shimmer or glow to the same screen.
+
+### Added the same week
+
+| Pattern | Where | Code |
+| --- | --- | --- |
+| Bento Grid | the home page's index (`/posts` keeps the ruled list: it is the archive, and a list scans faster) | `components/site/post-bento.tsx`: six columns, newest article 4×2, then 2·2 beside it and rows of 2·2·2 / 3·3; a lone last tile runs full width |
+| Drawer motion | the phone menu | the sheet slides in from the edge on `cubic-bezier(0.22, 1, 0.36, 1)` in 420 ms; rows arrive 55 ms apart (`.drawer-row`) |
+| Page transition | every client navigation | the old page sinks back and blurs out (180 ms), the new one rises 28 px and sharpens (460 ms); header and footer do not move |
