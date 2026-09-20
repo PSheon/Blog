@@ -40,7 +40,16 @@ const en: Dictionary = {
     instrumentTitle: "live · mnist-cnn",
     instrumentHint: "Draw a digit, 0–9",
     instrumentCaption: "A ~9,000-parameter CNN running in your browser. No server, no libraries.",
-    instrumentMore: "How does it work?",
+    instrumentMore: "How does it do that?",
+    stationsLabel: "Choose the model on show",
+    stations: {
+      think: { title: "live · transformer", caption: "A one-layer Transformer, starting from random weights, learning to write six digits backwards. A few seconds in, an anti-diagonal grows on its attention map.", more: "Watch attention grow by itself" },
+      generate: { title: "replay · diffusion", caption: "A cloud of coloured noise settles into an apple, step by step. This replays the diffusion process itself; the real model is in the article, trained by you in the browser.", more: "Go and train one" },
+      act: { title: "live · neuroevolution", caption: "Fifty birds, each with a six-weight brain. Whoever lasts longest breeds the next generation. Nobody teaches them to fly.", more: "See what they learn" },
+    },
+    think: { steps: "Training steps", input: "Problem", output: "The model writes", attention: "Which digit each answer looks at", again: "Learn it again" },
+    generate: { note: "A replay of the diffusion process; no model runs here" },
+    act: { generation: "Generation", alive: "Still flying", best: "Most pipes cleared" },
   },
   home: {
     latest: "Latest",

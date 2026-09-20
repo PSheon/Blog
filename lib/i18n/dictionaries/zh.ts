@@ -40,6 +40,16 @@ const zh = {
     instrumentHint: "在這裡畫一個 0–9 的數字",
     instrumentCaption: "約 9,000 個參數的 CNN，正在你的瀏覽器裡執行。沒有伺服器，沒有函式庫。",
     instrumentMore: "它是怎麼做到的？",
+    stationsLabel: "切換示範的模型",
+    // The hero's four stations: one live model per kind of article. `see` reuses the strings above.
+    stations: {
+      think: { title: "live · transformer", caption: "一層 Transformer，從隨機權重開始，正在學把六個數字倒過來寫。幾秒鐘後，注意力圖上會長出一條反對角線。", more: "看注意力怎麼自己長出來" },
+      generate: { title: "replay · diffusion", caption: "一團彩色雜訊一步一步收成一顆蘋果。這裡重播的是擴散過程本身；真正的模型在文章裡，由你在瀏覽器裡訓練。", more: "去訓練一個" },
+      act: { title: "live · neuroevolution", caption: "五十隻小鳥，各有一顆六個權重的大腦。活最久的生下一代，沒有人教牠們怎麼飛。", more: "看牠們學到了什麼" },
+    },
+    think: { steps: "訓練步數", input: "題目", output: "模型寫的", attention: "每個答案在看哪個數字", again: "再學一次" },
+    generate: { note: "擴散過程的重播，這裡沒有模型在跑" },
+    act: { generation: "第幾代", alive: "還在飛", best: "最多過幾根" },
   },
   home: {
     latest: "最新文章",
