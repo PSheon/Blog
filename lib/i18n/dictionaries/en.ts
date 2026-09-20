@@ -34,7 +34,7 @@ const en: Dictionary = {
       { word: "Act", tag: "ai-agent" },
     ],
     intro:
-      "I'm Paul. I build machines that see and agents that act. This notebook takes models apart in writing — every article ships with instruments you can operate right in the browser, all written from scratch in TypeScript.",
+      "No PyTorch and no inference library: convolution, attention, diffusion and SLAM are written line by line in TypeScript, and they run in the tab you have open. Every number in an article was measured.",
     ctaPrimary: "Read the latest",
     ctaSecondary: "All posts",
     instrumentTitle: "live · mnist-cnn",

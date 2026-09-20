@@ -33,7 +33,7 @@ const zh = {
       { word: "行動", tag: "ai-agent" },
     ],
     intro:
-      "我是 Paul，做會看的機器，也做會行動的代理。這本筆記把模型拆開來寫：每篇文章都附上能在瀏覽器裡直接操作的儀器，全部用 TypeScript 從零寫起。",
+      "沒有 PyTorch，也沒有推論函式庫：卷積、注意力、擴散、SLAM，都用 TypeScript 一行一行寫出來，就跑在你現在開著的這個分頁裡。文章裡的每個數字，都是實際量出來的。",
     ctaPrimary: "讀最新一篇",
     ctaSecondary: "所有文章",
     instrumentTitle: "live · mnist-cnn",
