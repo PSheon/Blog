@@ -551,8 +551,7 @@ test("a city of people runs in the page: the clock moves, the three heads differ
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   const response = await page.goto("/zh/posts/city-of-agents");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "city-of-agents is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(120_000);
   const errors = watchErrors(page);
   await expect(page.locator("[data-instrument]")).toHaveCount(5);

@@ -15,6 +15,8 @@ export const pages = [
   "/en/posts/diffusion-points",
   "/zh/posts/slam-2d",
   "/en/posts/slam-2d",
+  "/zh/posts/city-of-agents",
+  "/en/posts/city-of-agents",
 ];
 
 for (const theme of ["dark", "light"] as const) {

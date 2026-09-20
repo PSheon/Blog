@@ -17,8 +17,8 @@ For whoever picks this up next. Read this, then the memory files under
 | Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
 
 Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
-007 point-cloud diffusion, 008 2D SLAM. In progress elsewhere: 009 city of agents (a draft; `draft: true` shows only in
-`next dev`). A fly-connectome article was written and dropped: real wiring never beat shuffled wiring, and Paul found
+007 point-cloud diffusion, 008 2D SLAM, 009 city of agents. In progress elsewhere: 010 a PCB-flipping VLA (branch
+`feat/pcb-flip-vla`; a draft shows only in `next dev`). A fly-connectome article was written and dropped: real wiring never beat shuffled wiring, and Paul found
 it dull.
 
 ## Waiting on Paul
