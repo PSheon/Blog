@@ -14,7 +14,8 @@ import { ThemeToggle } from "./theme-toggle";
 export interface DrawerProps {
   locale: Locale;
   links: { href: string; label: string }[];
-  t: Pick<Dictionary, "nav" | "locale" | "theme" | "footer">;
+  /** Only what the drawer prints: everything here is serialised into the page for the client. */
+  t: Pick<Dictionary, "nav" | "locale" | "theme"> & { footer: Pick<Dictionary["footer"], "preferences"> };
   open: boolean;
   onOpenChange(open: boolean): void;
 }

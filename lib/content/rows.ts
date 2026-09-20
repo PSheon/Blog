@@ -1,5 +1,5 @@
 import type { IndexRow } from "@/components/site/post-index";
-import { type Locale, formatDate, getDictionary } from "@/lib/i18n";
+import { type Locale, formatDate, getDictionary, localeLabel } from "@/lib/i18n";
 import type { PostMeta } from "./posts";
 
 /** Flatten posts into serialisable rows for the client-side index. */
@@ -15,6 +15,6 @@ export function toRows(posts: PostMeta[], locale: Locale): IndexRow[] {
     minutesLabel: t.post.minutes(p.readingMinutes),
     tags: p.tags,
     interactive: p.interactive,
-    langNote: p.isFallback ? "中文" : undefined,
+    langNote: p.isFallback ? localeLabel.zh : undefined,
   }));
 }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ViewTransition, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { PostCover } from "./post-cover";
 import { EntryNo, InteractiveBadge } from "./post-meta";
 
 export interface IndexRow {
@@ -68,7 +69,7 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
             <li key={row.slug} className="border-b border-rule">
               <Link
                 href={`/${locale}/posts/${row.slug}`}
-                className="group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline"
+                className="group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline lg:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_9rem]"
               >
                 <EntryNo no={row.no} className="text-xs text-signal" />
                 <time dateTime={row.date} className="label">
@@ -91,7 +92,11 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
                     {row.langNote && <span className="text-signal-2">{row.langNote}</span>}
                   </p>
                 </div>
-                <span className="label md:text-right">{row.minutesLabel}</span>
+                <div className="md:text-right lg:self-start">
+                  {/* Each article's drawing, on wide screens only: on a phone the list is already long. */}
+                  <PostCover slug={row.slug} no={row.no} className="mb-2 hidden rounded-sm border border-border bg-panel opacity-80 transition-opacity group-hover:opacity-100 lg:block" />
+                  <span className="label">{row.minutesLabel}</span>
+                </div>
               </Link>
             </li>
           ))}

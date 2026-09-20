@@ -4,8 +4,11 @@ import { notFound } from "next/navigation";
 import { Instrument } from "@/components/lab/instrument";
 import { HeroInstrumentLazy } from "@/components/site/hero-instrument-lazy";
 import { PostIndex } from "@/components/site/post-index";
+import { CornerMarks } from "@/components/lab/corner-marks";
+import { PostCover } from "@/components/site/post-cover";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
+import { SectionHeading } from "@/components/site/section-heading";
 import { TriadRail } from "@/components/site/triad-rail";
 import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
@@ -22,8 +25,14 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   if (!isLocale(locale)) notFound();
   const t = getDictionary(locale);
   const posts = getAllPosts(locale);
-  const featured = posts.find((p) => p.featured) ?? posts[0];
+  // The card under the hero is the newest article. It used to be whichever post carried `featured: true`, which
+  // stayed on № 001 — the same CNN the hero already shows — while six newer articles came out.
   const latest = posts[0];
+  const readouts = [
+    { label: t.home.readouts.posts, value: String(posts.length).padStart(2, "0") },
+    { label: t.home.readouts.interactive, value: String(posts.filter((p) => p.interactive).length).padStart(2, "0") },
+    { label: t.home.readouts.libraries, value: "0" },
+  ];
 
   // What the site is and who writes it, for search engines: the home page had no structured data at all.
   const jsonLd = {
@@ -64,6 +73,17 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               {t.hero.ctaSecondary}
             </Link>
           </div>
+          {/* Three numbers lettered like an instrument's readouts; counted from the posts, not typed in. */}
+          <dl className="order-5 flex gap-8 border-t border-rule pt-5 lg:mt-10 lg:max-w-md">
+            {readouts.map((r, i) => (
+              <div key={r.label} className="flex flex-col-reverse gap-1">
+                <dt className="label">{r.label}</dt>
+                <dd className="font-mono text-2xl leading-none tabular" style={{ color: RAIL_COLORS[i === 2 ? 3 : i] }}>
+                  {r.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
         <div className="relative order-2">
@@ -94,36 +114,41 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         stops={t.hero.topics.map((s, i) => ({ ...s, color: RAIL_COLORS[i], count: posts.filter((p) => p.tags.includes(s.tag)).length }))}
       />
 
-      {featured && (
-        <section aria-labelledby="featured" className="border-t border-rule py-12">
-          <h2 id="featured" className="label mb-6">
-            {t.home.featured}
-          </h2>
-          <Link
-            href={`/${locale}/posts/${featured.slug}`}
-            className="group grid gap-8 md:grid-cols-[minmax(0,1fr)_20rem] md:items-center lg:gap-16"
-          >
-            <div>
-              <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                <EntryNo no={featured.no} className="text-signal" />
-                <time dateTime={featured.date} className="label">
-                  {formatDate(featured.date, locale)}
-                </time>
-                <span className="label">{t.post.minutes(featured.readingMinutes)}</span>
-                {featured.interactive && <InteractiveBadge label={t.post.interactive} />}
-              </p>
-              <h3 className="mt-4 font-heading text-3xl leading-tight font-semibold text-balance decoration-signal decoration-1 underline-offset-[6px] group-hover:underline sm:text-4xl">
-                {featured.title}
-              </h3>
-              <p className="mt-4 max-w-[58ch] font-serif text-lg leading-relaxed text-muted-foreground">
-                {featured.description}
-              </p>
-            </div>
-            {hasPreview(featured.slug) && (
-              <div className="glass-3 rounded-lg p-2.5">
-                <PostPreview slug={featured.slug} />
+      {latest && (
+        <section aria-labelledby="latest" className="border-t border-rule py-12">
+          <SectionHeading id="latest" no="01" label>
+            {t.home.latest}
+          </SectionHeading>
+          <Link href={`/${locale}/posts/${latest.slug}`} className="group relative block">
+            <div className="card-glow" aria-hidden />
+            <CornerMarks />
+            <div className="grid overflow-hidden rounded-md border border-border bg-panel transition-colors group-hover:border-foreground/25 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-cols-[minmax(0,1fr)_30rem]">
+              <div className="p-6 sm:p-8 lg:p-10">
+                <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  <EntryNo no={latest.no} className="text-signal" />
+                  <time dateTime={latest.date} className="label">
+                    {formatDate(latest.date, locale)}
+                  </time>
+                  <span className="label">{t.post.minutes(latest.readingMinutes)}</span>
+                  {latest.interactive && <InteractiveBadge label={t.post.interactive} />}
+                </p>
+                <h3 className="mt-4 font-heading text-3xl leading-tight font-semibold text-balance decoration-signal decoration-1 underline-offset-[6px] group-hover:underline sm:text-4xl">
+                  {latest.title}
+                </h3>
+                <p className="mt-4 max-w-[58ch] font-serif text-lg leading-relaxed text-muted-foreground">{latest.description}</p>
+                <p className="mt-7 inline-flex items-center gap-2 text-sm font-medium text-signal">
+                  {t.post.readMore}
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
+                </p>
               </div>
-            )}
+              {/* The stage is dark in both themes, like the article's own: yellow points vanish on white. */}
+              <div className="dark relative flex items-center border-t border-border bg-[#070918] md:border-t-0 md:border-l">
+                <div className="dot-grid absolute inset-0 opacity-60" aria-hidden />
+                <div className="relative w-full p-4">
+                  {hasPreview(latest.slug) ? <PostPreview slug={latest.slug} /> : <PostCover slug={latest.slug} no={latest.no} />}
+                </div>
+              </div>
+            </div>
           </Link>
         </section>
       )}
@@ -131,9 +156,9 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
       <section aria-labelledby="index" className="border-t border-rule py-12">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h2 id="index" className="font-heading text-2xl font-semibold">
+            <SectionHeading id="index" no="02">
               {t.home.index}
-            </h2>
+            </SectionHeading>
             <p className="mt-1 text-sm text-muted-foreground">{t.home.indexLead}</p>
           </div>
           <Link href={`/${locale}/posts`} className="text-sm text-signal underline-offset-4 hover:underline">
@@ -152,9 +177,9 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
       <section aria-labelledby="about" className="border-t border-rule py-12">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           <div>
-            <h2 id="about" className="font-heading text-2xl font-semibold">
+            <SectionHeading id="about" no="03">
               {t.about.strip}
-            </h2>
+            </SectionHeading>
             <p className="mt-4 font-serif text-lg leading-relaxed text-muted-foreground">{t.about.bio}</p>
             <p className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
               <a href={site.github} target="_blank" rel="me noreferrer" className="text-signal underline-offset-4 hover:underline">
@@ -163,9 +188,16 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </p>
           </div>
           <dl className="grid gap-x-10 gap-y-6 sm:grid-cols-2">
-            {t.about.focus.map((f) => (
-              <div key={f.key} className="border-t border-rule pt-3">
-                <dt className="font-medium">{f.title}</dt>
+            {t.about.focus.map((f, i) => (
+              <div key={f.key} className="relative border-t border-rule pt-3">
+                {/* A short length of the rail's gradient on each rule: the four fields sit along the same see → act path. */}
+                <span className="absolute -top-px left-0 h-px w-10" style={{ background: RAIL_COLORS[i % RAIL_COLORS.length] }} aria-hidden />
+                <dt className="flex items-baseline justify-between gap-3 font-medium">
+                  {f.title}
+                  <span className="label" aria-hidden>
+                    {f.key}
+                  </span>
+                </dt>
                 <dd className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{f.body}</dd>
               </div>
             ))}

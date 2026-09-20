@@ -141,6 +141,16 @@ test("a URL that matches nothing gets the site's own 404, not the framework's", 
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
 });
 
+test("URLs outside both locales get the site's own 404 too, styled and themed", async ({ page }) => {
+  for (const url of ["/no-such-page", "/no-such/page/at-all"]) {
+    const response = await page.goto(url);
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+    // The framework's fallback is black on white; ours carries the stylesheet and the default dark theme.
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(7, 9, 24)");
+  }
+});
+
 test("the home page describes the blog to search engines and has an icon iOS can use", async ({ page }) => {
   await page.goto("/en");
   const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').first().textContent())!);

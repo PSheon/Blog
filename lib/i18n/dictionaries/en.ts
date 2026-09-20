@@ -6,7 +6,7 @@ const en: Dictionary = {
     description:
       "Paul's lab notebook: machine learning models built from scratch that you can train, take apart and break in your browser. Computer vision, reinforcement learning, Transformers, diffusion and robots.",
   },
-  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home" },
+  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content" },
   search: {
     open: "Search",
     placeholder: "Search the full text: try “pooling” or “mutation”…",
@@ -43,7 +43,8 @@ const en: Dictionary = {
     instrumentMore: "How does it work?",
   },
   home: {
-    featured: "Featured",
+    latest: "Latest",
+    readouts: { posts: "articles", interactive: "you can play with", libraries: "ML libraries" },
     topics: "Browse by theme: see, think, generate, act",
     index: "Notebook index",
     indexLead: "Newest first.",
@@ -57,6 +58,8 @@ const en: Dictionary = {
     minutes: (n: number) => `${n} min`,
     published: "Published",
     updated: "Updated",
+    readingTime: "Reading time",
+    mathLabel: "Equation, scrolls sideways",
     toc: "On this page",
     backToTop: "Back to top",
     fallback: "This article is only available in 中文 for now.",

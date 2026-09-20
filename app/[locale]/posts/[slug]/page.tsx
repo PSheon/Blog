@@ -82,7 +82,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
   return (
     <>
       <ReadingProgress />
-      <ScrollableMath label={locale === "zh" ? "數學式，可左右捲動" : "Equation, scrolls sideways"} />
+      <ScrollableMath label={t.post.mathLabel} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
@@ -124,7 +124,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
                 </div>
               )}
               <div>
-                <dt className="text-muted-foreground">{locale === "zh" ? "閱讀時間" : "Reading time"}</dt>
+                <dt className="text-muted-foreground">{t.post.readingTime}</dt>
                 <dd className="mt-0.5">{t.post.minutes(post.readingMinutes)}</dd>
               </div>
             </dl>

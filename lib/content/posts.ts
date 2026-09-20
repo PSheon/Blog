@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
+import { cache } from "react";
 import { type Locale, locales } from "@/lib/i18n/config";
 import { readingMinutes } from "./reading-time";
 import { type Frontmatter, frontmatterSchema } from "./schema";
@@ -31,7 +32,15 @@ function available(dir: string, slug: string): Locale[] {
   return locales.filter((l) => fs.existsSync(path.join(/*turbopackIgnore: true*/ dir, slug, `${l}.mdx`)));
 }
 
-function load(dir: string, slug: string, locale: Locale): Loaded | null {
+/**
+ * One render asks for the same posts many times over (the layout's tags, the page's list, adjacent and related
+ * posts, metadata and the page both wanting the same article). React's `cache` makes each file one read and one
+ * parse per render; the arguments are primitives, so every caller shares the entry. Outside a render (tests,
+ * route handlers) it simply calls through.
+ */
+const load = cache(loadUncached);
+
+function loadUncached(dir: string, slug: string, locale: Locale): Loaded | null {
   const availableLocales = available(dir, slug);
   // A post exists only once its zh source does.
   if (!availableLocales.includes("zh")) return null;
