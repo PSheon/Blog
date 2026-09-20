@@ -120,3 +120,170 @@ scale: 84 % unperturbed, and the failure table the article is about is already t
 is ten minutes on a laptop GPU with a first-draft backend. 4. MuJoCo edge-grasp spike: not done; it does not block.
 Nothing in the plan has to change except two parameters, recorded in `params.ts` (grasp window, 1 % default slip) and one
 addition (a proprioception token).
+
+## Stage 1, first pass — four recipes, and what was wrong with the set-up (`main-table.test.ts.txt`, `pipeline.sh`)
+
+Evaluation is now batched: 64 worlds step together in node and the checkpoint answers on MPS; 300 episodes × 6
+conditions take about 160 s. **Rates from here on are over the episodes that need something done** (249 of 300); the
+"nothing-to-do" instructions are counted separately — every model left all 51 alone. By that count the stage-0 BC model
+is 71.5 %, not 84 %: the earlier figure was 100 episodes and included the ones where doing nothing is right.
+
+All recipes train in the same world (default 1 % slip, nobody interfering), so every disturbance is unseen by all of them.
+DAgger: five rounds of 500 fresh episodes, β = 0.5, 0.3, 0.2, 0.1, 0, each round fine-tuned from the last.
+
+```
+bc [154 s]
+  nothing: 71.5% (178/249, 30 steps; nothing-to-do 51/51)
+  slip 1 %: 62.7% (156/249, 30 steps; nothing-to-do 51/51)
+  one shove: 3.6% (9/249, 53 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 1.6% (4/249, 53 steps; nothing-to-do 51/51)
+  board turned back: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+  camera 5° off: 24.9% (62/249, 30 steps; nothing-to-do 51/51)
+dart [173 s]
+  nothing: 34.1% (85/249, 26 steps; nothing-to-do 51/51)
+  slip 1 %: 30.9% (77/249, 26 steps; nothing-to-do 51/51)
+  one shove: 0.4% (1/249, 31 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 0.4% (1/249, 31 steps; nothing-to-do 51/51)
+  board turned back: 0.4% (1/249, 79 steps; nothing-to-do 51/51)
+  camera 5° off: 3.6% (9/249, 33 steps; nothing-to-do 51/51)
+dagger [161 s]
+  nothing: 60.6% (151/249, 42 steps; nothing-to-do 51/51)
+  slip 1 %: 55.8% (139/249, 43 steps; nothing-to-do 51/51)
+  one shove: 47.8% (119/249, 58 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 27.3% (68/249, 55 steps; nothing-to-do 51/51)
+  board turned back: 2.8% (7/249, 58 steps; nothing-to-do 51/51)
+  camera 5° off: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+bc+camrand [166 s]
+  nothing: 36.5% (91/249, 30 steps; nothing-to-do 51/51)
+  slip 1 %: 32.1% (80/249, 30 steps; nothing-to-do 51/51)
+  one shove: 1.2% (3/249, 48 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 0.8% (2/249, 48 steps; nothing-to-do 51/51)
+  board turned back: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+  camera 5° off: 35.3% (88/249, 30 steps; nothing-to-do 51/51)
+dagger+camrand [178 s]
+  nothing: 29.7% (74/249, 45 steps; nothing-to-do 51/51)
+  slip 1 %: 26.1% (65/249, 46 steps; nothing-to-do 51/51)
+  one shove: 22.5% (56/249, 57 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 13.3% (33/249, 57 steps; nothing-to-do 51/51)
+  board turned back: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+  camera 5° off: 31.7% (79/249, 50 steps; nothing-to-do 51/51)
+```
+
+Success while collecting, by DAgger round (first five lines: plain; last five: with the camera randomised):
+
+```
+round: 500 episodes, 12816 frames, success on real tasks while collecting 97.6%
+round: 500 episodes, 14307 frames, success on real tasks while collecting 95.1%
+round: 500 episodes, 14383 frames, success on real tasks while collecting 94.7%
+round: 500 episodes, 16436 frames, success on real tasks while collecting 91.8%
+round: 500 episodes, 17282 frames, success on real tasks while collecting 84.3%
+round: 500 episodes, 12722 frames, success on real tasks while collecting 98.7%
+round: 500 episodes, 14857 frames, success on real tasks while collecting 93.1%
+round: 500 episodes, 15883 frames, success on real tasks while collecting 91.4%
+round: 500 episodes, 23622 frames, success on real tasks while collecting 60.4%
+round: 500 episodes, 29560 frames, success on real tasks while collecting 18.9%
+```
+
+What this pass showed:
+
+- **The effect the article is about is there.** One shove: BC 3.6 % → DAgger 47.8 %. Shove and 5 % slip: 1.6 % → 27.3 %.
+- **DART with σ = 0.15 (2.4 bins) was simply too much noise**: trajectories doubled in length (57 steps on average) and
+  the model got worse at everything. Retry at 0.05.
+- **Fine-tuning round after round drifts.** The round-4 model scored 84.3 % while collecting round 5 under the very
+  condition ("slip 1 %") where the round-5 model then scored 55.8 %. With the camera randomised the last two rounds
+  collapsed (60 %, 19 %). The shipped model should be trained once, from scratch, on the aggregate.
+- **"Board turned back" was 0–3 % for everyone, and that was the world's fault, not the models'.** After a flip the wrist
+  rests at roll = π, and every episode had started at roll = 0, so a model back at home saw joints it had never started
+  from. The start now draws the roll from 0, ±π. The condition also gets a fresh 80 steps once the board is turned, since
+  it asks for the job twice.
+- **Camera randomisation costs a lot with 2 000 demonstrations**: 36.5 % unperturbed for 35.3 % with the camera 5° off
+  (BC: 71.5 % / 24.9 %). It does make the two numbers equal, which is what it is for; it needs more data to make them high.
+- DAgger without camera randomisation is *worse* than BC when the camera moves (0 % vs 24.9 %): it has learned to lean
+  harder on exactly the pixels that moved. Worth a sentence in the article if it survives the second pass.
+
+Second pass (running): start roll randomised, 4 000 demonstrations and 4 000 steps for the expert-data recipes, DART at
+σ = 0.05, DAgger's final model retrained from scratch on the aggregate for 5 000 steps.
+
+## Stage 1, second pass — the table the article will be written from
+
+Changes from the first pass: the wrist starts at 0 or ±π; "board turned back" gets a fresh 80 steps; 4 000 demonstrations
+and 4 000 steps for the expert-data recipes; DART at σ = 0.05; DAgger's shipped model trained once from scratch on the
+aggregate (4 000 demonstrations + five rounds of 500 episodes) for 5 000 steps. The expert in the new world
+(`expert-probe`, 1000 seeds): 
+
+```
+slip 0: success 100.0%, mean steps 24.6, lost 0, timeout 0, events {"g
+slip 0.01: success 100.0%, mean steps 24.9, lost 0, timeout 0, events 
+slip 0.02: success 100.0%, mean steps 25.5, lost 0, timeout 0, events 
+slip 0.05: success 99.0%, mean steps 27.7, lost 0, timeout 10, events 
+slip 0.1: success 88.2%, mean steps 31.6, lost 0, timeout 118, events
+```
+
+```
+bc [172 s]
+  nothing: 35.7% (89/249, 30 steps; nothing-to-do 51/51)
+  slip 1 %: 32.5% (81/249, 30 steps; nothing-to-do 51/51)
+  one shove: 7.6% (19/249, 64 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 5.2% (13/249, 64 steps; nothing-to-do 51/51)
+  board turned back: 7.6% (19/249, 61 steps; nothing-to-do 51/51)
+  camera 5° off: 14.1% (35/249, 36 steps; nothing-to-do 51/51)
+dart [177 s]
+  nothing: 31.7% (79/249, 30 steps; nothing-to-do 51/51)
+  slip 1 %: 28.5% (71/249, 31 steps; nothing-to-do 51/51)
+  one shove: 6.4% (16/249, 64 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 4.0% (10/249, 64 steps; nothing-to-do 51/51)
+  board turned back: 2.4% (6/249, 62 steps; nothing-to-do 51/51)
+  camera 5° off: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+dagger [160 s]
+  nothing: 82.7% (206/249, 41 steps; nothing-to-do 51/51)
+  slip 1 %: 79.1% (197/249, 43 steps; nothing-to-do 51/51)
+  one shove: 53.4% (133/249, 58 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 32.9% (82/249, 60 steps; nothing-to-do 51/51)
+  board turned back: 61.4% (153/249, 49 steps; nothing-to-do 51/51)
+  camera 5° off: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+bc+camrand [173 s]
+  nothing: 26.1% (65/249, 30 steps; nothing-to-do 51/51)
+  slip 1 %: 24.1% (60/249, 30 steps; nothing-to-do 51/51)
+  one shove: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+  board turned back: 0.4% (1/249, 62 steps; nothing-to-do 51/51)
+  camera 5° off: 26.5% (66/249, 30 steps; nothing-to-do 51/51)
+dagger+camrand [171 s]
+  nothing: 31.3% (78/249, 37 steps; nothing-to-do 51/51)
+  slip 1 %: 28.5% (71/249, 38 steps; nothing-to-do 51/51)
+  one shove: 19.7% (49/249, 48 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 13.3% (33/249, 48 steps; nothing-to-do 51/51)
+  board turned back: 4.8% (12/249, 43 steps; nothing-to-do 51/51)
+  camera 5° off: 28.1% (70/249, 40 steps; nothing-to-do 51/51)
+```
+
+Success while collecting, by round (fine-tuned models; first five plain, last five with the camera randomised):
+
+```
+round: 500 episodes, 13000 frames, success on real tasks while collecting 99.7%
+round: 500 episodes, 15207 frames, success on real tasks while collecting 96.8%
+round: 500 episodes, 16844 frames, success on real tasks while collecting 93.4%
+round: 500 episodes, 18947 frames, success on real tasks while collecting 85.5%
+round: 500 episodes, 25025 frames, success on real tasks while collecting 43.5%
+round: 500 episodes, 13037 frames, success on real tasks while collecting 100.0%
+round: 500 episodes, 15566 frames, success on real tasks while collecting 96.8%
+round: 500 episodes, 18493 frames, success on real tasks while collecting 84.6%
+round: 500 episodes, 30090 frames, success on real tasks while collecting 23.2%
+round: 500 episodes, 29895 frames, success on real tasks while collecting 16.2%
+```
+
+- **DAgger against BC, with nobody interfering: 82.7 % against 35.7 %.** Shoved: 53.4 % against 7.6 %. Board turned back:
+  61.4 % against 7.6 %. Same architecture, same number of parameters, same training world.
+- **BC got worse than in the first pass (71.5 % → 35.7 %) although it has twice the data.** The world got harder: the wrist
+  now starts any of three ways up, so the approach has three variants. BC's typical failure is unchanged — it closes a
+  little off, misses, and has never seen "gripper shut on nothing". This is compounding error with no one pushing.
+- **DART did nothing here (31.7 %), at either noise level.** Noise on the joints teaches "drifted → steer back", but the
+  expert re-aims before it closes, so DART data still contains no missed grasp and no empty closed gripper — the states
+  BC actually dies in. DAgger's data has them because the model puts itself there. That contrast is worth a paragraph.
+- **Fine-tuning round after round still drifts** (43.5 % and 16.2 % in the last rounds); training once on the aggregate does
+  not (82.7 %). The rounds are for collecting states, not for producing the model.
+- **The camera.** DAgger goes from 82.7 % to 0 % when the camera is 5° off. The camera-randomised recipes are flat across
+  that shift (26 % / 27 % and 31 % / 28 %) but low: with this much data and this small a model, invariance is bought with
+  most of the accuracy. A 12 000-step run on the same aggregate is in progress to see whether it is data or training time.
+- Shipped for now: `public/vla/bc-v2`, `dart-v2`, `dagger-v2` (1.91 MB each, f32). `tests/vla/policy.test.ts` holds the
+  TypeScript forward pass to PyTorch's logits (< 2e-3) and tokens on five moments of expert episodes.

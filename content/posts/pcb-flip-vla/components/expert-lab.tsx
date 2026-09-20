@@ -10,7 +10,7 @@ import { Param } from "./param";
 import { BIG, type Driver, type Reply, type Request } from "./protocol";
 import { PARAMS, sentence } from "./sim";
 
-const CHECKPOINT = "bc-v1";
+const CHECKPOINTS = ["bc-v2", "dart-v2", "dagger-v2"] as const;
 
 function paint(canvas: HTMLCanvasElement | null, bytes: Uint8Array, size: number) {
   const context = canvas?.getContext("2d");
@@ -27,7 +27,7 @@ function paint(canvas: HTMLCanvasElement | null, bytes: Uint8Array, size: number
 export function ExpertLab() {
   const t = useLabels(), reduced = useReducedMotion(), english = t.play === "Play";
   const big = useRef<HTMLCanvasElement>(null), eye = useRef<HTMLCanvasElement>(null), root = useRef<HTMLDivElement>(null), worker = useRef<Worker | null>(null);
-  const [playing, setPlaying] = useState<boolean | null>(null), [slip, setSlip] = useState<number>(PARAMS.slip), [tilt, setTilt] = useState(false), [driver, setDriver] = useState<Driver>("expert");
+  const [playing, setPlaying] = useState<boolean | null>(null), [slip, setSlip] = useState<number>(PARAMS.slip), [tilt, setTilt] = useState(false), [driver, setDriver] = useState<Driver>("expert"), [checkpoint, setCheckpoint] = useState<string>("");
   const [loading, setLoading] = useState(false), [frame, setFrame] = useState<Extract<Reply, { type: "frame" }> | null>(null), [visible, setVisible] = useState(true);
   const running = playing ?? !reduced, send = (request: Request) => worker.current?.postMessage(request);
 
@@ -58,11 +58,13 @@ export function ExpertLab() {
       </div>
       <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.who}>
         <span className="label mr-1">{t.who}</span>
-        {(["expert", "model"] as const).map((d) => (
-          <Button key={d} size="sm" variant={d === driver ? "secondary" : "ghost"} aria-pressed={d === driver} className="h-auto min-h-7 whitespace-normal py-1 text-left" onClick={() => { setDriver(d); send({ type: "driver", driver: d, checkpoint: CHECKPOINT }); }} data-testid={`vla-driver-${d}`}>{t[d]}</Button>
+        <Button size="sm" variant={driver === "expert" ? "secondary" : "ghost"} aria-pressed={driver === "expert"} onClick={() => { setDriver("expert"); setCheckpoint(""); send({ type: "driver", driver: "expert", checkpoint: "" }); }} data-testid="vla-driver-expert">{t.expert}</Button>
+        {CHECKPOINTS.map((name) => (
+          <Button key={name} size="sm" variant={checkpoint === name ? "secondary" : "ghost"} aria-pressed={checkpoint === name} className="h-auto min-h-7 whitespace-normal py-1 text-left" onClick={() => { setDriver("model"); setCheckpoint(name); send({ type: "driver", driver: "model", checkpoint: name }); }} data-testid={`vla-driver-${name}`}>{t.models[name]}</Button>
         ))}
         {loading && <span className="label" role="status">{t.loading}</span>}
       </div>
+      <p className="label">{t.modelNote}</p>
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
         <Readout label={t.instruction} value={<span className="font-sans text-base" data-testid="vla-instruction">{frame ? sentence(frame.words, english) : "…"}</span>} tone="plain" />
         <Readout label={driver === "model" ? t.wouldDo : t.state} value={<span className="font-sans text-base">{frame ? t.states[frame.expertState] : "…"}</span>} />

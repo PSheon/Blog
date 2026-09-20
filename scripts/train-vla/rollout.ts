@@ -102,6 +102,6 @@ export const LEVELS: { name: string; options: Partial<RolloutOptions> }[] = [
   { name: "slip 1 %", options: {} },
   { name: "one shove", options: { slip: 0, disturb: (w, step) => { if (step === 10) w.shoveArm(); } } },
   { name: "shove + slip 5 %", options: { slip: 0.05, disturb: (w, step) => { if (step === 10) w.shoveArm(); } } },
-  { name: "board turned back", options: { slip: 0, afterSuccess: (w) => w.turnBoard(w.task.nest) } },
+  { name: "board turned back", options: { slip: 0, afterSuccess: (w) => { w.turnBoard(w.task.nest); w.t = 0; } } },
   { name: "camera 5° off", options: { slip: 0, camera: () => ({ ...NO_SHIFT, yaw: (5 * Math.PI) / 180 }) } },
 ];

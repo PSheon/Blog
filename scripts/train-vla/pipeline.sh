@@ -7,12 +7,12 @@ collect() { cp $R/export-bc.test.ts.txt $T/export-bc.test.ts; env "$@" pnpm exec
 train() { (cd scripts/train-vla && uv run --with torch --with numpy python train.py "$@" 2>&1 | grep -E "parameters|^step") ; }
 round() { cp $R/dagger-round.test.ts.txt $T/dagger-round.test.ts; env "$@" pnpm exec vitest run $T/dagger-round.test.ts --disable-console-intercept 2>&1 | grep -E "^round|Error"; rm -f $T/dagger-round.test.ts; }
 
-[ -d "$W/bc" ]   || collect VLA_OUT="$W/bc" VLA_N=2000
-[ -d "$W/dart" ] || collect VLA_OUT="$W/dart" VLA_N=2000 VLA_MODE=dart VLA_NOISE=0.15
-[ -d "$W/bc-cam" ] || collect VLA_OUT="$W/bc-cam" VLA_N=2000 VLA_CAMRAND=1
-[ -f "$W/run-bc/model.pt" ]   || train --data "$W/bc" --out "$W/run-bc" --steps 3000
-[ -f "$W/run-dart/model.pt" ] || train --data "$W/dart" --out "$W/run-dart" --steps 3000
-[ -f "$W/run-bc-cam/model.pt" ] || train --data "$W/bc-cam" --out "$W/run-bc-cam" --steps 3000
+[ -d "$W/bc" ]   || collect VLA_OUT="$W/bc" VLA_N=4000
+[ -d "$W/dart" ] || collect VLA_OUT="$W/dart" VLA_N=4000 VLA_MODE=dart VLA_NOISE=0.05
+[ -d "$W/bc-cam" ] || collect VLA_OUT="$W/bc-cam" VLA_N=4000 VLA_CAMRAND=1
+[ -f "$W/run-bc/model.pt" ]   || train --data "$W/bc" --out "$W/run-bc" --steps 4000
+[ -f "$W/run-dart/model.pt" ] || train --data "$W/dart" --out "$W/run-dart" --steps 4000
+[ -f "$W/run-bc-cam/model.pt" ] || train --data "$W/bc-cam" --out "$W/run-bc-cam" --steps 4000
 
 # DAgger: five rounds of 500 episodes on fresh seeds; each round's data joins all the earlier data and training carries on.
 dagger() { name="$1"; base="$2"; cam="$3"; prev="$W/run-$base/model.pt"; data="$W/$base"; k=1
@@ -21,6 +21,8 @@ dagger() { name="$1"; base="$2"; cam="$3"; prev="$W/run-$base/model.pt"; data="$
     data="$data,$W/$name-r$k"
     [ -f "$W/run-$name-r$k/model.pt" ] || train --data "$data" --out "$W/run-$name-r$k" --init "$prev" --steps 1500 --lr 5e-4
     prev="$W/run-$name-r$k/model.pt"; k=$((k + 1))
-  done; }
+  done
+  # Round after round of fine-tuning drifts (round 5 was worse than round 4 the first time): the model that ships is trained once, from scratch, on everything.
+  [ -f "$W/run-$name/model.pt" ] || train --data "$data" --out "$W/run-$name" --steps 5000; }
 dagger dagger bc ""
 dagger dagger-cam bc-cam VLA_CAMRAND=1

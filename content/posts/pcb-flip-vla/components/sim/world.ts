@@ -39,7 +39,10 @@ export class World {
     const nest = rng() < 0.5 ? 0 : 1, already = rng() < PARAMS.noopShare, named = already || rng() < 0.5;
     this.task = { nest, side: named ? (already ? this.boards[nest].up : !this.boards[nest].up) : null };
     this.wanted = named ? (this.task.side as boolean) : !this.boards[nest].up;
-    this.q = clampJoints([PARAMS.home[0] + spread(0.15), PARAMS.home[1] + spread(0.1), PARAMS.home[2] + spread(0.1), 0]);
+    // The wrist starts level either way up. After a flip it rests half a turn round, and the next job begins from there:
+    // a model that had only ever started at 0 froze when a finished board was turned back (RESULTS.md, stage 1).
+    const roll = [0, Math.PI, -Math.PI][Math.floor(rng() * 3)];
+    this.q = clampJoints([PARAMS.home[0] + spread(0.15), PARAMS.home[1] + spread(0.1), PARAMS.home[2] + spread(0.1), roll]);
   }
 
   /** The side the target board has to end with up ("turn it over" is fixed at the start). */
