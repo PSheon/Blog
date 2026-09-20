@@ -7,7 +7,8 @@ import { FlappyWorld, WORLD } from "@/content/posts/ai-flappy-bird/components/wo
 
 /**
  * "Act": article 002's flock. Fifty birds with random 2-2-1 brains; the ones that last longest breed the next
- * generation. Runs at three ticks a frame so that a reader sees a few generations die before the first one flies.
+ * generation. Runs at two and a half times the article's normal speed, by the clock, so that a reader sees a few generations die
+ * before the first one flies.
  */
 export default function HeroAct({ t }: { t: { generation: string; alive: string; best: string } }) {
   const canvas = useRef<HTMLCanvasElement>(null), still = useReducedMotion();
@@ -17,10 +18,16 @@ export default function HeroAct({ t }: { t: { generation: string; alive: string;
     const el = canvas.current, ctx = el?.getContext("2d");
     if (!el || !ctx) return;
     const world = new FlappyWorld(), palette = readPalette(el);
-    let frame = 0, n = 0;
-    const loop = () => {
+    // By the clock, not by the frame: three ticks a frame was 180 a second on a 60 Hz screen and 360 on a 120 Hz one,
+    // which is where it looked frantic. 150 a second everywhere: a generation of beginners still dies in a second or
+    // two, and a bird that has learned can be followed by eye.
+    const TICKS_PER_SECOND = 150;
+    let frame = 0, n = 0, last = 0, owed = 0;
+    const loop = (now: number) => {
       frame = requestAnimationFrame(loop);
-      for (let i = 0; i < 3; i++) world.step();
+      owed += Math.min(0.1, last ? (now - last) / 1000 : 0) * TICKS_PER_SECOND;
+      last = now;
+      for (; owed >= 1; owed--) world.step();
       const dpr = Math.min(2, window.devicePixelRatio || 1), w = Math.round(el.clientWidth * dpr), h = Math.round(el.clientHeight * dpr);
       if (el.width !== w || el.height !== h) { el.width = w; el.height = h; }
       draw(ctx, world, palette, w / WORLD.width);
