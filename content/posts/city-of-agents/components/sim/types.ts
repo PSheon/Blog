@@ -61,6 +61,10 @@ export type SimEvent = {
   from: number;
   /** The person's four needs at this moment, so a replay can draw the bars without re-simulating. */
   needs: Needs;
+  /** For `departed`: where the walk starts, and the pavement node the route starts from, so a replay can redraw the walk. */
+  x?: number;
+  y?: number;
+  node?: number;
   /** For `config`: the settings from here on. */
   mode?: Mode;
   duty?: boolean;

@@ -168,7 +168,7 @@ export class World {
     waypoints.push(spotAt(place, a.id)); nodes.push(-1);
     const from = a.place;
     a.state = "traveling"; a.action = action; a.goal = goal; a.place = -1; a.waypoints = waypoints; a.nodes = nodes; a.leg = 0;
-    this.emit({ t: this.t, type: "departed", agent: a.id, action, place: goal, from, needs: [...a.needs] as Needs });
+    this.emit({ t: this.t, type: "departed", agent: a.id, action, place: goal, from, needs: [...a.needs] as Needs, x: here[0], y: here[1], node: start });
   }
 
   private arrive(a: Agent): void {
