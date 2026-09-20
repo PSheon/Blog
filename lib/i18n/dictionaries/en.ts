@@ -6,7 +6,7 @@ const en: Dictionary = {
     description:
       "Paul's lab notebook: machine learning models built from scratch that you can train, take apart and break in your browser. Computer vision, reinforcement learning, Transformers, diffusion and robots.",
   },
-  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content" },
+  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content", close: "Close menu", loading: "Loading page" },
   search: {
     open: "Search",
     placeholder: "Search the full text: try “pooling” or “mutation”…",

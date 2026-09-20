@@ -64,7 +64,7 @@ function Wheels({ laps, drift, setDrift }: { laps: Laps; drift: number; setDrift
 
   return (
     <div ref={root} className="grid gap-4 text-sm">
-      <canvas ref={view} className="aspect-[16/10] w-full rounded-md border border-border text-foreground" />
+      <canvas role="img" aria-label={t.picWheels} ref={view} className="aspect-[16/10] w-full rounded-md border border-border text-foreground" />
       <p className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
         <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded bg-foreground" />{t.truePath}</span>
         <span className="flex items-center gap-1.5"><span className="inline-block h-0.5 w-4 rounded" style={{ background: PINK }} />{t.wheelPath}</span>

@@ -114,7 +114,7 @@ export function DriveLab() {
   return (
     <div ref={root} className="grid gap-4 text-sm">
       <div className="relative">
-        <canvas ref={stage} className="aspect-[3/4] w-full rounded-md border border-border text-foreground sm:aspect-[2/1]" />
+        <canvas role="img" aria-label={t.picDrive} ref={stage} className="aspect-[3/4] w-full rounded-md border border-border text-foreground sm:aspect-[2/1]" />
         <div ref={glow} className="pointer-events-none absolute right-0 bottom-0 h-[calc(50%-5px)] w-full rounded-md opacity-0 sm:h-full sm:w-[calc(50%-5px)]" style={{ background: VIOLET }} aria-hidden />
         {seen.keyframes >= MAX_KEYFRAMES && (
           <div className="absolute inset-0 grid place-items-center rounded-md bg-background/70 backdrop-blur-sm" role="status">

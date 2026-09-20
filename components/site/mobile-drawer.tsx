@@ -39,7 +39,7 @@ export default function MobileDrawer({ locale, links, t, open, onOpenChange }: D
 
   return (
     <Sheet open={shown} onOpenChange={onOpenChange}>
-      <SheetContent side="left" initialFocus={titleRef} className="w-[19rem] max-w-[85vw] gap-0 border-rule bg-background/95 p-0 backdrop-blur-xl duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] data-[side=left]:data-starting-style:-translate-x-full data-[side=left]:data-ending-style:-translate-x-full data-starting-style:opacity-100 data-ending-style:opacity-100 motion-reduce:duration-0">
+      <SheetContent side="left" closeLabel={t.nav.close} initialFocus={titleRef} className="w-[19rem] max-w-[85vw] gap-0 border-rule bg-background/95 p-0 backdrop-blur-xl duration-[420ms] ease-[cubic-bezier(0.22,1,0.36,1)] data-[side=left]:data-starting-style:-translate-x-full data-[side=left]:data-ending-style:-translate-x-full data-starting-style:opacity-100 data-ending-style:opacity-100 motion-reduce:duration-0">
         <SheetHeader className="border-b border-rule px-5 py-4">
           <SheetTitle ref={titleRef} tabIndex={-1} className="flex items-center gap-2.5 font-mono text-sm font-medium outline-none">
             <KernelMark className="size-4" />

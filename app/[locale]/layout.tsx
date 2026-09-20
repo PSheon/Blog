@@ -84,7 +84,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
         {/* Real-visitor numbers: page views without cookies, and Core Web Vitals from actual devices. Their scripts
             are served by Vercel itself (/_vercel/…), so anywhere else they would only 404 into the console. Both
             also have to be switched on once in the project's dashboard. */}
-        <NavProgress label={locale === "zh" ? "頁面載入中" : "Loading page"} />
+        <NavProgress label={t.nav.loading} />
         <ServiceWorker enabled={SERVICE_WORKER} />
         <Spotlight />
         <InstallHint text={t.install.hint} action={t.install.action} dismiss={t.install.dismiss} />

@@ -168,6 +168,45 @@ function Diffusion() {
   );
 }
 
+/**
+ * A lap of a corridor: the walls as lidar points, the wheels' own idea of the lap drifting open (pink), the
+ * corrected one as a chain of poses (cyan), and the loop closure that pulls the ends together (violet).
+ */
+function Slam() {
+  const rand = rng(8);
+  // Walls: points along an outer and an inner rectangle, a little noisy, like a scan.
+  const walls: [number, number][] = [];
+  const box = (x0: number, y0: number, x1: number, y1: number, step: number) => {
+    for (let x = x0; x <= x1; x += step) walls.push([x, y0], [x, y1]);
+    for (let y = y0 + step; y < y1; y += step) walls.push([x0, y], [x1, y]);
+  };
+  box(22, 10, 138, 90, 5.8);
+  box(50, 34, 110, 66, 5.8);
+  // The true lap runs between the two; poses sit on it at even steps.
+  const lap = (t: number): [number, number] => {
+    // A superellipse: a rectangle with generous corners, which is what a car's lap of a corridor looks like.
+    const a = t * Math.PI * 2 + Math.PI * 0.75, c = Math.cos(a), s = Math.sin(a);
+    return [80 + 44 * Math.sign(c) * Math.abs(c) ** 0.45, 50 + 28 * Math.sign(s) * Math.abs(s) ** 0.45];
+  };
+  const poses = Array.from({ length: 18 }, (_, i) => lap(i / 18));
+  // Dead reckoning: the same lap with an error that grows with distance, so it ends beside its start.
+  const drift = Array.from({ length: 41 }, (_, i) => {
+    const t = i / 40, [x, y] = lap(t);
+    return `${r1(x + t * t * 17)} ${r1(y + t * t * 12 - t * 3)}`;
+  });
+  const [ex, ey] = drift[40].split(" ").map(Number);
+  return (
+    <>
+      {walls.map(([x, y], i) => <circle key={i} cx={r1(x + (rand() - 0.5) * 1.4)} cy={r1(y + (rand() - 0.5) * 1.4)} r={0.95} fill={DIM} />)}
+      <path d={`M${drift.join(" L")}`} fill="none" stroke={S2} strokeWidth={1.2} strokeDasharray="2.5 2.5" opacity={0.85} />
+      <path d={`M${poses.map(([x, y]) => `${r1(x)} ${r1(y)}`).join(" L")} Z`} fill="none" stroke={S} strokeWidth={1.3} />
+      {poses.map(([x, y], i) => <circle key={i} cx={r1(x)} cy={r1(y)} r={i === 0 ? 3 : 1.9} fill={S} />)}
+      <path d={`M${ex} ${ey} L${r1(poses[0][0])} ${r1(poses[0][1])}`} stroke={S3} strokeWidth={1.6} />
+      <circle cx={ex} cy={ey} r={2.6} fill={S3} />
+    </>
+  );
+}
+
 /** For an article without a drawing of its own yet: its number as a constellation on the grid. */
 function Generic({ seed }: { seed: number }) {
   const rand = rng(seed * 97 + 1);
@@ -188,6 +227,7 @@ const covers: Record<string, () => ReactNode> = {
   "hydranet-fruit": Hydra,
   "lite3-walking": Lite3,
   "diffusion-points": Diffusion,
+  "slam-2d": Slam,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {

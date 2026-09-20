@@ -5,6 +5,7 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
 import { useLabels } from "./labels";
+import { followInk } from "./stage3d";
 import { type Cloud, type Pose3, ROOM, apply, compose3, fromEuler, icp3, inverse3, rotationAngle, sweep } from "./lidar3d/icp3";
 import { useVisible } from "./use-visible";
 
@@ -40,6 +41,7 @@ export function CloudLab() {
     const now = new T.Points(new T.BufferGeometry(), new T.PointsMaterial({ color: 0x79dafa, size: 0.07 }));
     const estLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: 0x79dafa })), truthLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: 0xff6e96 }));
     scene.add(old, now, estLine, truthLine);
+    const unfollow = followInk(T, canvas, () => [scene], ink);
 
     const rng = mulberry32(3), start = fromEuler(0, 0, 0, [2, 1.6, 0.6]);
     let truth = start, est = start, prev: Cloud = sweep(ROOM, truth, rng), k = 0, ms = 0, since = 0, frame = 0, last = performance.now();
@@ -77,7 +79,7 @@ export function CloudLab() {
     };
     if (k === 0) tick();
     frame = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(frame); renderer.dispose(); };
+    return () => { cancelAnimationFrame(frame); unfollow(); renderer.dispose(); };
   }, [status, playing, visible]);
 
   return (
@@ -87,7 +89,7 @@ export function CloudLab() {
           <Button onClick={() => void load()} disabled={status === "loading"}>{t.cloudLoad}</Button>
         </div>
       ) : (
-        <canvas ref={stage} className="aspect-[2/1] w-full rounded-md border border-border text-foreground" />
+        <canvas role="img" aria-label={t.picCloud} ref={stage} className="aspect-[2/1] w-full rounded-md border border-border text-foreground" />
       )}
       <p className="text-muted-foreground">{t.cloudLegend}</p>
       <div className="grid items-end gap-4 sm:grid-cols-[auto_1fr_1fr_1fr]">
