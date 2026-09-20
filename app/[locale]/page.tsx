@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Instrument } from "@/components/lab/instrument";
 import { HeroInstrumentLazy } from "@/components/site/hero-instrument-lazy";
-import { PostIndex } from "@/components/site/post-index";
+import { PostBento } from "@/components/site/post-bento";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { PostCover } from "@/components/site/post-cover";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
@@ -168,9 +168,8 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             {t.home.viewAll}
           </Link>
         </div>
-        <PostIndex
+        <PostBento
           locale={locale}
-          level={3}
           rows={toRows(posts, locale)}
           tags={getAllTags(locale).map((x) => x.tag)}
           labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
