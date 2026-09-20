@@ -20,7 +20,7 @@ const placeName = (t: Labels, city: City, id: number): string => {
 export function describeEvent(t: Labels, city: City, e: SimEvent): string {
   const when = formatTime(e.t);
   if (e.type === "config") return `${when} ${t.ev.config}：${e.mode ? t.modes[e.mode] : ""}・${t.duty} ${e.duty ? t.ev.on : t.ev.off}`;
-  const who = personName(t, e.agent), action = e.action ? t.actions[e.action] : "";
+  const who = personName(t, e.agent), action = e.action ? t.actionNouns[e.action] : "";
   if (e.type === "departed") return `${when} ${who} ${t.ev.departed} ${placeName(t, city, e.from)} → ${t.ev.heading} ${placeName(t, city, e.place)}`;
   if (e.type === "idle") return `${when} ${who} ${t.ev.idle} ${placeName(t, city, e.place)}`;
   return `${when} ${who} ${e.type === "started" ? t.ev.started : t.ev.finished} ${action} · ${placeName(t, city, e.place)}`;
@@ -36,7 +36,7 @@ export function StatusTable({ t, city, people, follow, onFollow }: { t: Labels; 
   const first = Math.max(0, Math.min(people.length - VIEWPORT, Math.floor(top / ROW) - 1)), rows = people.slice(first, first + VIEWPORT + 3);
   return (
     <div>
-      <div className="label grid grid-cols-[4.5rem_1fr_5.5rem] gap-2 border-b border-border pb-1"><span>{t.person}</span><span>{t.doing}・{t.where}</span><span>{t.needs.split("・")[0]}…</span></div>
+      <div className="label grid grid-cols-[4.5rem_1fr_5.5rem] gap-2 border-b border-border pb-1"><span>{t.person}</span><span>{t.doing}・{t.where}</span><span title={t.needs}>{t.needsShort}</span></div>
       <div ref={scroller} tabIndex={0} role="group" aria-label={t.table} className="relative overflow-y-auto" style={{ height: ROW * VIEWPORT }} onScroll={(e) => setTop(e.currentTarget.scrollTop)} data-testid="city-table">
         <div style={{ height: people.length * ROW }}>
           {rows.map((p, k) => (
