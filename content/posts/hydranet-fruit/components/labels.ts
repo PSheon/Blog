@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 
 const zh = {
   image: "訓練圖（32×32）",
@@ -89,5 +89,5 @@ const en: typeof zh = {
 export type Labels = typeof zh;
 
 export function useLabels(): Labels {
-  return usePathname().startsWith("/en") ? en : zh;
+  return useLocaleLabels(zh, en);
 }

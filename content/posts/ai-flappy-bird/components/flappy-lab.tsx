@@ -65,7 +65,7 @@ export function FlappyLab() {
     let visible = true;
 
     const paint = () => {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(2, window.devicePixelRatio || 1); // a 3× phone would draw 2.25 times the pixels for nothing
       const w = Math.round(canvas.clientWidth * dpr);
       const h = Math.round(canvas.clientHeight * dpr);
       if (canvas.width !== w || canvas.height !== h) {

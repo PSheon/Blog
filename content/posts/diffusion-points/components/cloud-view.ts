@@ -21,7 +21,7 @@ export class CloudView {
   ) {}
 
   static async create(canvas: HTMLCanvasElement, count: number, extent: [number, number] = [1.3, 1.2], narrowExtent = extent): Promise<CloudView> {
-    const three = await import("three");
+    const three = await import("@/lib/three");
     const renderer = new three.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
     const scene = new three.Scene(), camera = new three.PerspectiveCamera(30, 1, 0.1, 80);

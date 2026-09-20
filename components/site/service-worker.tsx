@@ -15,7 +15,7 @@ import { useEffect } from "react";
 export function ServiceWorker({ enabled }: { enabled: boolean }) {
   const pathname = usePathname();
   useEffect(() => {
-    if (!enabled || !("serviceWorker" in navigator)) return;
+    if (!enabled || !("serviceWorker" in navigator)) return undefined;
     let cancelled = false;
     const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 1500));
     void navigator.serviceWorker.ready.then((registration) => idle(() => {
@@ -27,7 +27,7 @@ export function ServiceWorker({ enabled }: { enabled: boolean }) {
   }, [enabled, pathname]);
 
   useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator)) return undefined;
     if (enabled) {
       // After load, so that registration never competes with the first paint.
       const register = () => void navigator.serviceWorker.register("/sw.js").catch((error) => console.warn("[sw] registration failed", error));
@@ -37,6 +37,7 @@ export function ServiceWorker({ enabled }: { enabled: boolean }) {
     }
     void navigator.serviceWorker.getRegistrations().then((all) => all.forEach((r) => void r.unregister()));
     if ("caches" in window) void caches.keys().then((keys) => keys.forEach((key) => void caches.delete(key)));
+    return undefined;
   }, [enabled]);
   return null;
 }

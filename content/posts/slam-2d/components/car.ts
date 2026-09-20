@@ -102,21 +102,9 @@ export function autopilot(truth: Pose, ranges: Float64Array, moved: boolean, sta
   return { throttle, steer };
 }
 
-/** Drive `laps` times round the ring on autopilot from `start`, calling `each` after every step. For the figures that replay a fixed drive. */
-export function driveLaps(car: Car, laps: number, each: (odometry: Pose, step: number) => void, dt = 1 / 30) {
-  const pilot = newAutopilot();
-  let moved = true, swept = 0, prev = Math.atan2(car.truth.y - 7, car.truth.x - 10);
-  for (let step = 0; swept < laps * 2 * Math.PI && step < 40000; step++) {
-    const before = car.truth, odometry = car.step(autopilot(car.truth, car.lastScan.ranges, moved, pilot, dt), dt);
-    moved = Math.hypot(car.truth.x - before.x, car.truth.y - before.y) > 1e-5;
-    const angle = Math.atan2(car.truth.y - 7, car.truth.x - 10);
-    swept += wrap(angle - prev); prev = angle;
-    each(odometry, step);
-  }
-}
-
 /**
- * The same drive as `driveLaps`, but in slices of a few milliseconds with the event loop in between. A lap costs
+ * Drive `laps` times round the ring on autopilot, calling `each` after every step: the fixed drive that the replay
+ * figures show. It runs in slices of a few milliseconds with the event loop in between. A lap costs
  * about 270 ms of lidar sweeps; run in one go during hydration, the two replay figures froze the page for 0.8 s
  * (3.4 s of blocking time under Lighthouse's phone throttling). Resolves to false if `cancelled()` turned true.
  */

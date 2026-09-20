@@ -3,7 +3,7 @@ import { type Outcome, START } from "./outcomes";
 import { compose } from "./se2";
 import { CYAN_HEX, PINK_HEX, VIOLET_HEX, followInk, setPoints, stubs } from "./stage3d";
 
-type Three = typeof THREE;
+type Three = typeof import("@/lib/three");
 
 /** Four finished maps in one WebGL canvas, a 2 × 2 grid of viewports: one context instead of four. */
 export class OutcomesView {

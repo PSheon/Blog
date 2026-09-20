@@ -9,17 +9,17 @@ interface Props {
 
 /** An instrument may crash; the article around it must not. */
 export class ErrorBoundary extends Component<Props, { failed: boolean }> {
-  state = { failed: false };
+  override state = { failed: false };
 
   static getDerivedStateFromError() {
     return { failed: true };
   }
 
-  componentDidCatch(error: unknown) {
+  override componentDidCatch(error: unknown) {
     console.error("[instrument]", error);
   }
 
-  render() {
+  override render() {
     return this.state.failed ? this.props.fallback : this.props.children;
   }
 }

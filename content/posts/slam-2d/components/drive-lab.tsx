@@ -64,7 +64,7 @@ export function DriveLab() {
   useEffect(() => {
     let cancelled = false;
     // three.js is about 170 KB the first paint does not need: fetch it once the browser is idle, not on mount.
-    const start = () => void import("three").then((T) => { if (!cancelled && stage.current) view.current = new DriveView(T, stage.current, RING); });
+    const start = () => void import("@/lib/three").then((T) => { if (!cancelled && stage.current) view.current = new DriveView(T, stage.current, RING); });
     const idle = window.requestIdleCallback ? window.requestIdleCallback(start, { timeout: 2000 }) : window.setTimeout(start, 300);
     return () => { cancelled = true; (window.cancelIdleCallback ?? window.clearTimeout)(idle); view.current?.dispose(); view.current = null; };
   }, []);

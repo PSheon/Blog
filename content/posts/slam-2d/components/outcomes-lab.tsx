@@ -23,7 +23,7 @@ export function OutcomesLab() {
     let cancelled = false, view: OutcomesView | null = null, raf = 0;
     const onResize = () => view?.render();
     const start = async () => {
-      const T = await import("three");
+      const T = await import("@/lib/three");
       if (cancelled || !canvas.current) return;
       view = new OutcomesView(T, canvas.current);
       window.addEventListener("resize", onResize);

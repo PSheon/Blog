@@ -4,7 +4,7 @@ import type { Slam } from "./slam";
 import { followInk } from "./stage3d";
 import type { Segment } from "./world";
 
-type Three = typeof THREE;
+type Three = typeof import("@/lib/three");
 const WALL = 1.0, STUB = 0.7, CYAN = 0x79dafa, PINK = 0xff6e96, VIOLET = 0xb9a5ff;
 
 export interface DriveFrame {

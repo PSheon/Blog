@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 
 const zh = {
   real: "真實世界（車子看不到這一邊）",
@@ -104,5 +104,5 @@ const en: typeof zh = {
 };
 
 export function useLabels() {
-  return usePathname()?.startsWith("/en") ? en : zh;
+  return useLocaleLabels(zh, en);
 }
