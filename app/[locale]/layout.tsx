@@ -1,14 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
-import { ViewTransition } from "react";
 import "../globals.css";
 import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { InstallHint } from "@/components/site/install";
 import { NavProgress } from "@/components/site/nav-progress";
+import { PageSwap } from "@/components/site/page-swap";
 import { ServiceWorker } from "@/components/site/service-worker";
+import { Spotlight } from "@/components/site/spotlight";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
@@ -69,19 +71,13 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             </a>
             <SiteHeader
               locale={locale}
-              t={{ nav: t.nav, search: t.search, locale: t.locale, theme: t.theme, footer: t.footer }}
+              t={{ nav: t.nav, search: t.search, locale: t.locale, theme: t.theme, footer: t.footer, install: t.install }}
               tags={getAllTags(locale).map((x) => x.tag)}
             />
             {/* Decorative glows may be wider than the viewport. Clip them at the full-width level, never at the
                 content container (that cuts them off mid-fade). `clip`, unlike `hidden`, keeps sticky children working. */}
             <main id="content" className="flex-1 overflow-x-clip">
-              {/*
-                This boundary lives in the layout and never remounts, so a navigation is an *update* of its
-                content (enter/exit would only fire if the boundary itself appeared or disappeared).
-              */}
-              <ViewTransition update="page-swap" default="none">
-                {children}
-              </ViewTransition>
+              <PageSwap>{children}</PageSwap>
             </main>
             <SiteFooter locale={locale} t={t} />
         </ThemeProvider>
@@ -90,6 +86,8 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             also have to be switched on once in the project's dashboard. */}
         <NavProgress label={locale === "zh" ? "頁面載入中" : "Loading page"} />
         <ServiceWorker enabled={SERVICE_WORKER} />
+        <Spotlight />
+        <InstallHint text={t.install.hint} action={t.install.action} dismiss={t.install.dismiss} />
         {process.env.VERCEL && <Analytics />}
         {process.env.VERCEL && <SpeedInsights />}
       </body>

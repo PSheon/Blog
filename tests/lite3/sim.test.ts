@@ -10,7 +10,9 @@ function walk(sim: Lite3Sim, knobs: Partial<Knobs>, seconds = 10) {
   return { vx: sim.position[0] / seconds, fellAt: sim.fellAt };
 }
 
-describe("Lite3 simulator", () => {
+// Every case here simulates seconds of physics: about 1 s locally, four to five times that on a GitHub runner, which
+// put several of them against vitest's 5 s default (one failed at 5.6 s on a Dependabot PR).
+describe("Lite3 simulator", { timeout: 60_000 }, () => {
   let sim: Lite3Sim;
   beforeAll(async () => {
     sim = await Lite3Sim.load(async (path) => new Uint8Array(await readFile(`public/lite3/${path}`)));

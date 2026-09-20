@@ -63,6 +63,11 @@ The one exception is a stage that must stay dark in both themes (section 5).
 
 - Short and functional: page swap 120 ms out / 260 ms in, title morph 340 ms (native View Transitions through
   React `<ViewTransition>`; not framer-motion).
+- The page swap is keyed to the pathname (`components/site/page-swap.tsx`, enter/exit). Never hang it on
+  `<ViewTransition update>`: a `next/dynamic` component replacing its placeholder is an update too, and replayed
+  the whole transition on every load of the home page.
+- Disclosures open and close visibly (phone menu, article outline): height by `grid-template-rows 0fr → 1fr`,
+  entries staggered in, a quicker exit. An open panel overlays the page; it never pushes the text.
 - Everything honours `prefers-reduced-motion`: the global rule in `globals.css` stops CSS animation; a canvas
   loop must check `useReducedMotion()` and draw one still frame instead.
 - Animate `transform` and `opacity` only. A loop that paints runs only while it is on screen and the tab is
@@ -191,3 +196,29 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm build
 - [ ] Cover drawing added to `post-cover.tsx`.
 - [ ] Numbers in the text re-read against their source.
 - [ ] Merged into `dev`; `main` only through a pull request.
+
+## Motion borrowed from Magic UI (2026-09-20)
+
+Paul asked for a more modern feel with magicui.design as the reference. The patterns are rebuilt in plain CSS and
+three tiny client components; **no animation library is installed** (Magic UI's own components need `motion`,
+and the site's budget is ~0.5 MB a page). Each one has to say something, as in section 1:
+
+| Pattern (Magic UI name) | Where | What it says | Code |
+| --- | --- | --- | --- |
+| Border Beam | the hero's live classifier (`<Instrument live>`) | this instrument is running right now | `.border-beam` in globals.css |
+| Magic Card spotlight | the latest-article card, post index rows | the thing under your pointer is a door | `.spotlight` + `components/site/spotlight.tsx` (one listener, mouse/pen only) |
+| Number Ticker | the three hero readouts | a readout settling; the numbers are counted, not typed | `components/site/number-ticker.tsx` |
+| Flickering Grid | the footer's top band | the 3×3 mark continued as a feature map | `components/site/kernel-field.tsx` (one canvas, ~11 fps, paused off screen) |
+| Blur Fade | the hero only: title, subtitle, instrument, once on load | one orchestrated moment; nothing else on the site fades in | `.reveal` with `--i` |
+| Animated Beam | the rail under the hero | the see → act path carries a signal | `.rail-pulse` (already there) |
+
+Rules: every one of them stands still under `prefers-reduced-motion`; none may move layout (CLS stays 0); do not
+add entrance animations to sections or cards, and do not add a second beam, shimmer or glow to the same screen.
+
+### Added the same week
+
+| Pattern | Where | Code |
+| --- | --- | --- |
+| Bento Grid | the home page's index (`/posts` keeps the ruled list: it is the archive, and a list scans faster) | `components/site/post-bento.tsx`: six columns, newest article 4×2, then 2·2 beside it and rows of 2·2·2 / 3·3; a lone last tile runs full width |
+| Drawer motion | the phone menu | the sheet slides in from the edge on `cubic-bezier(0.22, 1, 0.36, 1)` in 420 ms; rows arrive 55 ms apart (`.drawer-row`) |
+| Page transition | every client navigation | the old page sinks back and blurs out (180 ms), the new one rises 28 px and sharpens (460 ms); header and footer do not move |

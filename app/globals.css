@@ -109,6 +109,139 @@
   --sidebar-ring: var(--ring);
 }
 
+/*
+ * Patterns borrowed from Magic UI (magicui.design), rebuilt in plain CSS so that no animation library ships:
+ * a beam travelling round a live instrument's border, a light that follows the pointer over a card, and the
+ * hero's one load-time reveal. All three stand still under prefers-reduced-motion.
+ */
+@property --beam-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+.border-beam {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from var(--beam-angle), transparent 0 76%, var(--signal) 84%, var(--signal-3) 91%, var(--signal-2) 97%, transparent 100%);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: border-beam 8s linear infinite;
+}
+@keyframes border-beam {
+  to { --beam-angle: 360deg; }
+}
+
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+.spotlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s;
+  background: radial-gradient(22rem circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--signal-3) 13%, transparent), transparent 65%);
+}
+@media (hover: hover) {
+  .spotlight:hover::before { opacity: 1; }
+}
+
+@keyframes blur-rise {
+  from { opacity: 0; filter: blur(6px); transform: translateY(8px); }
+}
+.reveal {
+  animation: blur-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .border-beam { animation: none; --beam-angle: 300deg; }
+  .reveal { animation: none; }
+}
+
+/*
+ * A bento tile's drawing on hover: it comes forward and tilts a touch, the dot grid drifts behind it, and a band
+ * of light crosses once (Magic UI's "glare hover"). Pointer devices only; still under reduced motion.
+ */
+.bento-art {
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s;
+  will-change: transform;
+}
+.bento-cover {
+  transition: background-position 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.bento-cover::after {
+  content: "";
+  position: absolute;
+  inset: -40% -60%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 42%, color-mix(in oklab, var(--foreground) 9%, transparent) 50%, transparent 58%);
+  transform: translateX(-70%);
+}
+@media (hover: hover) {
+  .group:hover .bento-art { transform: scale(1.08) rotate(-1.2deg) translateY(-2px); opacity: 1; }
+  .group:hover .bento-cover { background-position: 9px 9px; }
+  .group:hover .bento-cover::after { transform: translateX(70%); transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bento-art, .bento-cover, .bento-cover::after { transition: none !important; }
+  .group:hover .bento-art { transform: none; }
+  .group:hover .bento-cover::after { transform: translateX(-70%); }
+}
+
+/*
+ * The phone menu: the panel slides in from the edge on a soft spring, then its rows arrive one after another.
+ * (The sheet primitive only nudged 2.5rem and faded.)
+ */
+@keyframes drawer-row {
+  from { opacity: 0; transform: translateX(-18px); }
+}
+.drawer-row {
+  animation: drawer-row 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(140ms + var(--i, 0) * 55ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .drawer-row { animation: none; }
+}
+
+/*
+ * The article outline on small screens: the panel unfolds to its own height, and the entries settle in one after
+ * another behind it. Closing is quicker than opening, and the entries leave together.
+ */
+.toc-panel {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.26s cubic-bezier(0.4, 0, 0.6, 1), opacity 0.18s ease-out;
+}
+[data-open="true"] > .toc-panel {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition: grid-template-rows 0.42s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease-out;
+}
+.toc-row {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+}
+[data-open="true"] .toc-row {
+  opacity: 1;
+  transform: none;
+  transition: opacity 0.35s ease-out, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(60ms + var(--i, 0) * 28ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .toc-panel,
+  .toc-row,
+  [data-open="true"] > .toc-panel,
+  [data-open="true"] .toc-row { transition: none; }
+}
+
 /* Navigation progress: creeps towards 90 % and waits there; the page arriving removes it. */
 @keyframes nav-progress {
   from { transform: scaleX(0.05); }
@@ -172,8 +305,12 @@ html:not(.dark) {
   html {
     @apply font-sans;
     scroll-behavior: smooth;
-    scroll-padding-top: 5rem;
+    /* The sticky header, plus the outline bar that sits under it below the xl breakpoint. */
+    scroll-padding-top: 8rem;
     text-size-adjust: 100%;
+  }
+  @media (min-width: 80rem) {
+    html { scroll-padding-top: 5rem; }
   }
   body {
     @apply bg-background text-foreground;
@@ -552,8 +689,7 @@ html:not(.dark) {
 
 /*
  * Page transitions (React <ViewTransition> → the browser's View Transitions API).
- * The routed content fades and rises a few pixels; header and footer are not part of it.
- * Short on purpose: a transition that makes people wait is worse than none.
+ * The routed content moves; header and footer are not part of it.
  */
 /* Header and footer are identical before and after: swap the document snapshot instantly instead of cross-fading it. */
 ::view-transition-old(root),
@@ -561,22 +697,31 @@ html:not(.dark) {
   animation: none;
   mix-blend-mode: normal;
 }
+/*
+ * The leaving page sinks back a little and blurs out; the arriving one rises into place and sharpens. Long enough
+ * to read as movement (Paul asked for a transform, not a bare fade), short enough that nobody waits for it.
+ */
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(28px) scale(0.985);
+    filter: blur(5px);
   }
 }
 @keyframes page-out {
   to {
     opacity: 0;
+    transform: translateY(-14px) scale(0.985);
+    filter: blur(3px);
   }
 }
 ::view-transition-old(.page-swap) {
-  animation: page-out 120ms ease-in both;
+  animation: page-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  transform-origin: 50% 20vh;
 }
 ::view-transition-new(.page-swap) {
-  animation: page-in 260ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms both;
+  animation: page-in 460ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both;
+  transform-origin: 50% 20vh;
 }
 /* Old and new pages differ in height; don't stretch one into the other while they swap. */
 ::view-transition-group(.page-swap) {

@@ -178,6 +178,30 @@ test("on a phone the hero instrument is on the first screen and small controls a
   expect(control!.height).toBeGreaterThanOrEqual(24);
 });
 
+test("on a phone the outline sticks under the header, names the section being read, and closes after a jump", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "the outline is a side column on wide screens");
+  await page.goto("/zh/posts/lite3-walking");
+  const bar = page.getByTestId("toc-bar");
+  await page.evaluate(() => window.scrollTo({ top: 2600, behavior: "instant" }));
+  await expect.poll(async () => Math.round((await bar.boundingBox())!.y)).toBe(56); // right under the 56 px header
+  const toggle = bar.getByRole("button");
+  await expect(toggle).not.toHaveText(/^本頁目錄\s*\+?$/);
+  // Closed, the list takes no room and cannot be tabbed into; opening unfolds it over time instead of popping.
+  const panel = bar.locator(".toc-panel");
+  expect((await panel.boundingBox())!.height).toBe(0);
+  await expect(panel).toHaveAttribute("inert", "");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(await panel.evaluate((el) => getComputedStyle(el).transitionProperty)).toContain("grid-template-rows");
+  await bar.getByRole("link", { name: "推它" }).click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect.poll(async () => (await panel.boundingBox())!.height).toBe(0);
+  await expect(toggle).toContainText("推它", { timeout: 10_000 });
+  // The heading lands below the bar, not underneath it.
+  const heading = (await page.getByRole("heading", { name: "推它" }).boundingBox())!, box = (await bar.boundingBox())!;
+  expect(heading.y).toBeGreaterThan(box.y + box.height);
+});
+
 test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
   await page.goto("/zh/posts/lite3-walking");
   const hidden = page.locator(".katex-mathml");
@@ -405,8 +429,14 @@ test("a car maps a corridor, closes the loop, and takes a failure mode from the 
   const number = async (id: string) => Number((await page.getByTestId(id).first().textContent())!.match(/[\d.]+/)![0]);
 
   await expect(page.locator("[data-instrument]")).toHaveCount(6);
-  await page.getByTestId("slam-autopilot").scrollIntoViewIfNeeded();
-  await page.getByTestId("slam-autopilot").click();
+  const autopilot = page.getByTestId("slam-autopilot"), idle = await autopilot.textContent();
+  await autopilot.scrollIntoViewIfNeeded();
+  // A click that lands before the lab has hydrated is lost (seen once on a slow CI runner: no lap in 150 s).
+  // The label flips when autopilot is on, so click until it has.
+  await expect(async () => {
+    if ((await autopilot.textContent()) === idle) await autopilot.click();
+    await expect(autopilot).not.toHaveText(idle!, { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
   // One lap on autopilot: the first loop closure pulls the estimate back onto the truth.
   await expect.poll(() => number("slam-closures"), { timeout: 150_000 }).toBeGreaterThan(0);
   await expect.poll(() => number("slam-error"), { timeout: 20_000 }).toBeLessThan(0.5);
@@ -424,4 +454,26 @@ test("a car maps a corridor, closes the loop, and takes a failure mode from the 
   await page.getByTestId("slam-outcome-wrong").getByRole("button").click();
   await expect(page.getByTestId("slam-preset")).toContainText("認錯一次");
   expect(errors).toEqual([]);
+});
+
+test("loading the home page plays no page transition: a late-loading demo is not a navigation", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as { __vt: number };
+    w.__vt = 0;
+    const original = document.startViewTransition?.bind(document);
+    if (original) document.startViewTransition = ((...args: Parameters<typeof original>) => (w.__vt++, original(...args))) as typeof document.startViewTransition;
+  });
+  await page.goto("/zh");
+  // The hero demo arrives after hydration (next/dynamic). Wait for it, then for anything it might have set off.
+  await expect(page.locator("main canvas").first()).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => (window as unknown as { __vt: number }).__vt)).toBe(0);
+});
+
+test("the home index is a short bento: at most six tiles, each saying what its article is about on a phone", async ({ page, isMobile }) => {
+  await page.goto("/zh");
+  const tiles = page.getByTestId("post-bento").locator("> li");
+  expect(await tiles.count()).toBeLessThanOrEqual(6);
+  if (!isMobile) return;
+  for (const tile of await tiles.all()) await expect(tile.locator("p.leading-relaxed")).toBeVisible();
 });

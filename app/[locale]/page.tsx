@@ -3,11 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Instrument } from "@/components/lab/instrument";
 import { HeroInstrumentLazy } from "@/components/site/hero-instrument-lazy";
-import { PostIndex } from "@/components/site/post-index";
+import { PostBento } from "@/components/site/post-bento";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { PostCover } from "@/components/site/post-cover";
 import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
+import { NumberTicker } from "@/components/site/number-ticker";
 import { SectionHeading } from "@/components/site/section-heading";
 import { TriadRail } from "@/components/site/triad-rail";
 import { countOperators } from "@/lib/content/ml-stats";
@@ -30,9 +31,9 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   // stayed on № 001 — the same CNN the hero already shows — while six newer articles came out.
   const latest = posts[0];
   const readouts = [
-    { label: t.home.readouts.posts, value: String(posts.length).padStart(2, "0") },
-    { label: t.home.readouts.interactive, value: String(posts.filter((p) => p.interactive).length).padStart(2, "0") },
-    { label: t.home.readouts.operators, value: String(countOperators()) },
+    { label: t.home.readouts.posts, value: posts.length, pad: 2 },
+    { label: t.home.readouts.interactive, value: posts.filter((p) => p.interactive).length, pad: 2 },
+    { label: t.home.readouts.operators, value: countOperators(), pad: 0 },
   ];
 
   // What the site is and who writes it, for search engines: the home page had no structured data at all.
@@ -58,10 +59,10 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         <div className="max-lg:contents">
           {/* A title that says what is here, and a subtitle that says how: Paul asked for a technical blog's title,
               not a slogan. The see / think / generate / act words live on in the rail below. */}
-          <h1 className="triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+          <h1 style={{ "--i": 0 } as React.CSSProperties} className="reveal triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance">
             {t.hero.title}
           </h1>
-          <p className="order-1 font-heading text-xl leading-snug font-medium text-foreground/90 max-lg:-mt-3 sm:text-2xl lg:mt-5">{t.hero.subtitle}</p>
+          <p style={{ "--i": 1 } as React.CSSProperties} className="reveal order-1 font-heading text-xl leading-snug font-medium text-foreground/90 max-lg:-mt-3 sm:text-2xl lg:mt-5">{t.hero.subtitle}</p>
           <p className="order-3 max-w-[52ch] font-serif text-lg leading-relaxed text-muted-foreground lg:mt-8">{t.hero.intro}</p>
           <div className="order-4 flex flex-wrap gap-3 lg:mt-8">
             {latest && (
@@ -80,18 +81,19 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               <div key={r.label} className="flex flex-col-reverse justify-end gap-1">
                 <dt className="label">{r.label}</dt>
                 <dd className="font-mono text-2xl leading-none tabular" style={{ color: RAIL_COLORS[i === 2 ? 3 : i] }}>
-                  {r.value}
+                  <NumberTicker value={r.value} pad={r.pad} />
                 </dd>
               </div>
             ))}
           </dl>
         </div>
 
-        <div className="relative order-2">
+        <div style={{ "--i": 2 } as React.CSSProperties} className="reveal relative order-2">
           <div className="hero-glow" aria-hidden />
         <Instrument
           title={t.hero.instrumentTitle}
           figureClassName="my-0"
+          live
           caption={
             <>
               {t.hero.instrumentCaption}{" "}
@@ -123,7 +125,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           <Link href={`/${locale}/posts/${latest.slug}`} className="group relative block">
             <div className="card-glow" aria-hidden />
             <CornerMarks />
-            <div className="grid overflow-hidden rounded-md border border-border bg-panel transition-colors group-hover:border-foreground/25 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-cols-[minmax(0,1fr)_30rem]">
+            <div className="spotlight grid overflow-hidden rounded-md border border-border bg-panel transition-colors group-hover:border-foreground/25 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-cols-[minmax(0,1fr)_30rem]">
               <div className="p-6 sm:p-8 lg:p-10">
                 <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                   <EntryNo no={latest.no} className="text-signal" />
@@ -166,10 +168,10 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             {t.home.viewAll}
           </Link>
         </div>
-        <PostIndex
+        <PostBento
           locale={locale}
-          level={3}
-          rows={toRows(posts, locale)}
+          // The newest article has its own card right above; the index starts with the one before it.
+          rows={toRows(posts.filter((p) => p.slug !== latest?.slug), locale)}
           tags={getAllTags(locale).map((x) => x.tag)}
           labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
         />
