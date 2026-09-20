@@ -106,6 +106,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
       <TriadRail
         locale={locale}
         label={t.home.topics}
+        show={t.hero.railShow}
         stops={t.hero.topics.map((s, i) => ({ ...s, color: RAIL_COLORS[i], count: posts.filter((p) => p.tags.includes(s.tag)).length }))}
       />
 
