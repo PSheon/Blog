@@ -19,6 +19,7 @@ no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 
 | № | English | 中文 |
 | --- | --- | --- |
+| 008 | [Drawing the map while finding yourself on it — SLAM from scratch](https://paul-notebook.vercel.app/en/posts/slam-2d) | [一邊畫地圖，一邊找自己](https://paul-notebook.vercel.app/zh/posts/slam-2d) |
 | 007 | [How a cloud of noise becomes an apple: a 3-D diffusion model trained in the browser](https://paul-notebook.vercel.app/en/posts/diffusion-points) | [一團雜訊怎麼長成一顆蘋果](https://paul-notebook.vercel.app/zh/posts/diffusion-points) |
 | 006 | [A robot dog in the browser: its walking policy is four matrix multiplications (MuJoCo WASM)](https://paul-notebook.vercel.app/en/posts/lite3-walking) | [把一隻機器狗搬進瀏覽器](https://paul-notebook.vercel.app/zh/posts/lite3-walking) |
 | 005 | [One body, two heads: a multi-task HydraNet that draws boxes and masks](https://paul-notebook.vercel.app/en/posts/hydranet-fruit) | [一個身體，兩個頭：HydraNet](https://paul-notebook.vercel.app/zh/posts/hydranet-fruit) |

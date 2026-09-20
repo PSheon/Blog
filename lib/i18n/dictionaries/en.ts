@@ -4,7 +4,7 @@ const en: Dictionary = {
   meta: {
     title: "paul.notebook — machine learning models, built from scratch",
     description:
-      "Paul's lab notebook: machine learning models built from scratch that you can train, take apart and break in your browser. Computer vision, reinforcement learning, Transformers, diffusion and robots.",
+      "Machine learning models built from scratch that you can train, take apart and break in your browser: vision, reinforcement learning, Transformers, robots.",
   },
   nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content", close: "Close menu", loading: "Loading page" },
   search: {
