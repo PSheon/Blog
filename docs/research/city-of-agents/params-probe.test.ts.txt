@@ -1,0 +1,31 @@
+// Where a day goes under a set of need rates: 300 people, N = 8, seed 1, five days, figures from the last full day.
+// Run like bench.test.ts.txt (copy into tests/city/, vitest run --disable-console-intercept, delete).
+import { it } from "vitest";
+import { generateCity, PARAMS, SPEC_PARAMS, World, departureHistogram, peakDepartureShare, modalShare, type Params, type SimEvent, type Mode } from "@/content/posts/city-of-agents/components/sim";
+
+function run(label: string, mode: Mode, params: Params, duty = true, days = 5) {
+  const city = generateCity(1, 8), world = new World(city, { agents: 300, mode, duty, params }), events: SimEvent[] = [];
+  world.onEvent = (e) => events.push(e);
+  const share: Record<string, number> = {}, pinned = [0, 0, 0, 0]; let samples = 0, modal = 0;
+  const lastStart = PARAMS.startMinute + (days - 1) * 1440 - PARAMS.startMinute; // last full day from 00:00
+  for (let k = 0; k < days * 1440 - PARAMS.startMinute; k++) {
+    world.tick();
+    if (world.t >= lastStart) {
+      for (const a of world.agents) { const key = a.state === "acting" ? a.action! : a.state; share[key] = (share[key] ?? 0) + 1; a.needs.forEach((v, i) => { if (v > 0.999) pinned[i]++; }); samples++; }
+      modal += modalShare(world.agents) / 1440;
+    }
+  }
+  const last = events.filter((e) => e.t >= lastStart), pct = (v: number) => `${Math.round((100 * v) / samples)}%`;
+  const arrivals = last.filter((e) => e.type === "started" && e.action === "work").map((e) => (e.t % 1440) / 60).sort((a, b) => a - b);
+  const q = (f: number) => (arrivals.length ? arrivals[Math.floor(f * (arrivals.length - 1))].toFixed(1) : "-");
+  const trips = events.filter((e) => e.type === "departed"), arr = events.filter((e) => e.type === "arrived");
+  return { label, ...Object.fromEntries(["sleep", "eat", "social", "work", "traveling", "idle"].map((k) => [k, pct(share[k] ?? 0)])), pinned: pinned.map(pct).join(" "),
+    "events/agent/day": (last.length / 300).toFixed(1), "trips/agent/day": (last.filter((e) => e.type === "departed").length / 300).toFixed(1),
+    "peak10": `${Math.round(100 * peakDepartureShare(departureHistogram(last, lastStart, lastStart + 1440), 300))}%`, modal: modal.toFixed(2), "work start p10/50/90": `${q(0.1)}/${q(0.5)}/${q(0.9)}`, trips: trips.length, arrived: arr.length };
+}
+
+it("probe", () => {
+  console.table([run("first draft (SPEC_PARAMS)", "utility", SPEC_PARAMS), run("first draft, duty off", "utility", SPEC_PARAMS, false),
+    run("proposed (PARAMS)", "utility", PARAMS), run("proposed, duty off", "utility", PARAMS, false), run("proposed, no body clock", "utility", { ...PARAMS, circadian: 0 }),
+    run("fsm", "fsm", PARAMS), run("random", "random", PARAMS)]);
+}, 300000);
