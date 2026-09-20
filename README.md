@@ -1,11 +1,34 @@
-# paul.notebook
+# paul.notebook — machine learning models built from scratch, trained in your browser
 
-Paul's lab notebook on machines that see and agents that act: bilingual (中文 / English)
-articles with interactive, in-browser ML demos written from scratch in TypeScript.
+[![CI](https://github.com/PSheon/Blog/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PSheon/Blog/actions/workflows/ci.yml)
+[![Live site](https://img.shields.io/badge/live-paul--notebook.vercel.app-79dafa)](https://paul-notebook.vercel.app)
 
-Live at <https://paul-notebook.vercel.app>.
+**[paul-notebook.vercel.app](https://paul-notebook.vercel.app)** · [English](https://paul-notebook.vercel.app/en) · [中文](https://paul-notebook.vercel.app/zh) · [RSS](https://paul-notebook.vercel.app/en/feed.xml)
 
-Next.js 16 · MDX · shadcn/ui (Base UI) · Tailwind v4 · TypeScript
+An interactive machine-learning blog. Every article takes one model apart — a CNN, a Transformer, a
+diffusion model, neuroevolution, a quadruped's walking policy — and ships with instruments you can train,
+open up and break right in the page. The models are written from scratch in TypeScript: no TensorFlow.js,
+no ONNX Runtime, no server. Bilingual (繁體中文 / English).
+
+從零實作機器學習模型的互動部落格：每一篇都能在瀏覽器裡訓練、拆開、弄壞。CNN、Transformer、擴散模型、
+神經演化、機器狗走路策略，全部用 TypeScript 從零寫起，不靠任何機器學習函式庫。
+
+![paul.notebook](https://paul-notebook.vercel.app/en/opengraph-image)
+
+## Articles
+
+| № | English | 中文 |
+| --- | --- | --- |
+| 007 | [How a cloud of noise becomes an apple: a 3-D diffusion model trained in the browser](https://paul-notebook.vercel.app/en/posts/diffusion-points) | [一團雜訊怎麼長成一顆蘋果](https://paul-notebook.vercel.app/zh/posts/diffusion-points) |
+| 006 | [A robot dog in the browser: its walking policy is four matrix multiplications (MuJoCo WASM)](https://paul-notebook.vercel.app/en/posts/lite3-walking) | [把一隻機器狗搬進瀏覽器](https://paul-notebook.vercel.app/zh/posts/lite3-walking) |
+| 005 | [One body, two heads: a multi-task HydraNet that draws boxes and masks](https://paul-notebook.vercel.app/en/posts/hydranet-fruit) | [一個身體，兩個頭：HydraNet](https://paul-notebook.vercel.app/zh/posts/hydranet-fruit) |
+| 004 | [Training a Transformer from scratch: autodiff engine, attention maps](https://paul-notebook.vercel.app/en/posts/transformer-from-scratch) | [在瀏覽器裡從零訓練一個 Transformer](https://paul-notebook.vercel.app/zh/posts/transformer-from-scratch) |
+| 003 | [A neuroevolution trading squad on 2024 AAPL prices](https://paul-notebook.vercel.app/en/posts/trading-agent) | [打造神經進化交易戰隊](https://paul-notebook.vercel.app/zh/posts/trading-agent) |
+| 002 | [Neuroevolution: 50 birds teach themselves Flappy Bird](https://paul-notebook.vercel.app/en/posts/ai-flappy-bird) | [讓 50 隻小鳥自己學會 Flappy Bird](https://paul-notebook.vercel.app/zh/posts/ai-flappy-bird) |
+| 001 | [A CNN from scratch: watching a convolutional network see](https://paul-notebook.vercel.app/en/posts/cnn-from-scratch) | [從零開始的 CNN](https://paul-notebook.vercel.app/zh/posts/cnn-from-scratch) |
+
+Built with Next.js 16 (App Router, static generation) · MDX · shadcn/ui (Base UI) · Tailwind v4 · TypeScript ·
+Three.js and MuJoCo WebAssembly where an article needs them.
 
 ## Develop
 
@@ -42,7 +65,6 @@ description: …
 date: 2026-09-18
 tags: [computer-vision, cnn]   # lowercase kebab-case
 no: 3                          # notebook entry number
-featured: true                 # optional — home page feature slot
 interactive: true              # optional — shows the "interactive" badge
 draft: true                    # optional — built in `pnpm dev` only, never in production
 ---
