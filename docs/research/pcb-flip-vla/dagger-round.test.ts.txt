@@ -1,0 +1,16 @@
+// One DAgger round: the checkpoint acts (the expert takes over a step with probability VLA_BETA), the expert labels every
+// state that was visited, and the result is written as a dataset train.py can add to the others.
+// Run: cp docs/research/pcb-flip-vla/dagger-round.test.ts.txt tests/vla/dagger-round.test.ts
+//      VLA_MODEL=… VLA_OUT=… VLA_SEED0=200001 VLA_N=500 VLA_BETA=0.3 [VLA_CAMRAND=1] pnpm exec vitest run tests/vla/dagger-round.test.ts --disable-console-intercept
+import { it } from "vitest";
+import { randomCamera } from "@/content/posts/pcb-flip-vla/components/sim";
+import { Policy, rollout, writeDataset } from "@/scripts/train-vla/rollout";
+
+it("dagger round", async () => {
+  const first = Number(process.env.VLA_SEED0), n = Number(process.env.VLA_N ?? 500), seeds = Array.from({ length: n }, (_, i) => first + i);
+  const policy = await Policy.load(process.env.VLA_MODEL as string);
+  const episodes = await rollout(policy, seeds, { frames: Number(process.env.VLA_FRAMES ?? 4), beta: Number(process.env.VLA_BETA ?? 0), record: true, camera: process.env.VLA_CAMRAND ? randomCamera : undefined });
+  policy.close();
+  const real = episodes.filter((e) => !e.noop);
+  console.log(`round: ${episodes.length} episodes, ${writeDataset(process.env.VLA_OUT as string, episodes)} frames, success on real tasks while collecting ${((100 * real.filter((e) => e.success).length) / real.length).toFixed(1)}%`);
+}, 7_200_000);

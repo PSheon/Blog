@@ -39,3 +39,9 @@ export function collect(seed: number, options: Collect): Trajectory {
 
 /** Radians a bin index stands for, for every joint: handy when a script wants the numbers and not the tokens. */
 export const actionDeltas = (a: Action): number[] => [0, 1, 2, 3].map((j) => deltaOf(j, a[j]));
+
+/** A camera knocked about at random, the same for a whole trajectory: up to ±8° about both axes and ±50 mm each way. */
+export function randomCamera(seed: number): CameraShift {
+  const rng = mulberry32(seed ^ 0x0ca3e7a), spread = (by: number) => (rng() * 2 - 1) * by;
+  return { yaw: spread(0.14), pitch: spread(0.14), dx: spread(0.05), dy: spread(0.05), dz: spread(0.05) };
+}

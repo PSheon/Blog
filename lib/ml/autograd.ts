@@ -153,21 +153,26 @@ export class Tape {
   }
 
   /** Row-wise softmax where position i may only see positions ≤ i. Input must be square. */
-  causalSoftmax(scores: Mat): Mat {
+  /**
+   * Row-wise softmax where position i only sees positions up to i. With `prefix` > 0, the first `prefix` positions see
+   * each other freely (a prompt — pictures, words — that is given whole) and everything after stays causal.
+   */
+  causalSoftmax(scores: Mat, prefix = 0): Mat {
     const n = scores.rows;
+    const last = (i: number) => (i < prefix ? prefix - 1 : i);
     const out = new Mat(n, n);
     for (let i = 0; i < n; i++) {
       let max = -Infinity;
-      for (let j = 0; j <= i; j++) max = Math.max(max, scores.data[i * n + j]);
+      for (let j = 0; j <= last(i); j++) max = Math.max(max, scores.data[i * n + j]);
       let sum = 0;
-      for (let j = 0; j <= i; j++) sum += out.data[i * n + j] = Math.exp(scores.data[i * n + j] - max);
-      for (let j = 0; j <= i; j++) out.data[i * n + j] /= sum;
+      for (let j = 0; j <= last(i); j++) sum += out.data[i * n + j] = Math.exp(scores.data[i * n + j] - max);
+      for (let j = 0; j <= last(i); j++) out.data[i * n + j] /= sum;
     }
     this.record(() => {
       for (let i = 0; i < n; i++) {
         let dot = 0;
-        for (let j = 0; j <= i; j++) dot += out.grad[i * n + j] * out.data[i * n + j];
-        for (let j = 0; j <= i; j++) scores.grad[i * n + j] += out.data[i * n + j] * (out.grad[i * n + j] - dot);
+        for (let j = 0; j <= last(i); j++) dot += out.grad[i * n + j] * out.data[i * n + j];
+        for (let j = 0; j <= last(i); j++) scores.grad[i * n + j] += out.data[i * n + j] * (out.grad[i * n + j] - dot);
       }
     });
     return out;

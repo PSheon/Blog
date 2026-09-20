@@ -1,6 +1,7 @@
-"""Answers one request per line on stdin: {"frames": base64 of k*48*48*3 bytes, "words": [...], "history": [[5 tokens] * 3]}
-with the five action tokens the model would take (greedy, one after another). Used by the node evaluation script, so the
-world and its pixels stay in TypeScript while the model is still only in PyTorch."""
+"""Answers batches over stdin/stdout, one JSON line each way:
+  request  {"frames": base64 of n*k*48*48*3 bytes, "words": [[...]]*n, "history": [[[5 tokens]*3]]*n, "proprio": [[9 floats]]*n}
+  response [[5 tokens]]*n   (greedy, one token after another)
+The world, its rules and its pixels stay in TypeScript (scripts/train-vla/rollout.ts); only the model is here."""
 import base64, json, sys
 import numpy as np
 import torch
@@ -8,16 +9,19 @@ from model import VLA, BINS, SLOTS, IMAGE
 
 checkpoint = torch.load(sys.argv[1], map_location="cpu")
 args = checkpoint["args"]
-model = VLA(args["frames"], args["d"], args["layers"], proprio=not args.get("no_proprio", False)); model.load_state_dict(checkpoint["state"]); model.eval()
+device = "mps" if torch.backends.mps.is_available() else "cpu"
+model = VLA(args["frames"], args["d"], args["layers"], proprio=not args.get("no_proprio", False)).to(device)
+model.load_state_dict(checkpoint["state"]); model.eval()
 print("ready", flush=True)
 for line in sys.stdin:
-    request = json.loads(line)
-    frames = torch.from_numpy(np.frombuffer(base64.b64decode(request["frames"]), dtype=np.uint8).reshape(1, args["frames"], IMAGE, IMAGE, 3).copy())
-    words, tokens, feel = torch.tensor([request["words"]]), sum(request["history"], []), torch.tensor([request["proprio"]], dtype=torch.float32)
+    r = json.loads(line); n = len(r["words"])
+    frames = torch.from_numpy(np.frombuffer(base64.b64decode(r["frames"]), dtype=np.uint8).reshape(n, args["frames"], IMAGE, IMAGE, 3).copy()).to(device)
+    words, feel = torch.tensor(r["words"], device=device), torch.tensor(r["proprio"], dtype=torch.float32, device=device)
+    tokens = torch.tensor([sum(h, []) for h in r["history"]], device=device)
     with torch.no_grad():
         for slot in range(SLOTS):
-            padded = torch.tensor([tokens + [0] * (SLOTS - slot)])  # what comes after is masked out; the last is never read
-            logits = model(frames, words, padded, feel)[0, slot]
-            allowed = logits[BINS:] if slot == 4 else logits[:BINS]
-            tokens.append(int(allowed.argmax()) + (BINS if slot == 4 else 0))
-    print(json.dumps(tokens[-SLOTS:]), flush=True)
+            padded = torch.cat([tokens, torch.zeros(n, SLOTS - slot, dtype=torch.long, device=device)], 1)  # what follows is masked out
+            logits = model(frames, words, padded, feel)[:, slot]
+            choice = logits[:, BINS:].argmax(-1) + BINS if slot == 4 else logits[:, :BINS].argmax(-1)
+            tokens = torch.cat([tokens, choice[:, None]], 1)
+    print(json.dumps(tokens[:, -SLOTS:].tolist()), flush=True)

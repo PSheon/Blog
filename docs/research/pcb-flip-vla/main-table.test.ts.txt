@@ -1,0 +1,18 @@
+// The main table: every checkpoint named in VLA_MODELS (label=path,label=path) under the six conditions, seeds 100001+.
+// Run: cp docs/research/pcb-flip-vla/main-table.test.ts.txt tests/vla/main-table.test.ts
+//      VLA_MODELS="bc=/path/model.pt,dart=/path/model.pt" VLA_EPISODES=300 pnpm exec vitest run tests/vla/main-table.test.ts --disable-console-intercept ; rm tests/vla/main-table.test.ts
+import { it } from "vitest";
+import { LEVELS, Policy, rollout } from "@/scripts/train-vla/rollout";
+
+it("main table", async () => {
+  const episodes = Number(process.env.VLA_EPISODES ?? 300), frames = Number(process.env.VLA_FRAMES ?? 4), seeds = Array.from({ length: episodes }, (_, i) => 100001 + i);
+  for (const entry of (process.env.VLA_MODELS as string).split(",")) {
+    const [label, path] = entry.split("="), policy = await Policy.load(path), started = Date.now(), cells: string[] = [];
+    for (const level of LEVELS) {
+      const done = await rollout(policy, seeds, { frames, ...level.options }), real = done.filter((e) => !e.noop), ok = real.filter((e) => e.success);
+      cells.push(`${level.name}: ${((100 * ok.length) / real.length).toFixed(1)}% (${ok.length}/${real.length}, ${(ok.reduce((s, e) => s + e.steps, 0) / Math.max(1, ok.length)).toFixed(0)} steps; nothing-to-do ${done.filter((e) => e.noop && e.success).length}/${done.filter((e) => e.noop).length})`);
+    }
+    policy.close();
+    console.log(`${label} [${Math.round((Date.now() - started) / 1000)} s]\n  ${cells.join("\n  ")}`);
+  }
+}, 7_200_000);

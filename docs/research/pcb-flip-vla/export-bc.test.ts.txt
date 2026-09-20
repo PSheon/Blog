@@ -1,16 +1,17 @@
-// Writes BC trajectories for PyTorch: frames.u8 (all frames, 48*48*3 bytes each), meta.json (per trajectory: seed, start, length,
+// Writes expert trajectories for PyTorch (VLA_MODE=bc|dart, VLA_NOISE, VLA_CAMRAND=1, VLA_SEED0): frames.u8 (all frames, 48*48*3 bytes each), meta.json (per trajectory: seed, start, length,
 // instruction, labels, taken). Seeds 1..N train, 100001.. held out. OUT and N come from the environment.
 // Run: cp docs/research/pcb-flip-vla/export-bc.test.ts.txt tests/vla/export-bc.test.ts
 //      VLA_OUT=/some/dir VLA_N=2000 pnpm exec vitest run tests/vla/export-bc.test.ts ; rm tests/vla/export-bc.test.ts
 import { mkdirSync, openSync, writeSync, closeSync, writeFileSync } from "node:fs";
 import { it } from "vitest";
-import { collect } from "@/content/posts/pcb-flip-vla/components/sim";
+import { collect, randomCamera } from "@/content/posts/pcb-flip-vla/components/sim";
 it("export", () => {
   const out = process.env.VLA_OUT as string, n = Number(process.env.VLA_N ?? 2000), mode = (process.env.VLA_MODE ?? "bc") as "bc" | "dart";
   mkdirSync(out, { recursive: true });
   const fd = openSync(`${out}/frames.u8`, "w"), meta = []; let start = 0;
-  for (let seed = 1; seed <= n; seed++) {
-    const t = collect(seed, { mode, noise: Number(process.env.VLA_NOISE ?? 0) });
+  const first = Number(process.env.VLA_SEED0 ?? 1), camera = process.env.VLA_CAMRAND ? randomCamera : undefined;
+  for (let seed = first; seed < first + n; seed++) {
+    const t = collect(seed, { mode, noise: Number(process.env.VLA_NOISE ?? 0), camera });
     for (const f of t.frames) writeSync(fd, f);
     meta.push({ seed, start, length: t.frames.length, instruction: t.instruction, proprio: t.proprio, labels: t.labels, taken: t.taken, success: t.success }); start += t.frames.length;
   }
