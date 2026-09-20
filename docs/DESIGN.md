@@ -63,6 +63,11 @@ The one exception is a stage that must stay dark in both themes (section 5).
 
 - Short and functional: page swap 120 ms out / 260 ms in, title morph 340 ms (native View Transitions through
   React `<ViewTransition>`; not framer-motion).
+- The page swap is keyed to the pathname (`components/site/page-swap.tsx`, enter/exit). Never hang it on
+  `<ViewTransition update>`: a `next/dynamic` component replacing its placeholder is an update too, and replayed
+  the whole transition on every load of the home page.
+- Disclosures open and close visibly (phone menu, article outline): height by `grid-template-rows 0fr → 1fr`,
+  entries staggered in, a quicker exit. An open panel overlays the page; it never pushes the text.
 - Everything honours `prefers-reduced-motion`: the global rule in `globals.css` stops CSS animation; a canvas
   loop must check `useReducedMotion()` and draw one still frame instead.
 - Animate `transform` and `opacity` only. A loop that paints runs only while it is on screen and the tab is
