@@ -46,7 +46,7 @@ export function PostFooter({ locale, post, newer, older, related, t }: Props) {
           href={editUrl(post.slug, post.locale)}
           target="_blank"
           rel="noreferrer"
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-signal"
+          className="flex min-h-6 items-center gap-1.5 text-sm text-muted-foreground hover:text-signal"
         >
           <Pencil className="size-3.5" aria-hidden />
           {t.edit}

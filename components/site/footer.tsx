@@ -7,7 +7,7 @@ import { KernelMark } from "./kernel-mark";
 import { LocaleSwitch } from "./locale-switch";
 import { ThemeToggle } from "./theme-toggle";
 
-const linkClass = "text-sm text-muted-foreground transition-colors hover:text-foreground";
+const linkClass = "py-0.5 text-sm text-muted-foreground transition-colors hover:text-foreground";
 
 function Column({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -25,7 +25,7 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
       <Footer className="mx-auto w-full max-w-7xl bg-transparent px-5 pt-12 pb-6 sm:px-8">
         <FooterContent className="sm:grid-cols-3 md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))] lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
           <FooterColumn className="col-span-2 gap-3 sm:col-span-3 md:col-span-1">
-            <Link href={`/${locale}`} className="flex items-center gap-2.5">
+            <Link href={`/${locale}`} className="flex min-h-6 items-center gap-2.5">
               <KernelMark className="size-4" />
               <span className="font-mono text-sm">{site.name}</span>
             </Link>

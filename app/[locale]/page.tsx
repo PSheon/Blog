@@ -10,6 +10,7 @@ import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
 import { SectionHeading } from "@/components/site/section-heading";
 import { TriadRail } from "@/components/site/triad-rail";
+import { countOperators } from "@/lib/content/ml-stats";
 import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
 import { getAllPosts, getAllTags } from "@/lib/content/posts";
@@ -31,7 +32,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const readouts = [
     { label: t.home.readouts.posts, value: String(posts.length).padStart(2, "0") },
     { label: t.home.readouts.interactive, value: String(posts.filter((p) => p.interactive).length).padStart(2, "0") },
-    { label: t.home.readouts.libraries, value: "0" },
+    { label: t.home.readouts.operators, value: String(countOperators()) },
   ];
 
   // What the site is and who writes it, for search engines: the home page had no structured data at all.
@@ -161,7 +162,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </SectionHeading>
             <p className="mt-1 text-sm text-muted-foreground">{t.home.indexLead}</p>
           </div>
-          <Link href={`/${locale}/posts`} className="text-sm text-signal underline-offset-4 hover:underline">
+          <Link href={`/${locale}/posts`} className="inline-flex min-h-6 items-center text-sm text-signal underline-offset-4 hover:underline">
             {t.home.viewAll}
           </Link>
         </div>
@@ -182,7 +183,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </SectionHeading>
             <p className="mt-4 font-serif text-lg leading-relaxed text-muted-foreground">{t.about.bio}</p>
             <p className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm">
-              <a href={site.github} target="_blank" rel="me noreferrer" className="text-signal underline-offset-4 hover:underline">
+              <a href={site.github} target="_blank" rel="me noreferrer" className="inline-flex min-h-6 items-center text-signal underline-offset-4 hover:underline">
                 GitHub
               </a>
             </p>
