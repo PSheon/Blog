@@ -66,6 +66,11 @@ The one exception is a stage that must stay dark in both themes (section 5).
 - The page swap is keyed to the pathname (`components/site/page-swap.tsx`, enter/exit). Never hang it on
   `<ViewTransition update>`: a `next/dynamic` component replacing its placeholder is an update too, and replayed
   the whole transition on every load of the home page.
+- The home page's hero is four stations (see, think, generate, act), one live model each, and the rail under it is
+  the same control: both read `components/site/hero/station-store.ts`. Only the classifier loads with the page; the
+  others arrive when first chosen. The classifier stays mounted underneath so the box never changes height. A new
+  station is a file in `components/site/hero/`, built from its article's own code, with a caption that says plainly
+  if no model is running.
 - Disclosures open and close visibly (phone menu, article outline): height by `grid-template-rows 0fr → 1fr`,
   entries staggered in, a quicker exit. An open panel overlays the page; it never pushes the text.
 - Everything honours `prefers-reduced-motion`: the global rule in `globals.css` stops CSS animation; a canvas

@@ -2,10 +2,11 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { ErrorBoundary } from "@/components/lab/error-boundary";
 import { cn } from "@/lib/utils";
+import { type StationKey, setStation, useStation } from "./hero/station-store";
 import { HeroInstrumentLazy } from "./hero-instrument-lazy";
 
 const Think = dynamic(() => import("./hero/think"), { ssr: false });
@@ -13,7 +14,7 @@ const Generate = dynamic(() => import("./hero/generate"), { ssr: false });
 const Act = dynamic(() => import("./hero/act"), { ssr: false });
 
 export interface Station {
-  key: "see" | "think" | "generate" | "act";
+  key: StationKey;
   word: string;
   color: string;
   /** Title-bar name, e.g. "live · mnist-cnn". */
@@ -41,7 +42,7 @@ interface Props {
  * whatever is showing and nothing on the page moves.
  */
 export function HeroStations({ stations, label, hint, t }: Props) {
-  const [active, setActive] = useState<Station["key"]>("see");
+  const active = useStation(), setActive = setStation;
   const id = useId(), current = stations.find((s) => s.key === active) ?? stations[0];
   const move = (from: number, by: number) => {
     const next = stations[(from + by + stations.length) % stations.length];
@@ -50,7 +51,7 @@ export function HeroStations({ stations, label, hint, t }: Props) {
   };
 
   return (
-    <figure className="not-prose my-0" data-instrument={current.title}>
+    <figure id="hero-instrument" className="not-prose my-0 scroll-mt-24" data-instrument={current.title}>
       <div className="relative">
         <CornerMarks />
         <div className="relative overflow-hidden rounded-md border border-border bg-panel">
