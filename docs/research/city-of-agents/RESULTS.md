@@ -5,6 +5,9 @@ Everything here is headless: `content/posts/city-of-agents/components/sim` only,
 The scripts are the `.test.ts.txt` files in this folder; each says how to run it in its first lines.
 Browser frame time is not recorded here on purpose: the instrument measures it live.
 
+A word on names: the fourth need is `duty` in the code (`dutyHours`, `setDuty`) and in the tables below. The article and the
+instruments call it 待辦事項 / "backlog" — work waiting on the desk. It is the same number.
+
 ## 1. Cost of one tick (`bench.test.ts.txt`)
 
 One tick = one simulated minute = needs + due decisions + 6 movement sub-steps. 120 warm-up ticks, then one simulated day
