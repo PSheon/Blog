@@ -88,10 +88,12 @@ export function Timeline({ t, panel, onSeek, onLive }: { t: Labels; panel: Panel
         <span className="label">{t.timeline}{panel.replaying && <span className="ml-2 text-signal-2">● {t.replay}</span>}</span>
         <span className="font-mono text-xs tabular">{formatTime(panel.t)}</span>
       </div>
-      <div className="relative">
+      {/* The range input inside the slider takes its name from the label around it, as in Param. */}
+      <label className="relative block">
+        <span className="sr-only">{t.timeline}: {t.timelineHint}</span>
         <Slider value={[panel.t]} min={panel.from} max={Math.max(panel.from + 1, panel.now)} step={1} aria-label={`${t.timeline}: ${t.timelineHint}`} onValueChange={(v) => onSeek(Array.isArray(v) ? v[0] : v)} data-testid="city-timeline" />
         {panel.marks.map((m, k) => <span key={k} title={t.modeMark} aria-hidden className="pointer-events-none absolute -top-1 h-1.5 w-px bg-signal-2" style={{ left: `${((m - panel.from) / span) * 100}%` }} />)}
-      </div>
+      </label>
       <div className="flex items-center justify-between gap-3">
         <span className="label">{t.recordFrom} {formatTime(panel.from)}</span>
         <Button size="sm" variant="ghost" disabled={!panel.replaying} onClick={onLive} data-testid="city-live">{t.live}</Button>

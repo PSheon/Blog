@@ -8,6 +8,8 @@ import { useVisible } from "./use-visible";
 
 /** One colour per activity, shared by the people in the scene and every legend: the data-series tokens, in their dark values. */
 export const SWATCH = { work: "bg-chart-1", eat: "bg-chart-2", social: "bg-chart-5", sleep: "bg-chart-4", idle: "bg-foreground" } as const;
+/** The same, for SVG. Spelled out: Tailwind only ships the class names it can read in the source. */
+export const FILL = { work: "fill-chart-1", eat: "fill-chart-2", social: "fill-chart-5", sleep: "fill-chart-4", idle: "fill-foreground", walking: "fill-muted-foreground" } as const;
 const TOKEN: Record<keyof typeof SWATCH, string> = { work: "--chart-1", eat: "--chart-2", social: "--chart-5", sleep: "--chart-4", idle: "--foreground" };
 
 /**

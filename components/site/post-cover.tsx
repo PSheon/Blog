@@ -219,6 +219,25 @@ function Generic({ seed }: { seed: number }) {
   );
 }
 
+/** № 009: a block of the city from above, with people on the pavement coloured by what they are up to. */
+function City() {
+  const lots: [number, number, number, number][] = [[20, 16, 34, 26], [62, 16, 36, 26], [106, 16, 34, 26], [20, 58, 34, 26], [62, 58, 36, 26], [106, 58, 34, 26]];
+  const people: [number, number, string][] = [[24, 49, S], [38, 52, S], [57, 30, S2], [58, 66, S3], [70, 50, S], [88, 53, S2], [101, 38, S], [102, 72, S3], [120, 50, S], [136, 52, S2]];
+  return (
+    <>
+      {lots.map(([x, y, w, h], i) => (
+        <g key={i}>
+          <rect x={x} y={y} width={w} height={h} rx={2} fill="none" stroke={DIM} strokeWidth={1} />
+          <rect x={x + 5} y={y + 5} width={w - 10} height={h - 10} rx={1} fill="var(--background)" stroke={i === 1 || i === 4 ? S : DIM} strokeWidth={i === 1 || i === 4 ? 1.6 : 1} />
+        </g>
+      ))}
+      <path d="M57 44 v12 M101 44 v12 M56 47 h-2 M56 50 h-2 M56 53 h-2" stroke={DIM} strokeWidth={1} />
+      <path d="M24 49 H57 V30" fill="none" stroke={S3} strokeWidth={1} strokeDasharray="2 3" />
+      {people.map(([x, y, c], i) => <circle key={i} cx={x} cy={y} r={2.2} fill={c} />)}
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -228,6 +247,7 @@ const covers: Record<string, () => ReactNode> = {
   "lite3-walking": Lite3,
   "diffusion-points": Diffusion,
   "slam-2d": Slam,
+  "city-of-agents": City,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {
