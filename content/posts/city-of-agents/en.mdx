@@ -11,37 +11,130 @@ draft: true
 ---
 
 import { CityLab, ModesLab, NeedsLab, OverseerLab, UtilityLab } from "./components";
+import { PARAMS } from "./components/sim/params";
 
-{/* Skeleton: the prose is the author's. Every Instrument is a mounting point; keep them in step with zh.mdx. */}
+[The previous entry](/en/posts/slam-2d) had one car. This one has three hundred people living in the same city, each going to work, eating, finding company and going home to sleep.
 
-<Instrument fig="01" title="city / day" size="wide" caption="(to be written) A city grown from a seed, and one of its days.">
+Look first. One second in the city is ten minutes outside, so a day takes two and a half minutes; 20× is faster still. Click any person in the scene, or press "Follow someone", and the camera comes down to the street and walks with them.
+
+<Instrument fig="01" title="city / day" size="wide" caption="300 people (100 on a phone). A person's colour is what they are doing, or on their way to do. Sky, street lamps and lit windows all follow the city's clock.">
   <CityLab />
 </Instrument>
 
+Around eight or nine in the morning the cyan dots gather from the residential blocks towards the towers in the centre; in the evening they spread out again; at night only a few people are left on the streets and the windows go dark one building at a time.
+
+There is no timetable in this city. You will not find a line of code that says "work starts at eight". Each person knows four numbers of their own and one formula for scoring things.
+
+First, what this is not: **there is no machine learning here.** No training, no neural network. It is an old method from the games industry called utility AI, the way a Sim decides between the fridge and the bed. It earns an article by being small: the scoring and choosing is under thirty lines, and that is enough for a city to keep hours. The whole simulation is about nine hundred lines of TypeScript, with no physics engine and no external assets.
+
 ## How the city grows
+
+The whole city comes from one number, the seed. The same seed always grows the same city.
+
+Lay out 8 × 8 blocks, every fourth road a wider arterial. The east column is the riverside; every other block is zoned by its distance from the centre: commercial nearest, then restaurant streets and more offices, residential outside, a few parks at random. A building's height is a random number times how close it is to the centre. Seed 1 grows 373 buildings: 248 houses, 29 office blocks and 96 shopfronts, the tallest 80 metres.
+
+People walk on pavements and zebra crossings only. Each block is ringed by a pavement, joined to its neighbours at the corners, and every building has a door on it. Those points and lines are a graph of 639 nodes and 863 edges; going somewhere is a shortest path on it, found with A\* and remembered for the next person.
+
+<Sidenote>Everything on screen takes 10 draw calls, shadow pass included: every box — ground, buildings, crossing stripes, benches, lamp posts — is one InstancedMesh; tree crowns, windows, lamps, people's bodies and people's heads are one each. The sun's height is sin((hour − 6) / 24 · 2π), and light, sky, fog, lamps and windows are all functions of that value: the scene itself does not remember whether it is day or night.</Sidenote>
 
 ## Four needs
 
-<Instrument fig="02" title="city / needs" caption="(to be written) One person, three days, four needs. Worked out by your browser; the numbers live in sim/params.ts.">
+Each person carries four numbers from 0 to 1, where 0 is content and 1 is unbearable. They grow with time, and fall when the person does the right thing in the right place.
+
+| need | grows per hour | considered once past | where | falls per hour |
+| --- | --- | --- | --- | --- |
+| fatigue | {PARAMS.decay[0]} | {PARAMS.threshold[0]} | their own home | {PARAMS.recovery[0]} |
+| hunger | {PARAMS.decay[1]} | {PARAMS.threshold[1]} | any place on a restaurant street | {PARAMS.recovery[1]} |
+| social | {PARAMS.decay[2]} | {PARAMS.threshold[2]} | a park or the riverside | {PARAMS.recovery[2]} |
+| duty | {PARAMS.decay[3]} (only from {PARAMS.dutyHours[0]}:00 to {PARAMS.dutyHours[1]}:00) | {PARAMS.threshold[3]} | their own office | {PARAMS.recovery[3]} |
+
+When a person is created, each growth rate is shifted by up to {PARAMS.rateJitter * 100}%, and the first three needs start at random levels. No two people are alike.
+
+Here are three days of one of them, worked out by your browser just now.
+
+<Instrument fig="02" title="city / needs" caption="Four lines for four needs, the dashed line the threshold; the darker spans are night. The strip at the bottom is what the person was doing. Untick duty and see how much of the day comes free.">
   <NeedsLab />
 </Instrument>
 
+Hunger is the most regular: eight hours to reach 0.6, forty minutes to eat, three meals a day. Duty grows only by day, so work happens by day.
+
+Fatigue has one thing the others do not: **it grows faster at night.** Its rate is multiplied by (1 − {PARAMS.circadian} × the sun's height), so the lower the sun, the sooner people tire. I measured what happens without it: the sleep of 300 people spreads evenly over the day, with a fifth to almost half of them asleep at any hour, and the city has no night. With it, two thirds are asleep at one in the morning and 2% at noon.
+
+<Sidenote>My first version of this table did not fit into a day. Add up the time the four needs each demand and you get 28.8 hours out of every 24, before any walking. Run, it gave a city where nobody had a free minute, every need sat at 1.0 for more than a quarter of the time, and the median start of work was two in the afternoon. The numbers above were changed against measurements; the comparison is in this project's `docs/research/city-of-agents/RESULTS.md`.</Sidenote>
+
 ## Picking the next thing to do
 
-<Instrument fig="03" title="city / utility" caption="(to be written) utility = need² − 0.1 × walk (hours). It is the function every person in the city uses.">
+Everything a person could do gets a score:
+
+**utility = need² − {PARAMS.distanceCost} × hours of walking to get there**
+
+The square makes urgent things matter out of proportion: a hunger of 0.9 is not one and a half times a hunger of 0.6 but more than twice it. The second term is the price of the walk. A person scores everything that is past its threshold and takes the best; if nothing is, they stay where they are with nothing to do.
+
+<Instrument fig="03" title="city / utility" caption="Two options, each with a need behind it and a walk in front of it. The scoring is the very function every person in the city uses.">
   <UtilityLab />
 </Instrument>
 
+To begin with, A is more urgent but forty minutes away, B milder but next door, and A wins (0.573 to 0.482). Drag B's need from 0.70 to 0.77 and B overtakes: seven points of urgency are worth thirty-five minutes on foot. The median trip in this city is 15 minutes, so distance mostly decides between things about equally urgent — which restaurant, for instance.
+
+The formula alone is not enough. Two things go wrong:
+
+**One bite and gone.** Someone goes to eat when hunger passes 0.6; half an hour later it is below 0.6, eating is no longer an option, so they leave — and are hungry again within minutes. The cure is two thresholds (start past {PARAMS.threshold[1]}, finish at {PARAMS.doneAt}) and {PARAMS.stayBonus} extra for whatever a person is already doing.
+
+**Everyone deciding on the same minute.** People do not think again every frame. They think on arriving, on finishing, and every {PARAMS.reconsiderMinutes} minutes. Count those {PARAMS.reconsiderMinutes} minutes from midnight for everybody and three hundred people set off together, as if someone were conducting. So each person counts from a moment of their own.
+
 ## Three heads, the same legs
 
-<Instrument fig="04" title="city / modes" size="wide" caption="(to be written) The same 300 people run for two days, headless, by your browser; the chart is day two, the share of people doing each thing in every ten minutes.">
+To know whether the daily rhythm really grows out of the needs, swap the head and leave everything else: the same city, the same 300 people, the same walking code.
+
+- **Fixed timetable**: everyone works at {PARAMS.fsm.work}, eats at {PARAMS.fsm.lunch}, goes home at {PARAMS.fsm.home}.
+- **Each by their needs**: the formula from the last section.
+- **At random**: pick any place, stay half an hour to two hours.
+
+<Instrument fig="04" title="city / modes" size="wide" caption="Each head is run for two days by your browser in the background (no picture, so it is quick). The chart is day two: in every ten minutes, what share of people was doing what.">
   <ModesLab />
 </Instrument>
 
+The timetable's day is cut with a knife. At eight sharp, 100% of people leave within the same ten minutes; nobody ever seeks company, because the timetable has no line for it, and the social need sits at 1.0 throughout.
+
+The random day is flat: three in the morning looks like three in the afternoon.
+
+The one in the middle keeps hours: most people asleep at night, the cyan of work rising through the morning and ebbing through the evening, meals and company scattered across the day. Nobody drew up that rota; it is what three hundred slightly different sets of numbers work out separately. In its busiest ten minutes only 12% of people set off together, much like random's 10% — but random has no shape.
+
+Switch duty off and measure again (offline: 300 people, seed 1, the last of five days): sleeping, eating and company barely change, and free time goes from 11% to 40%. People do not find themselves something to do, and that is the most honest thing about this model: **it only answers the needs you give it.** If you want them to shop or exercise, that is another number.
+
 ## Who is watching everyone
 
-<Instrument fig="05" title="city / overseer" size="wide" caption="(to be written) Everyone's state, the events as sentences, every knob, and a timeline you can drag back.">
+With three hundred people each minding their own business, how do you know who is doing what? The simulation writes a record of every event: who, when, departed / arrived / started / finished / idle, and where. Three hundred people make about eleven thousand of them a day.
+
+Below is the whole bench. On the right is the overseer: a row per person with what they are doing, where, and how high each need is; choose a row and the camera goes to follow them. Under it the record is written out as sentences. Every knob is here: how many people, the seed, the size of the city, the three heads, duty on or off, how hard people avoid each other.
+
+<Instrument fig="05" title="city / overseer" size="wide" caption="The timeline can be dragged back. The replayed picture, everyone's state and their need bars are worked out from the event record alone; nothing is re-simulated. The small pink ticks mark where you changed the rules.">
   <OverseerLab />
 </Instrument>
 
+Drag the timeline back. The picture returns to that moment, but the simulation is not rewound and run again: the moment is **computed** from the record, in two parts.
+
+**Need bars.** Between two events nothing about a person changes, so every need is a straight line. Each event notes the person's four numbers, and any later value is that number plus rate times elapsed time.
+
+**Positions.** A "departed" event says where the walk started and where it is going, so the route can be found again (same start, same goal: A\* always gives the same path); the time of arrival then says how far along it the person is at this moment. A replay does not reproduce people stepping around each other, so positions are slightly off: measured over people who were walking, the median gap between the replayed and the real position is 6 units, about forty seconds of walking.
+
+The record keeps at most 5000 events, about ten hours of three hundred people. Older events are not simply dropped: they are folded into a snapshot of "the state when the record begins", so the start of the timeline is always a known state.
+
+The "frame time" under the scene is measured on your machine as you watch: the milliseconds of CPU each frame spends on the simulation, the panel and issuing draw commands, not the time the graphics card takes to draw. The simulation itself is cheap: on my machine (Apple M4 Pro) a city of 300 people moves one minute forward in 0.095 ms.
+
 ## What differs from the real thing, and how the numbers were measured
+
+**This does not simulate people.** I chose the four needs and tuned their rates until it looked like a day. Duty starts to build at {PARAMS.dutyHours[0]} in the morning so that it passes its threshold around half past eight; that is not how an office worker works. The model can claim one thing only: without a timetable, a few numbers that rise and fall and one scoring formula are enough for a crowd to find a rhythm.
+
+**The walking is drawn.** A position moves along its route, steps aside a little and is kept within the pavement; the bobbing and the lean are only drawing. No cars, no traffic lights, no interiors: people doing something stand at the door, twice life size, or from the air they would be two pixels.
+
+**What a game's version adds.** Real utility AI gives each option several considerations, passes each through its own curve (not necessarily a square) and multiplies them; objects advertise what they can satisfy; and there are personalities, memory, queues and reservations. What is left here is the smallest skeleton.
+
+The numbers come from three places. Figures 02, 03 and 04 and the read-outs on the bench are computed by your browser as you read; the ones I say I measured were run offline, with seed, population and scripts in `docs/research/city-of-agents/`; the counts of buildings and nodes are what seed 1 grows at 8 × 8, and a test guarantees the same seed always grows the same city.
+
+## Sources
+
+- Utility AI in full: Dave Mark, *Behavioral Mathematics for Game AI*, 2009.
+- Needs and advertising objects in The Sims: Kenneth Forbus and Will Wright, *Some notes on programming objects in The Sims*, 2001.
+- Seek, arrive, separation: Craig Reynolds, *Steering Behaviors For Autonomous Characters*, GDC 1999.
+- A\*: Hart, Nilsson, Raphael, *A Formal Basis for the Heuristic Determination of Minimum Cost Paths*, 1968.
