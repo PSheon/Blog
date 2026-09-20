@@ -9,6 +9,7 @@ import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { NavProgress } from "@/components/site/nav-progress";
 import { ServiceWorker } from "@/components/site/service-worker";
+import { Spotlight } from "@/components/site/spotlight";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
@@ -90,6 +91,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             also have to be switched on once in the project's dashboard. */}
         <NavProgress label={locale === "zh" ? "頁面載入中" : "Loading page"} />
         <ServiceWorker enabled={SERVICE_WORKER} />
+        <Spotlight />
         {process.env.VERCEL && <Analytics />}
         {process.env.VERCEL && <SpeedInsights />}
       </body>
