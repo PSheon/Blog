@@ -6,7 +6,11 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: `${site.name} — 從零實作機器學習模型`,
     short_name: site.name,
-    description: "Machine learning models built from scratch that you can train, take apart and break in your browser.",
+    description: "從零實作機器學習模型，每一篇都能在瀏覽器裡訓練、拆開、弄壞。",
+    lang: "zh-Hant-TW",
+    // A stable identity for the installed app, whatever the start URL becomes later.
+    id: "/",
+    // "/" redirects by language. A redirect cannot be cached, so offline the worker answers it with the cached home page.
     start_url: "/",
     scope: "/",
     display: "standalone",

@@ -23,7 +23,7 @@ export function OutcomesLab() {
     let cancelled = false, view: OutcomesView | null = null, raf = 0;
     const onResize = () => view?.render();
     const start = async () => {
-      const T = await import("three");
+      const T = await import("@/lib/three");
       if (cancelled || !canvas.current) return;
       view = new OutcomesView(T, canvas.current);
       window.addEventListener("resize", onResize);
@@ -43,7 +43,7 @@ export function OutcomesLab() {
   return (
     <div ref={root} className="grid gap-4 text-sm">
       <div className="relative">
-        <canvas ref={canvas} className="aspect-[3/4] w-full rounded-md text-foreground sm:aspect-[16/10]" />
+        <canvas role="img" aria-label={t.picOutcomes} ref={canvas} className="aspect-[3/4] w-full rounded-md text-foreground sm:aspect-[16/10]" />
         <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-[10px]">
           {CARDS.map((id, i) => (
             <div key={id} className="flex min-w-0 flex-col justify-between rounded-md border border-border p-2" data-testid={`slam-outcome-${id}`}>

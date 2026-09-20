@@ -27,7 +27,7 @@ export function DigitCanvas({ strokes, onChange, ariaLabel, hint, className }: P
     const canvas = ref.current;
     if (!canvas) return;
     const paint = () => {
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = Math.min(2, window.devicePixelRatio || 1); // a 3× phone would draw 2.25 times the pixels for nothing
       const side = canvas.clientWidth;
       if (canvas.width !== Math.round(side * dpr)) {
         canvas.width = canvas.height = Math.round(side * dpr);

@@ -2,6 +2,7 @@
 
 import { Dices } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNear } from "@/components/lab/use-near";
 import { Button } from "@/components/ui/button";
 import { type SceneSource, createSceneSource } from "./emoji";
 import { useLabels } from "./labels";
@@ -20,16 +21,18 @@ export function LabelsFigure() {
     setKind(source.current.kind);
     setScene(source.current.next(Math.random));
   };
+  const root = useRef<HTMLDivElement>(null), near = useNear(root);
   useEffect(() => {
+    if (!near) return; // drawing the emoji set is not free: wait until the figure is a screen away
     const id = window.setTimeout(next, 0);
     return () => window.clearTimeout(id);
-  }, []);
+  }, [near]);
 
   const maskOverlay = useMemo(() => (scene ? { values: scene.mask, threshold: 0.5 } : undefined), [scene]);
   const truth = useMemo(() => (scene ? [{ box: scene.box, color: "#ff6e96" }] : []), [scene]);
 
   return (
-    <div className="grid gap-4">
+    <div ref={root} className="grid gap-4">
       <div className="grid grid-cols-3 gap-3 sm:gap-5">
         <figure>
           <SceneCanvas image={scene?.image ?? null} label={t.image} />

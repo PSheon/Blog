@@ -75,7 +75,20 @@ export function AlignLab() {
     <div ref={root} className="grid gap-4 text-sm">
       <canvas
         ref={view}
-        className="aspect-[16/9] w-full cursor-grab touch-none rounded-md border border-border text-foreground active:cursor-grabbing"
+        // Focusable, with the arrow keys doing what a drag does: moving the scan was pointer-only before.
+        role="application"
+        tabIndex={0}
+        aria-label={`${t.picAlign}${t.keysHint}`}
+        onKeyDown={(e) => {
+          const move: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+          const d = move[e.key];
+          if (!d) return;
+          e.preventDefault(); // or the page scrolls
+          stop();
+          const by = e.shiftKey ? 0.5 : 0.1;
+          setGuess((g) => ({ ...g, x: g.x + d[0] * by, y: g.y + d[1] * by })); setResult(null); setStep(0);
+        }}
+        className="aspect-[16/9] w-full cursor-grab touch-none rounded-md border border-border text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
         onPointerDown={(e) => { stop(); drag.current = floor(live.current?.stage, e); e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => {
           const now = floor(live.current?.stage, e);

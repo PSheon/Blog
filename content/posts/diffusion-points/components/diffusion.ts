@@ -146,7 +146,3 @@ export function schedule(count: number): number[] {
   return Array.from({ length: count + 1 }, (_, k) => Math.round(T - (k * T) / count));
 }
 
-/** A clean point pushed to noise level `t`: what the network is trained on. */
-export function diffuse(p: ArrayLike<number>, t: number, rng: Rng, out: Float64Array, at: number) {
-  for (let k = 0; k < DIMS; k++) out[at + k] = Math.sqrt(ALPHA_BAR[t]) * p[k] + Math.sqrt(1 - ALPHA_BAR[t]) * gaussian(rng);
-}

@@ -5,11 +5,12 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
 import { useLabels } from "./labels";
+import { followInk } from "./stage3d";
 import { type Cloud, type Pose3, ROOM, apply, compose3, fromEuler, icp3, inverse3, rotationAngle, sweep } from "./lidar3d/icp3";
 import { useVisible } from "./use-visible";
 
 const KEEP = 14; // sweeps kept in the drawn map
-type Three = typeof import("three");
+type Three = typeof import("@/lib/three");
 
 /** The sensor's true motion for sweep k: mostly forward, a slow sway, and a quarter turn now and then — a lap of the room. */
 const motion = (k: number): Pose3 => {
@@ -26,7 +27,7 @@ export function CloudLab() {
   const [seen, setSeen] = useState({ sweeps: 0, drift: 0, turn: 0, ms: 0 });
   const three = useRef<Three | null>(null);
 
-  const load = async () => { setStatus("loading"); three.current = await import("three"); setStatus("ready"); setPlaying(true); };
+  const load = async () => { setStatus("loading"); three.current = await import("@/lib/three"); setStatus("ready"); setPlaying(true); };
 
   useEffect(() => {
     const T = three.current, canvas = stage.current;
@@ -40,6 +41,7 @@ export function CloudLab() {
     const now = new T.Points(new T.BufferGeometry(), new T.PointsMaterial({ color: 0x79dafa, size: 0.07 }));
     const estLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: 0x79dafa })), truthLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: 0xff6e96 }));
     scene.add(old, now, estLine, truthLine);
+    const unfollow = followInk(T, canvas, () => [scene], ink);
 
     const rng = mulberry32(3), start = fromEuler(0, 0, 0, [2, 1.6, 0.6]);
     let truth = start, est = start, prev: Cloud = sweep(ROOM, truth, rng), k = 0, ms = 0, since = 0, frame = 0, last = performance.now();
@@ -77,7 +79,7 @@ export function CloudLab() {
     };
     if (k === 0) tick();
     frame = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(frame); renderer.dispose(); };
+    return () => { cancelAnimationFrame(frame); unfollow(); renderer.dispose(); };
   }, [status, playing, visible]);
 
   return (
@@ -87,7 +89,7 @@ export function CloudLab() {
           <Button onClick={() => void load()} disabled={status === "loading"}>{t.cloudLoad}</Button>
         </div>
       ) : (
-        <canvas ref={stage} className="aspect-[2/1] w-full rounded-md border border-border text-foreground" />
+        <canvas role="img" aria-label={t.picCloud} ref={stage} className="aspect-[2/1] w-full rounded-md border border-border text-foreground" />
       )}
       <p className="text-muted-foreground">{t.cloudLegend}</p>
       <div className="grid items-end gap-4 sm:grid-cols-[auto_1fr_1fr_1fr]">

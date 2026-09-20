@@ -168,6 +168,45 @@ function Diffusion() {
   );
 }
 
+/**
+ * A lap of a corridor: the walls as lidar points, the wheels' own idea of the lap drifting open (pink), the
+ * corrected one as a chain of poses (cyan), and the loop closure that pulls the ends together (violet).
+ */
+function Slam() {
+  const rand = rng(8);
+  // Walls: points along an outer and an inner rectangle, a little noisy, like a scan.
+  const walls: [number, number][] = [];
+  const box = (x0: number, y0: number, x1: number, y1: number, step: number) => {
+    for (let x = x0; x <= x1; x += step) walls.push([x, y0], [x, y1]);
+    for (let y = y0 + step; y < y1; y += step) walls.push([x0, y], [x1, y]);
+  };
+  box(22, 10, 138, 90, 5.8);
+  box(50, 34, 110, 66, 5.8);
+  // The true lap runs between the two; poses sit on it at even steps.
+  const lap = (t: number): [number, number] => {
+    // A superellipse: a rectangle with generous corners, which is what a car's lap of a corridor looks like.
+    const a = t * Math.PI * 2 + Math.PI * 0.75, c = Math.cos(a), s = Math.sin(a);
+    return [80 + 44 * Math.sign(c) * Math.abs(c) ** 0.45, 50 + 28 * Math.sign(s) * Math.abs(s) ** 0.45];
+  };
+  const poses = Array.from({ length: 18 }, (_, i) => lap(i / 18));
+  // Dead reckoning: the same lap with an error that grows with distance, so it ends beside its start.
+  const drift = Array.from({ length: 41 }, (_, i) => {
+    const t = i / 40, [x, y] = lap(t);
+    return `${r1(x + t * t * 17)} ${r1(y + t * t * 12 - t * 3)}`;
+  });
+  const [ex, ey] = drift[40].split(" ").map(Number);
+  return (
+    <>
+      {walls.map(([x, y], i) => <circle key={i} cx={r1(x + (rand() - 0.5) * 1.4)} cy={r1(y + (rand() - 0.5) * 1.4)} r={0.95} fill={DIM} />)}
+      <path d={`M${drift.join(" L")}`} fill="none" stroke={S2} strokeWidth={1.2} strokeDasharray="2.5 2.5" opacity={0.85} />
+      <path d={`M${poses.map(([x, y]) => `${r1(x)} ${r1(y)}`).join(" L")} Z`} fill="none" stroke={S} strokeWidth={1.3} />
+      {poses.map(([x, y], i) => <circle key={i} cx={r1(x)} cy={r1(y)} r={i === 0 ? 3 : 1.9} fill={S} />)}
+      <path d={`M${ex} ${ey} L${r1(poses[0][0])} ${r1(poses[0][1])}`} stroke={S3} strokeWidth={1.6} />
+      <circle cx={ex} cy={ey} r={2.6} fill={S3} />
+    </>
+  );
+}
+
 /** For an article without a drawing of its own yet: its number as a constellation on the grid. */
 function Generic({ seed }: { seed: number }) {
   const rand = rng(seed * 97 + 1);
@@ -180,6 +219,25 @@ function Generic({ seed }: { seed: number }) {
   );
 }
 
+/** № 009: a block of the city from above, with people on the pavement coloured by what they are up to. */
+function City() {
+  const lots: [number, number, number, number][] = [[20, 16, 34, 26], [62, 16, 36, 26], [106, 16, 34, 26], [20, 58, 34, 26], [62, 58, 36, 26], [106, 58, 34, 26]];
+  const people: [number, number, string][] = [[24, 49, S], [38, 52, S], [57, 30, S2], [58, 66, S3], [70, 50, S], [88, 53, S2], [101, 38, S], [102, 72, S3], [120, 50, S], [136, 52, S2]];
+  return (
+    <>
+      {lots.map(([x, y, w, h], i) => (
+        <g key={i}>
+          <rect x={x} y={y} width={w} height={h} rx={2} fill="none" stroke={DIM} strokeWidth={1} />
+          <rect x={x + 5} y={y + 5} width={w - 10} height={h - 10} rx={1} fill="var(--background)" stroke={i === 1 || i === 4 ? S : DIM} strokeWidth={i === 1 || i === 4 ? 1.6 : 1} />
+        </g>
+      ))}
+      <path d="M57 44 v12 M101 44 v12 M56 47 h-2 M56 50 h-2 M56 53 h-2" stroke={DIM} strokeWidth={1} />
+      <path d="M24 49 H57 V30" fill="none" stroke={S3} strokeWidth={1} strokeDasharray="2 3" />
+      {people.map(([x, y, c], i) => <circle key={i} cx={x} cy={y} r={2.2} fill={c} />)}
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -188,6 +246,8 @@ const covers: Record<string, () => ReactNode> = {
   "hydranet-fruit": Hydra,
   "lite3-walking": Lite3,
   "diffusion-points": Diffusion,
+  "slam-2d": Slam,
+  "city-of-agents": City,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {

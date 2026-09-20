@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 import type { ShapeName } from "./shapes";
 
 const zh = {
@@ -84,5 +84,5 @@ const en: typeof zh = {
 };
 
 export function useLabels() {
-  return usePathname().startsWith("/en") ? en : zh;
+  return useLocaleLabels(zh, en);
 }

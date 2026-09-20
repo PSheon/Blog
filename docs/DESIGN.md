@@ -66,6 +66,11 @@ The one exception is a stage that must stay dark in both themes (section 5).
 - The page swap is keyed to the pathname (`components/site/page-swap.tsx`, enter/exit). Never hang it on
   `<ViewTransition update>`: a `next/dynamic` component replacing its placeholder is an update too, and replayed
   the whole transition on every load of the home page.
+- The home page's hero is four stations (see, think, generate, act), one live model each, and the rail under it is
+  the same control: both read `components/site/hero/station-store.ts`. Only the classifier loads with the page; the
+  others arrive when first chosen. The classifier stays mounted underneath so the box never changes height. A new
+  station is a file in `components/site/hero/`, built from its article's own code, with a caption that says plainly
+  if no model is running.
 - Disclosures open and close visibly (phone menu, article outline): height by `grid-template-rows 0fr → 1fr`,
   entries staggered in, a quicker exit. An open panel overlays the page; it never pushes the text.
 - Everything honours `prefers-reduced-motion`: the global rule in `globals.css` stops CSS animation; a canvas
@@ -116,6 +121,15 @@ Rules inside an instrument:
 
 ### A new article also needs
 
+- Its instruments exported twice: `components/labs.ts` re-exports them plainly, and `components/index.ts` (the one the
+  MDX imports) is a `"use client"` file of `next/dynamic` wrappers over `./labs`. Copy an existing pair. All articles
+  share one route, and Next gives a route the client code of everything it can render, so plain re-exports ship every
+  article's instruments with every article (measured: 292 KB gzip of page scripts, 203 KB after the split). A
+  `dynamic()` in a server file does not split; it has to be a client file.
+- `draft: true` in the front matter of both language files while it is being written. A draft is left out of
+  production builds and shown only by `next dev`, where it wears a "草稿 DRAFT" mark beside its number on every
+  surface (`EntryNo`) and a banner on its own page. Publishing is removing the flag from both files, adding the
+  article to the page list in `e2e/a11y.spec.ts`, and a row in the README.
 - A cover drawing in `components/site/post-cover.tsx` (`viewBox="0 0 160 100"`, the three signal variables only,
   deterministic — no `Math.random()`; it is hydrated). Until it has one, it gets the generic constellation.
 - Optionally a live preview for the "latest" card: a component registered in `components/site/post-previews.tsx`
@@ -193,6 +207,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm build
 - [ ] Looked at in a real browser: 1440 and 390 wide, dark and light, console read once.
 - [ ] `draft: true` removed from both files; date set; `no` is the next number.
 - [ ] Both pages added to `pages` in `e2e/a11y.spec.ts`; a smoke test for the main instrument in `e2e/smoke.spec.ts`.
+- [ ] `components/labs.ts` + the lazy `components/index.ts`; no other article's test ids in this page's scripts.
 - [ ] Cover drawing added to `post-cover.tsx`.
 - [ ] Numbers in the text re-read against their source.
 - [ ] Merged into `dev`; `main` only through a pull request.

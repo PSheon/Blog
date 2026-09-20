@@ -1,0 +1,22 @@
+// Headless cost of one tick (one simulated minute) of the city simulation: no three.js, no rendering.
+// The repo has no TypeScript runner, so this is a vitest file kept as .txt. To run it:
+//   cp docs/research/city-of-agents/bench.test.ts.txt tests/city/bench.test.ts
+//   pnpm exec vitest run tests/city/bench.test.ts --disable-console-intercept ; rm tests/city/bench.test.ts
+import { it } from "vitest";
+import { generateCity, World } from "@/content/posts/city-of-agents/components/sim";
+
+it("bench", () => {
+  const rows = [];
+  for (const n of [4, 8, 16]) for (const agents of [50, 100, 300, 1000]) {
+    const t0 = performance.now(), city = generateCity(1, n), world = new World(city, { agents }), built = performance.now() - t0;
+    let events = 0;
+    world.onEvent = () => { events++; };
+    for (let k = 0; k < 120; k++) world.tick(); // warm up the JIT and the path cache a little
+    const times = new Float64Array(1440);
+    for (let k = 0; k < 1440; k++) { const s = performance.now(); world.tick(); times[k] = performance.now() - s; }
+    const sorted = [...times].sort((a, b) => a - b), mean = times.reduce((s, v) => s + v, 0) / times.length;
+    rows.push({ N: n, agents, "nav nodes": city.nav.nodes.length, "build ms": built.toFixed(1), "tick mean ms": mean.toFixed(3), "tick p95 ms": sorted[Math.floor(0.95 * 1440)].toFixed(3),
+      "tick max ms": sorted[1439].toFixed(2), "events/day": events, "path cache hit": `${Math.round((100 * world.paths.hits) / (world.paths.hits + world.paths.misses))}%` });
+  }
+  console.table(rows);
+}, 600_000);

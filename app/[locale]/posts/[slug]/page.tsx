@@ -96,9 +96,18 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
         </aside>
 
         <div className="mx-auto min-w-0 max-w-[42.5rem] xl:col-span-2 xl:mx-0 xl:max-w-none">
+          {post.draft && (
+            // Only ever rendered by `next dev`: a production build has no drafts. To the author, so in both languages.
+            <p role="note" data-testid="draft-banner" className="mb-6 max-w-[48rem] rounded-md border border-signal-2 bg-signal-2/10 px-4 py-3 font-sans text-sm leading-relaxed">
+              <strong className="font-semibold text-signal-2">草稿 DRAFT</strong>
+              <span className="mx-2 text-muted-foreground">/</span>
+              這篇只在本機的 <code className="font-mono text-xs">next dev</code> 看得到，正式站不會出現。拿掉 frontmatter 的 <code className="font-mono text-xs">draft: true</code>（中英文兩個檔）才會發布。
+              <span lang="en" className="mt-1 block text-muted-foreground">Only <code className="font-mono text-xs">next dev</code> shows this page; production builds leave it out. Remove <code className="font-mono text-xs">draft: true</code> from both language files to publish.</span>
+            </p>
+          )}
           <header className="max-w-[48rem] border-b border-rule pb-8">
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              <EntryNo no={post.no} className="text-signal" />
+              <EntryNo no={post.no} draft={post.draft} className="text-signal" />
               {post.interactive && <InteractiveBadge label={t.post.interactive} />}
             </p>
             {/* Same name as the title in the post index: the browser morphs one into the other. */}

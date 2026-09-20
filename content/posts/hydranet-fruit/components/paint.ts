@@ -13,7 +13,7 @@ export interface Overlay {
 export function paintScene(canvas: HTMLCanvasElement, image: ArrayLike<number> | null, { mask, boxes = [] }: Overlay = {}) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  const dpr = window.devicePixelRatio || 1;
+  const dpr = Math.min(2, window.devicePixelRatio || 1); // a 3× phone would draw 2.25 times the pixels for nothing
   const side = Math.max(1, Math.round(canvas.clientWidth * dpr));
   if (canvas.width !== side) canvas.width = canvas.height = side;
   const cell = side / SIZE, n = SIZE * SIZE;

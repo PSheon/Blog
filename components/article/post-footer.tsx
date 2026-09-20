@@ -19,6 +19,8 @@ function Neighbour({ post, locale, label, align }: { post: PostMeta; locale: Loc
   return (
     <Link
       href={`/${locale}/posts/${post.slug}`}
+      // No prefetch down here: each article's payload is 20 KB and up, and six links fetched six of them per page view.
+      prefetch={false}
       className={`group block border-t border-rule pt-4 ${align === "right" ? "sm:text-right" : ""}`}
     >
       <span className={`label flex items-center gap-1.5 ${align === "right" ? "sm:justify-end" : ""}`}>
@@ -68,8 +70,8 @@ export function PostFooter({ locale, post, newer, older, related, t }: Props) {
           <ul>
             {related.map((p) => (
               <li key={p.slug} className="border-b border-rule">
-                <Link href={`/${locale}/posts/${p.slug}`} className="group flex items-baseline gap-4 py-3">
-                  <EntryNo no={p.no} className="shrink-0 text-xs text-signal" />
+                <Link href={`/${locale}/posts/${p.slug}`} prefetch={false} className="group flex items-baseline gap-4 py-3">
+                  <EntryNo no={p.no} draft={p.draft} className="shrink-0 text-xs text-signal" />
                   <span className="font-heading text-base font-medium decoration-signal decoration-1 underline-offset-4 group-hover:underline">
                     {p.title}
                   </span>

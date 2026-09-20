@@ -1,9 +1,10 @@
 import type * as THREE from "three";
 import { type Pose, compose } from "./se2";
 import type { Slam } from "./slam";
+import { followInk } from "./stage3d";
 import type { Segment } from "./world";
 
-type Three = typeof THREE;
+type Three = typeof import("@/lib/three");
 const WALL = 1.0, STUB = 0.7, CYAN = 0x79dafa, PINK = 0xff6e96, VIOLET = 0xb9a5ff;
 
 export interface DriveFrame {
@@ -39,6 +40,7 @@ export class DriveView {
   private readonly badLink: THREE.Line;
   private mapVersion = "";
   private eye: [number, number, number] | null = null;
+  private readonly unfollow: () => void;
 
   constructor(private readonly T: Three, private readonly canvas: HTMLCanvasElement, world: Segment[]) {
     this.renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -46,6 +48,7 @@ export class DriveView {
     this.renderer.setScissorTest(true);
     const ink = new T.Color(getComputedStyle(canvas).color);
     this.real = new T.Scene(); this.map = new T.Scene();
+    this.unfollow = followInk(T, canvas, () => [this.real, this.map], ink); // the lab draws every frame, so no redraw to ask for
     this.chase = new T.PerspectiveCamera(55, 1, 0.1, 80); this.above = new T.PerspectiveCamera(38, 1, 0.1, 120);
     this.chase.up.set(0, 0, 1); this.above.up.set(0, 0, 1);
 
@@ -133,6 +136,7 @@ export class DriveView {
   }
 
   dispose() {
+    this.unfollow();
     this.renderer.dispose();
   }
 }

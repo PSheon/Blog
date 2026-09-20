@@ -51,7 +51,9 @@ export function Instrument({ fig, title, size = "inline", caption, status, class
               </p>
             }
           >
-            {children}
+            {/* `data-lab` marks where the instrument itself begins: its code arrives in the article's own chunk, a moment
+                after the page's, and a test has to be able to tell when it has come alive. */}
+            <div className="contents" data-lab>{children}</div>
           </ErrorBoundary>
           <noscript>
             <p className="pt-3 text-center text-sm text-muted-foreground">

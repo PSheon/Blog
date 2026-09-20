@@ -94,7 +94,7 @@ function Springs({ lap }: { lap: Lap }) {
 
   return (
     <div ref={root} className="grid gap-4 text-sm">
-      <canvas ref={view} className="aspect-[16/10] w-full rounded-md border border-border text-foreground" />
+      <canvas role="img" aria-label={t.picSprings} ref={view} className="aspect-[16/10] w-full rounded-md border border-border text-foreground" />
       <p className="text-muted-foreground">{t.springsHint}</p>
       <div className="grid items-end gap-4 sm:grid-cols-[auto_1fr_1fr_1fr]">
         <div className="flex gap-2">

@@ -1,0 +1,18 @@
+// Share of 300 people in each activity by two-hour slot (N = 8, seed 1, last two of six days). Run like bench.test.ts.txt.
+import { it } from "vitest";
+import { generateCity, PARAMS, SPEC_PARAMS, World, type Params } from "@/content/posts/city-of-agents/components/sim";
+
+function profile(label: string, params: Params, days = 6) {
+  const world = new World(generateCity(1, 8), { agents: 300, params }), rows: Record<string, number>[] = Array.from({ length: 12 }, () => ({}));
+  for (let k = 0; k < days * 1440; k++) {
+    world.tick();
+    if (k >= (days - 2) * 1440) for (const a of world.agents) { const key = a.state === "acting" ? a.action! : a.state, r = rows[Math.floor(world.hour / 2)]; r[key] = (r[key] ?? 0) + 1; }
+  }
+  console.log(label);
+  console.table(rows.map((r, i) => { const n = Object.values(r).reduce((s, v) => s + v, 0); return { hour: `${i * 2}-${i * 2 + 2}`, ...Object.fromEntries(["sleep", "eat", "social", "work", "traveling", "idle"].map((k) => [k, Math.round((100 * (r[k] ?? 0)) / n)])) }; }));
+}
+it("hourly profile", () => {
+  profile("first draft (SPEC_PARAMS)", SPEC_PARAMS);
+  profile("proposed, no body clock", { ...PARAMS, circadian: 0 });
+  profile("proposed (PARAMS)", PARAMS);
+}, 300000);

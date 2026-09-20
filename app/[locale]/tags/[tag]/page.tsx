@@ -18,7 +18,8 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/tags/[ta
   const { locale, tag } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale), posts = getAllPosts(locale).filter((p) => p.tags.includes(tag));
-  return { title: t.tags.tagged(tag), description: t.tags.taggedLead(tag, posts.length), ...sharedMetadata(locale, `/tags/${tag}`) };
+  // One article under a tag is a thin page (the same entry as on /posts): readers can follow it, search engines skip it.
+  return { title: t.tags.tagged(tag), description: t.tags.taggedLead(tag, posts.length), ...(posts.length < 2 && { robots: { index: false, follow: true } }), ...sharedMetadata(locale, `/tags/${tag}`, { siteCard: true }) };
 }
 
 export default async function TagPage({ params }: PageProps<"/[locale]/tags/[tag]">) {

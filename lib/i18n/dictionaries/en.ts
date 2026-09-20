@@ -4,9 +4,9 @@ const en: Dictionary = {
   meta: {
     title: "paul.notebook — machine learning models, built from scratch",
     description:
-      "Paul's lab notebook: machine learning models built from scratch that you can train, take apart and break in your browser. Computer vision, reinforcement learning, Transformers, diffusion and robots.",
+      "Machine learning models built from scratch that you can train, take apart and break in your browser: vision, reinforcement learning, Transformers, robots.",
   },
-  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content" },
+  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content", close: "Close menu", loading: "Loading page" },
   search: {
     open: "Search",
     placeholder: "Search the full text: try “pooling” or “mutation”…",
@@ -34,13 +34,23 @@ const en: Dictionary = {
       { word: "Act", tag: "ai-agent" },
     ],
     intro:
-      "I'm Paul. I build machines that see and agents that act. This notebook takes models apart in writing — every article ships with instruments you can operate right in the browser, all written from scratch in TypeScript.",
+      "No PyTorch and no inference library: convolution, attention, diffusion and SLAM are written line by line in TypeScript, and they run in the tab you have open. Every number in an article was measured.",
     ctaPrimary: "Read the latest",
     ctaSecondary: "All posts",
     instrumentTitle: "live · mnist-cnn",
     instrumentHint: "Draw a digit, 0–9",
     instrumentCaption: "A ~9,000-parameter CNN running in your browser. No server, no libraries.",
-    instrumentMore: "How does it work?",
+    instrumentMore: "How does it do that?",
+    stationsLabel: "Choose the model on show",
+    railShow: "Show the {word} model in the instrument above",
+    stations: {
+      think: { title: "live · transformer", caption: "A one-layer Transformer, starting from random weights, learning to write six digits backwards. A few seconds in, an anti-diagonal grows on its attention map.", more: "Watch attention grow by itself" },
+      generate: { title: "replay · diffusion", caption: "A cloud of coloured noise settles into an apple, step by step. This replays the diffusion process itself; the real model is in the article, trained by you in the browser.", more: "Go and train one" },
+      act: { title: "live · neuroevolution", caption: "Fifty birds, each with a six-weight brain. Whoever lasts longest breeds the next generation. Nobody teaches them to fly.", more: "See what they learn" },
+    },
+    think: { steps: "Training steps", input: "Problem", output: "The model writes", attention: "Which digit each answer looks at", again: "Learn it again" },
+    generate: { note: "A replay of the diffusion process; no model runs here" },
+    act: { generation: "Generation", alive: "Still flying", best: "Most pipes" },
   },
   home: {
     latest: "Latest",

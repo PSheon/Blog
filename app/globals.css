@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "../styles/shadcn.css";
 @import "../styles/launch-ui.css";
 
 @custom-variant dark (&:is(.dark *));
@@ -151,6 +151,17 @@
 }
 @media (hover: hover) {
   .spotlight:hover::before { opacity: 1; }
+}
+/*
+ * A row of a ruled list has no box of its own, so its glow stopped dead at the edge of the text column: a hard
+ * vertical line when the pointer was near either end. The glow of a row reaches into the gutter on both sides and
+ * fades to nothing before it gets there. Above and below it still ends on the rules, which is where a row ends.
+ */
+.spotlight-row::before {
+  inset: 0 -2.5rem;
+  /* --mx is measured from the row's own left edge; the glow's box starts 2.5rem before it. */
+  background: radial-gradient(22rem circle at calc(var(--mx, 50%) + 2.5rem) var(--my, 50%), color-mix(in oklab, var(--signal-3) 13%, transparent), transparent 65%);
+  mask-image: linear-gradient(90deg, transparent, #000 3.5rem, #000 calc(100% - 3.5rem), transparent);
 }
 
 @keyframes blur-rise {

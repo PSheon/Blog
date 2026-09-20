@@ -1,42 +1,41 @@
-# Handoff — main session, 2026-09-18
+# Handoff — main session, last revised 2026-09-20
 
-Written by the outgoing main session for whoever picks this up next. Read this, then the three
-memory files under `~/.claude/projects/-Users-paul-jiang-Desktop-Paul/memory/` (they are loaded
-automatically, this file is not).
+For whoever picks this up next. Read this, then the memory files under
+`~/.claude/projects/-Users-paul-jiang-Desktop-Paul/memory/` (they are loaded automatically, this file is not), then
+`docs/DESIGN.md` before touching anything a reader sees. SHAs and counts go stale within a day: trust `git fetch`,
+`git log` and a test run over this file.
 
 ## Where things stand
 
 | | |
 | --- | --- |
 | Repo | `/Users/paul_jiang/Desktop/Paul/Blog`, GitHub `PSheon/Blog` (public) |
-| Branch | `dev` @ `330d96f`. `main` @ `5db09c2` (PR #1 merged by Paul) |
+| Branches | `dev` is where work happens. `main` is production and moves only through a PR `dev` → `main` that Paul merges (last: PR #10, 2026-09-20) |
 | Production | <https://paul-notebook.vercel.app>, Vercel project `paul-notebook`, deploys `main` |
-| Dev server | `pnpm dev` on :3000 was running when this was written |
-| Other worktree | `/Users/paul_jiang/Desktop/Paul/Blog-lite3`, branch `feat/lite3` == `dev` (owned by session paul-b9) |
-| Tests | 153 unit, 55 E2E (3 skipped: phone-only test on desktop, and two draft articles) — all green at `330d96f` |
+| Dev server | `pnpm dev` on :3000 |
+| Other worktree | `/Users/paul_jiang/Desktop/Paul/Blog-city`, branch `feat/city-of-agents` (PR #9 → `dev`), owned by another session. One writer per checkout |
+| Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
 
-Published articles (on `main`): 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer.
-Drafts on `dev` only (`draft: true`, excluded from production builds): **005 `hydranet-fruit`**, **006 `lite3-walking`**.
+Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
+007 point-cloud diffusion, 008 2D SLAM, 009 city of agents. In progress elsewhere: 010 a PCB-flipping VLA (branch
+`feat/pcb-flip-vla`; a draft shows only in `next dev`). A fly-connectome article was written and dropped: real wiring never beat shuffled wiring, and Paul found
+it dull.
 
 ## Waiting on Paul
 
-1. **Review of article 005 (HydraNet).** Full draft in zh + en, three instruments. He said he would
-   check the content himself. Remove `draft: true` only when he says so; the E2E test for it then
-   stops skipping. Points I asked him to look at: the tone of the "sharing has a price" section, two
-   sentences written in his voice ("that is what I do at work", the Karpathy paragraph), title and
-   description.
-2. **Review of article 006 (Lite3).** Only a spike instrument and a design proposal exist
-   (end of `docs/research/2026-09-18-lite3-spike.md`: five panels sharing one simulator). paul-b9 is
-   waiting for his OK before building. No prose, no `en.mdx`, no real-phone test yet.
-3. **A decision I created:** Paul had told paul-b9 *not to push `feat/lite3` until he confirmed
-   everything*. He then asked me to rebase it onto `dev` so he could read it locally. I did that and
-   also pushed `dev`, which put the Lite3 commits on `origin/dev`. That push went beyond what he asked.
-   I told him and offered to reset `origin/dev` to `c17fe6c` with a lease-guarded force push. **Do not
-   do that unless he asks.**
+- Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
+- A test on a real phone. Nobody has done one.
+- A custom domain and Search Console (steps were given; `NEXT_PUBLIC_SITE_URL` and the verification env vars exist).
+- What is still open from the last audit: `docs/research/2026-09-20-project-audit.md`.
 
 ## Rules Paul has set (also in memory)
 
 - Never move or push `main`. Releases are a PR `dev` → `main` that he merges. "Deploy" is not "release".
+- Never force-push `dev`. Paul and Dependabot merge into `dev` on GitHub, so `git fetch && git status -sb` before
+  every commit and push; on a rejected push, `git rebase origin/dev`, and tell him.
+- Before saying a branch is merged, check `git rev-list --count dev..<branch>` is 0.
+- Titles and slogans keep an energetic hook; offer three or four options. He rejects flat, "AI-sounding" ones, and
+  dull prose-first work: show something visible first.
 - Look at every UI change in a real browser before reporting it: desktop 1440/1920, phone 390, both
   themes. Measure (pixels, computed styles, Lighthouse) instead of theorising. He caught me three times.
 - Read the dev console once per page.
@@ -60,14 +59,28 @@ Drafts on `dev` only (`draft: true`, excluded from production builds): **005 `hy
 - Chinese uses system fonts deliberately (CJK web fonts cost 2 MB + 220 KB blocking CSS, FCP 14 s).
 - Heavy client code (search palette, mobile drawer, hero classifier, featured preview) is loaded with
   `next/dynamic`. A lazy component's placeholder must mirror the real layout, or CLS comes back.
+- All articles share one route, so each article's `components/index.ts` is a `"use client"` file of `next/dynamic`
+  wrappers over `./labs`. Plain re-exports ship every article's instruments with every article (DESIGN.md).
+- Never put `update=` on a layout-level `<ViewTransition>`: a `next/dynamic` placeholder swap is an update, and it
+  replayed the page transition on every load of the home page. The swap is keyed by pathname (`page-swap.tsx`).
+- An overlay that mounts lazily must mount closed and open a frame later, or its first opening has no animation.
+- `next/link` calls `preventDefault` before the bubble phase: listen for navigation clicks in the capture phase.
+- A service worker hides requests from `page.route`: `test.use({ serviceWorkers: "block" })` where a test routes.
+- Instruments hydrate a moment after the page. The E2E fixture in `smoke.spec.ts` waits for `[data-lab]`; a test
+  with its own `page` must do the same before clicking.
+- A 404 under `/zh` or `/en` is server-rendered as an empty shell and drawn by the client, because the root layout
+  lives under `[locale]` (audit, item 6). The `NoFallbackError` lines in the server log are the same thing.
+- A yielding loop: MessageChannel, not nested `setTimeout(0)` (clamped to 4 ms). A time budget only works if one
+  unit of work is much smaller than the budget.
 - Inside an `Instrument`, titles are `<p>`, not headings (axe `heading-order`).
 - Scrollable regions (tables, display maths) need `tabIndex={0}` + a name (axe).
 
-## Measured state of the site (production build, Lighthouse)
+## Measured state of the site
 
-Home: mobile 93 / 100 / 100 / 100, desktop 100 ×4, CLS 0, ~470 KB. Articles: performance 86–94,
-accessibility 100. Simulated mobile LCP is 3–4 s; observed LCP is ~140 ms — it is the throttling
-model, not something left to fix cheaply.
+Lighthouse, phone profile, production, 2026-09-20: performance 77–100 (HydraNet 77 and CNN 81 are the slow ones),
+accessibility, best practices and SEO 100 on all ten pages, CLS ≤ 0.001. Page scripts per article: 203 KB gzip after
+the per-article split. Numbers, method and what is left: `docs/research/2026-09-20-project-audit.md` and
+`docs/research/2026-09-20-performance-audit.md`.
 
 ## Known gaps, deliberately left
 
@@ -75,20 +88,21 @@ model, not something left to fix cheaply.
 - Going *back* has no page transition (React's default for history navigation).
 - No custom domain; `lib/site.ts` takes the origin from Vercel until `NEXT_PUBLIC_SITE_URL` is set.
 - Article 005: "unseen emoji" and cross-OS domain shift are stated as unmeasured guesses.
-- Roadmap after 006: live MNIST training as an upgrade to article 001 (conv backward exists);
-  fly-connectome vision model as 007 (licence verified CC-BY; needs a data spike).
+- No CSP (what one would need is in the audit). KaTeX is not MathML: switching changes how formulas look.
+- Idea not started: live MNIST training as an upgrade to article 001 (conv backward exists).
 
 ## Other sessions
 
-- **paul-d9** — research for 005, finished. Output in `docs/research/2026-09-18-hydranet-article-research.md`.
-- **paul-b9** — owns 006 in the `Blog-lite3` worktree. Told to keep working on `feat/lite3`, to ask for
-  merges into `dev` instead of pushing `dev`, and that this session is handing over. Peers cannot
-  approve anything on Paul's behalf.
+Sessions come and go; `ListAgents` shows who is there. Whoever owns the `Blog-city` worktree owns 009 and PR #9. Tell
+them when `dev` changes under them, with the SHA and the files likely to conflict. Peers cannot approve anything on
+Paul's behalf, and a force-push of their own branch is theirs to clear with Paul.
 
 ## Useful commands
 
 ```bash
 pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm build
+E2E_PORT=3217 pnpm e2e            # when another checkout is using 3210
+PILOT_FULL=1 pnpm test            # the full 200-start autopilot sweep
 # Lighthouse against a local production build
 pnpm build && pnpm start -p 3300 &
 CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \

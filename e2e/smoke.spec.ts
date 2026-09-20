@@ -1,4 +1,22 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, expect, test as base } from "@playwright/test";
+
+/**
+ * An article's instruments hydrate a moment after the page (their code is a chunk of its own), and a click that
+ * lands before that is lost. A reader never clicks within 200 ms of the page appearing; a test does. So every
+ * navigation here waits until each instrument in the page has come alive.
+ */
+const test = base.extend({
+  page: async ({ page }, run) => {
+    const goto = page.goto.bind(page), reload = page.reload.bind(page);
+    const alive = () => page.waitForFunction(() => [...document.querySelectorAll("[data-lab]")].every((lab) => {
+      const first = lab.firstElementChild;
+      return !first || Object.keys(first).some((key) => key.startsWith("__reactFiber"));
+    }), null, { timeout: 20_000 });
+    page.goto = async (...args) => { const response = await goto(...args); await alive(); return response; };
+    page.reload = async (...args) => { const response = await reload(...args); await alive(); return response; };
+    await run(page);
+  },
+});
 
 /** Fail a test on any console error or uncaught exception. */
 function watchErrors(page: Page): string[] {
@@ -112,7 +130,11 @@ test("feeds and sitemap are served", async ({ request }) => {
   const xml = await feed.text();
   expect(xml).toContain("<rss");
   expect(xml).toContain("cnn-from-scratch");
-  expect((await request.get("/sitemap.xml")).ok()).toBe(true);
+  const sitemap = await (await request.get("/sitemap.xml")).text();
+  expect(sitemap).toContain("/zh/tags/from-scratch</loc>");
+  // A tag with one article is left out, and its page asks not to be indexed.
+  expect(sitemap).not.toContain("/zh/tags/llm</loc>");
+  expect(await (await request.get("/zh/tags/llm")).text()).toContain('content="noindex, follow"');
 });
 
 // Next replaces `alternates` and `openGraph` wholesale when a page sets them, which once cost article
@@ -128,6 +150,10 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
     expect(await href('link[rel="alternate"][type="application/rss+xml"]')).toContain(`${path.slice(0, 3)}/feed.xml`);
     expect(new URL((await page.locator('meta[property="og:url"]').getAttribute("content"))!).pathname).toBe(path);
     await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute("content", "paul.notebook");
+    // Every page shares with a picture: its own card for the home page and an article, the site's for the rest.
+    const card = new URL((await page.locator('meta[property="og:image"]').first().getAttribute("content"))!).pathname;
+    expect(card).toBe(path.includes("/posts/") ? `${path}/opengraph-image` : `${path.slice(0, 3)}/opengraph-image`);
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.{20,}/);
     await expect(page.locator("h1")).toHaveCount(1);
   });
@@ -291,8 +317,7 @@ test("phone header: menu left, mark centred, search right; drawer holds navigati
 
 test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page }) => {
   const response = await page.goto("/en/posts/hydranet-fruit");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "hydranet-fruit is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(120_000);
   const errors = watchErrors(page);
 
@@ -375,18 +400,30 @@ test("a diffusion model trains in the page and its instruments share it", async 
   expect(errors).toEqual([]);
 });
 
-test("an article that has been opened once works offline, and its model still trains", async ({ page, context }) => {
+test("one visit is enough to read offline: the first page, an article reached by a link, and the app's start URL", async ({ page, context }) => {
   test.setTimeout(120_000);
-  await page.goto("/en/posts/transformer-from-scratch");
-  // Wait for the worker to take control, then load once more through it so that the page's assets are cached.
-  await page.evaluate(async () => { await navigator.serviceWorker.ready; if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })); });
-  await page.reload({ waitUntil: "networkidle" });
+  // Has the worker been handed this page and every script it loaded? (It sees none of them on a first visit.)
+  const kept = () => page.evaluate(async () => {
+    if (!(await caches.match(location.pathname))) return false;
+    const scripts = performance.getEntriesByType("resource").map((entry) => entry.name).filter((url) => url.includes("/_next/static/") && url.endsWith(".js"));
+    return scripts.length > 0 && (await Promise.all(scripts.map((url) => caches.match(url)))).every(Boolean);
+  });
+  await page.goto("/en");
+  await expect.poll(kept, { timeout: 30_000 }).toBe(true);
+  // A client-side navigation fetches an RSC payload, not the HTML that a reload asks for. That has to be kept too.
+  await page.locator('main a[href="/en/posts/transformer-from-scratch"]').first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
+  await expect.poll(kept, { timeout: 30_000 }).toBe(true);
 
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
   await page.getByTestId("tf-train").click();
   await expect.poll(async () => Number((await page.getByTestId("tf-steps").textContent())!.replace(/,/g, "")), { timeout: 60_000 }).toBeGreaterThan(20);
+
+  // "/" is where the installed app starts. It is a redirect by language, which cannot be cached; the home page can.
+  await page.goto("/");
+  await expect(page.getByTestId("post-bento")).toBeVisible();
 
   // A page never visited has nothing cached: the reader gets the offline page, not the browser's error.
   await page.goto("/en/posts/ai-flappy-bird");
@@ -396,7 +433,7 @@ test("an article that has been opened once works offline, and its model still tr
 
 test("the site can be installed: a manifest with icons, and a worker script that is never cached", async ({ request }) => {
   const manifest = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifest).toMatchObject({ display: "standalone", start_url: "/" });
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/", id: "/", lang: "zh-Hant-TW" });
   for (const icon of manifest.icons) expect((await request.get(icon.src)).headers()["content-type"]).toBe("image/png");
   expect((await request.get("/sw.js")).headers()["cache-control"]).toContain("no-cache");
 });
@@ -477,3 +514,132 @@ test("the home index is a short bento: at most six tiles, each saying what its a
   if (!isMobile) return;
   for (const tile of await tiles.all()) await expect(tile.locator("p.leading-relaxed")).toBeVisible();
 });
+
+test("a 3D figure follows the theme: switching to light re-inks a scene that was built in the dark", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the theme buttons are in the footer on wide screens and in the menu on a phone; one is enough");
+  await page.goto("/zh/posts/slam-2d");
+  const figure = page.locator('[data-instrument="slam / wheels"]'), canvas = figure.locator("canvas");
+  await figure.scrollIntoViewIfNeeded();
+  // The scene records the ink it is drawn in; it has to keep up with the CSS colour of its canvas.
+  const drawn = () => canvas.getAttribute("data-ink"), page_ink = () => canvas.evaluate((el) => {
+    const [r, g, b] = getComputedStyle(el).color.match(/[\d.]+/g)!.map(Number);
+    return [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  });
+  await page.getByRole("button", { name: "深色" }).first().click();
+  await expect.poll(drawn, { timeout: 20_000 }).not.toBeNull();
+  const dark = await drawn();
+  expect(dark).toBe(await page_ink());
+  await page.getByRole("button", { name: "淺色" }).first().click();
+  await expect.poll(drawn, { timeout: 10_000 }).not.toBe(dark);
+  expect(await drawn()).toBe(await page_ink());
+});
+
+test("pages are served with a content security policy, and nothing on an article trips it", async ({ page }) => {
+  const violations: string[] = [];
+  await page.addInitScript(() => document.addEventListener("securitypolicyviolation", (e) => console.error(`CSP ${e.violatedDirective} ${e.blockedURI}`)));
+  page.on("console", (m) => m.text().startsWith("CSP ") && violations.push(m.text()));
+  const response = await page.goto("/zh/posts/diffusion-points"); // KaTeX, a module worker, three.js
+  const policy = response!.headers()["content-security-policy"];
+  for (const part of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'self'"]) expect(policy).toContain(part);
+  expect(response!.headers()["cross-origin-opener-policy"]).toBe("same-origin");
+  await page.getByTestId("diffusion-train").first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1500);
+  expect(violations).toEqual([]);
+});
+
+test("a city of people runs in the page: the clock moves, the three heads differ, the Overseer follows and replays", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (r) => requests.push(r.url()));
+  const response = await page.goto("/zh/posts/city-of-agents");
+  expect(response?.status()).toBe(200);
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+
+  // The two 2-D figures work the simulation out in the page. A fixed timetable sends everyone out in the same ten minutes.
+  await page.getByTestId("modes-fsm").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("modes-fsm")).toContainText("100%", { timeout: 60_000 });
+  await expect(page.getByTestId("modes-utility")).toContainText("%", { timeout: 60_000 });
+  await expect(page.getByTestId("modes-utility")).not.toContainText("100%");
+
+  // The Overseer: the table fills, a row follows a person, the record replays and comes back.
+  await page.getByTestId("city-play").scrollIntoViewIfNeeded();
+  const table = page.getByTestId("city-table");
+  await expect(table.locator("button").first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("city-events").locator("li").nth(3)).toBeVisible({ timeout: 30_000 });
+  await table.locator("button").nth(1).click();
+  await expect(page.getByRole("status").filter({ hasText: "正在跟拍" })).toBeVisible();
+  const thumb = page.getByTestId("city-timeline").locator('input[type="range"]');
+  await thumb.focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("city-live")).toBeEnabled();
+  await page.getByTestId("city-live").click();
+  await expect(page.getByTestId("city-live")).toBeDisabled();
+  expect(errors).toEqual([]);
+});
+
+test("the hero is four stations: each tab shows a different live model and the page does not move", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/zh");
+  await expect(page.getByTestId("hero-prediction")).toHaveText("7", { timeout: 20_000 });
+  const figure = page.locator("figure[data-instrument]").first(), height = async () => Math.round((await figure.locator("[role=tabpanel]").boundingBox())!.height);
+  const before = await height();
+
+  // Think: a Transformer trains from random weights until it writes the digits backwards.
+  await page.getByTestId("hero-tab-think").click();
+  await expect(page.getByTestId("hero-think-output")).toHaveText("951413", { timeout: 60_000 });
+  expect(await height()).toBe(before);
+  // Arrow keys move between the tabs, as a tablist should.
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("hero-tab-generate")).toHaveAttribute("aria-selected", "true");
+  await expect(figure.locator("[role=tabpanel] canvas:visible")).toHaveCount(1);
+  expect(await height()).toBe(before);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("hero-tab-act")).toHaveAttribute("aria-selected", "true");
+  await expect(figure.locator("figcaption a")).toHaveAttribute("href", "/zh/posts/ai-flappy-bird");
+  expect(await height()).toBe(before);
+  // The rail under the hero is the same control: a stop switches the instrument, and the instrument's tabs light the stop.
+  await page.getByTestId("rail-think").click();
+  await expect(page.getByTestId("hero-tab-think")).toHaveAttribute("aria-selected", "true");
+  await expect(figure).toBeInViewport();
+  await page.getByTestId("hero-tab-act").click();
+  await expect(page.getByTestId("rail-act")).toHaveAttribute("aria-pressed", "true");
+  // A stop is still a way to the articles of its kind.
+  await expect(page.locator('nav a[href="/zh/tags/ai-agent"]')).toHaveCount(1);
+  // Back to the classifier: it kept its state underneath.
+  await page.getByTestId("hero-tab-see").click();
+  await expect(page.getByTestId("hero-prediction")).toHaveText("7");
+  expect(errors).toEqual([]);
+});
+
+for (const locale of ["zh", "en"] as const) {
+  test(`the hero instrument fits its screen in ${locale}: no tab, panel or picture is cut off at any station`, async ({ page }) => {
+    await page.goto(`/${locale}`);
+    // The narrowest phones as well as whatever this project's viewport is: four English tab names in one line once
+    // made the instrument 434 px wide on a 390 px screen.
+    const widths = [page.viewportSize()!.width, 320];
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const key of ["see", "think", "generate", "act"]) {
+        await page.getByTestId(`hero-tab-${key}`).click();
+        const problems = await page.evaluate(() => {
+          const figure = document.getElementById("hero-instrument")!, box = figure.querySelector(".overflow-hidden")!.getBoundingClientRect();
+          const panel = figure.querySelector("[role=tabpanel]")!, p = panel.getBoundingClientRect(), found: string[] = [];
+          if (box.left < -0.5 || box.right > window.innerWidth + 0.5) found.push(`instrument ${Math.round(box.left)}..${Math.round(box.right)} on a ${window.innerWidth} px screen`);
+          if (document.documentElement.scrollWidth > window.innerWidth) found.push("the page scrolls sideways");
+          for (const tab of figure.querySelectorAll("[role=tab]")) {
+            const t = tab.getBoundingClientRect();
+            if (t.right > box.right + 0.5 || t.left < box.left - 0.5 || tab.scrollWidth > tab.clientWidth + 1) found.push(`tab cut off: ${tab.textContent}`);
+          }
+          for (const el of panel.querySelectorAll("*")) {
+            if (getComputedStyle(el).visibility === "hidden") continue;
+            const b = el.getBoundingClientRect();
+            if (b.width && b.height && (b.right > p.right + 1 || b.bottom > p.bottom + 1)) found.push(`${el.tagName.toLowerCase()} sticks out of the panel`);
+          }
+          return [...new Set(found)];
+        });
+        expect(problems, `${width} px, ${key}`).toEqual([]);
+      }
+    }
+  });
+}

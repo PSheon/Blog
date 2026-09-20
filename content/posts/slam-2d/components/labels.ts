@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 
 const zh = {
   real: "真實世界（車子看不到這一邊）",
@@ -24,7 +24,8 @@ const zh = {
   endError: "兩圈後差了",
   replay: "再跑一次",
   place: "地點", corner: "轉角", corridor: "走廊中段",
-  dragHint: "拖曳青色的掃描去對白色的掃描；滑桿可以轉它。",
+  dragHint: "拖曳青色的掃描去對白色的掃描（或先點一下畫面，用方向鍵移動）；滑桿可以轉它。",
+  keysHint: "。方向鍵移動掃描，按住 Shift 移得更快",
   rotate: "轉動",
   runIcp: "交給 ICP",
   scramble: "打亂",
@@ -38,6 +39,13 @@ const zh = {
   computing: "計算中…",
   tryAbove: "用上面那台車試",
   tryShort: "試試",
+  // What each picture shows, for readers who cannot see it; the numbers beside it carry the rest.
+  picDrive: "3D 畫面，左邊是走廊裡的車和它的光達掃描，右邊是車子邊開邊畫出來的地圖與路徑",
+  picWheels: "3D 畫面：車子真正走的路，和只靠輪子推算、越走越歪的路",
+  picAlign: "3D 畫面：兩次光達掃描，其中一次可以拖曳去對齊另一次",
+  picSprings: "3D 畫面：一串位姿用彈簧連起來，加上閉環後整條路徑被拉回原位",
+  picOutcomes: "四張 3D 小圖，同一圈路在四種設定下各自畫出的地圖",
+  picCloud: "3D 點雲：光達一圈一圈掃出的房間，和估計路徑、真實路徑兩條線",
   cardsNote: "同一條路線繞兩圈之後，車子畫出來的地圖。數字是最後的位置誤差。這四張圖是你的瀏覽器剛剛算出來的，沒有預先錄好。",
   cloudPlay: "開始", cloudPause: "暫停",
   cloudDrift: "只靠點雲比對，漂了", cloudPer: "每一圈的比對", cloudSweeps: "圈", ms: "ms",
@@ -68,7 +76,8 @@ const en: typeof zh = {
   endError: "off after two laps",
   replay: "Run again",
   place: "place", corner: "a corner", corridor: "mid-corridor",
-  dragHint: "Drag the cyan scan onto the white one; the slider turns it.",
+  dragHint: "Drag the cyan scan onto the white one (or click the picture and use the arrow keys); the slider turns it.",
+  keysHint: ". Arrow keys move the scan; hold Shift for bigger steps",
   rotate: "turn",
   runIcp: "Let ICP do it",
   scramble: "Scramble",
@@ -82,6 +91,12 @@ const en: typeof zh = {
   computing: "working…",
   tryAbove: "Try it on the car above",
   tryShort: "Try it",
+  picDrive: "3D view: on the left the car in its corridor with its lidar scan, on the right the map and path the car is drawing as it drives",
+  picWheels: "3D view: the path the car really took, and the path worked out from the wheels alone, drifting further off",
+  picAlign: "3D view: two lidar scans; one of them can be dragged to line up with the other",
+  picSprings: "3D view: a chain of poses joined by springs; adding the loop closure pulls the whole path back into place",
+  picOutcomes: "Four small 3D views: the map the same lap produces under four different settings",
+  picCloud: "3D point cloud: the room as swept by the lidar turn after turn, with the estimated and the true path as two lines",
   cardsNote: "The map the car ends up with after the same two laps. The number is its final position error. Your browser worked these four out just now; nothing is pre-recorded.",
   cloudPlay: "Start", cloudPause: "Pause",
   cloudDrift: "drift from cloud matching alone", cloudPer: "matching per sweep", cloudSweeps: "sweeps", ms: "ms",
@@ -91,5 +106,5 @@ const en: typeof zh = {
 };
 
 export function useLabels() {
-  return usePathname()?.startsWith("/en") ? en : zh;
+  return useLocaleLabels(zh, en);
 }

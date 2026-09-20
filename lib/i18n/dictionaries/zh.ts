@@ -3,7 +3,7 @@ const zh = {
     title: "paul.notebook — 從零實作機器學習模型",
     description: "Paul 的實驗筆記：從零實作機器學習模型，每一篇都能在瀏覽器裡訓練、拆開、弄壞。電腦視覺、強化學習、Transformer、擴散模型與機器人。",
   },
-  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁", skip: "跳到主要內容" },
+  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁", skip: "跳到主要內容", close: "關閉選單", loading: "頁面載入中" },
   search: {
     open: "搜尋",
     placeholder: "搜尋全文：試試「池化」或「突變」…",
@@ -33,13 +33,24 @@ const zh = {
       { word: "行動", tag: "ai-agent" },
     ],
     intro:
-      "我是 Paul，做會看的機器，也做會行動的代理。這本筆記把模型拆開來寫：每篇文章都附上能在瀏覽器裡直接操作的儀器，全部用 TypeScript 從零寫起。",
+      "沒有 PyTorch，也沒有推論函式庫：卷積、注意力、擴散、SLAM，都用 TypeScript 一行一行寫出來，就跑在你現在開著的這個分頁裡。文章裡的每個數字，都是實際量出來的。",
     ctaPrimary: "讀最新一篇",
     ctaSecondary: "所有文章",
     instrumentTitle: "live · mnist-cnn",
     instrumentHint: "在這裡畫一個 0–9 的數字",
     instrumentCaption: "約 9,000 個參數的 CNN，正在你的瀏覽器裡執行。沒有伺服器，沒有函式庫。",
     instrumentMore: "它是怎麼做到的？",
+    stationsLabel: "切換示範的模型",
+    railShow: "在上面的儀器顯示「{word}」的模型",
+    // The hero's four stations: one live model per kind of article. `see` reuses the strings above.
+    stations: {
+      think: { title: "live · transformer", caption: "一層 Transformer，從隨機權重開始，正在學把六個數字倒過來寫。幾秒鐘後，注意力圖上會長出一條反對角線。", more: "看注意力怎麼自己長出來" },
+      generate: { title: "replay · diffusion", caption: "一團彩色雜訊一步一步收成一顆蘋果。這裡重播的是擴散過程本身；真正的模型在文章裡，由你在瀏覽器裡訓練。", more: "去訓練一個" },
+      act: { title: "live · neuroevolution", caption: "五十隻小鳥，各有一顆六個權重的大腦。活最久的生下一代，沒有人教牠們怎麼飛。", more: "看牠們學到了什麼" },
+    },
+    think: { steps: "訓練步數", input: "題目", output: "模型寫的", attention: "每個答案在看哪個數字", again: "再學一次" },
+    generate: { note: "擴散過程的重播，這裡沒有模型在跑" },
+    act: { generation: "第幾代", alive: "還在飛", best: "最多過幾根" },
   },
   home: {
     latest: "最新文章",
