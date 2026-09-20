@@ -4,6 +4,7 @@ description: No PyTorch and no libraries. A tiny autodiff engine and a Transform
 seoTitle: "Train a Transformer from scratch, in-browser"
 seoDescription: "No PyTorch, no libraries: a tiny autodiff engine and a 14,000-parameter Transformer in TypeScript that learns to reverse digits in seconds, in your browser."
 date: 2025-07-03
+updated: 2026-09-20
 tags: [llm, transformer, from-scratch]
 no: 4
 interactive: true
@@ -126,7 +127,7 @@ The forward pass is only a chain of matrix operations. Training needs the other 
 
 Doing that by hand is out of the question, so I wrote a very small automatic-differentiation engine. The idea: whenever you perform an operation, also note down "if someone tells me the gradient of my output, this is how I pass it back to my inputs". For a matrix product $C = AB$ the backward rules are $\partial A = \partial C \, B^{\top}$ and $\partial B = A^{\top} \partial C$:
 
-```ts title="lib/ml/autograd.ts" {7-8}
+```ts title="simplified from lib/ml/autograd.ts" {7-8}
 matmul(a: Mat, b: Mat): Mat {
   const out = /* … forward: compute a·b as usual … */;
   this.record(() => {

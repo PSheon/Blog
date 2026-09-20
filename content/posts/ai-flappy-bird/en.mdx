@@ -4,6 +4,7 @@ description: Give each of fifty birds a brain of only six weights, add survival 
 seoTitle: "50 birds teach themselves Flappy Bird"
 seoDescription: "Give each of fifty birds a brain of six weights, add survival of the fittest, and within twenty-odd generations they clear a hundred pipes. Then open the brain."
 date: 2025-03-23
+updated: 2026-09-20
 tags: [ai-agent, neuroevolution, from-scratch]
 no: 2
 interactive: true
@@ -33,7 +34,7 @@ The network has no biases, so its connections carry six weights in all: 2 × 2 +
 
 In the first generation all six weights of all fifty birds are random, and most birds hit the wall straight away.
 
-```ts title="content/posts/ai-flappy-bird/components/world.ts"
+```ts title="simplified from content/posts/ai-flappy-bird/components/world.ts"
 const population = new Population({
   shape: [2, 2, 1], // 2 inputs, 2 hidden neurons, 1 output
   size: 50,

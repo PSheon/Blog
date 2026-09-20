@@ -1,9 +1,10 @@
 ---
 title: "Building a neuroevolution trading squad: from gambler to market wizard"
 description: Let a crowd of random trading bots compete, breed and mutate on Apple's 2024 share price. After thirty generations they return +43%, against +34% for buy-and-hold. Train one yourself, then see why that number doesn't count.
-seoTitle: "A neuroevolution trading squad"
+seoTitle: "Trading squad: from gambler to market wizard"
 seoDescription: "Random trading bots evolve for thirty generations on Apple's 2024 share price: +43%, against +34% for buy-and-hold. Train one, then see why that doesn't count."
 date: 2025-04-16
+updated: 2026-09-20
 tags: [ai-agent, neuroevolution, trading]
 no: 3
 interactive: true
@@ -49,7 +50,7 @@ It looks as if they understand this market better and better.
 
 ## What it actually learned
 
-I trained six different random seeds for thirty generations each (population 50 and mutation rate 15%, the instrument's defaults; the default number of generations is 20, which gives +41.5% to +43.8%).<Sidenote>Every number in this section comes from `docs/research/evolution-seeds/`. The seeds are fixed, so a re-run gives exactly the same results.</Sidenote> Every return landed between +42.9% and +43.9%, and the winners all did nearly the same thing: **most of the buying happens in the first half of the year, while the price is still low (the year's lowest close is $165 on 19 April), and by year end the bot is almost fully invested.** In between it makes a few dozen small sell-high, buy-low round trips, eight or nine in ten of them profitable.
+I trained six different random seeds for thirty generations each (population 50 and mutation rate 15%, all of them the instrument's defaults; stopping at 20 generations gives +41.5% to +43.8%).<Sidenote>Every number in this section comes from `docs/research/evolution-seeds/`. The seeds are fixed, so a re-run gives exactly the same results.</Sidenote> Every return landed between +42.9% and +43.9%, and the winners all did nearly the same thing: **most of the buying happens in the first half of the year, while the price is still low (the year's lowest close is $165 on 19 April), and by year end the bot is almost fully invested.** In between it makes a few dozen small sell-high, buy-low round trips, eight or nine in ten of them profitable.
 
 Apple rose 35% over 2024. In a year like that, any strategy that fills up while the price is low and holds to the end beats filling up at $185 on 2 January.
 

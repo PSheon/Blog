@@ -47,7 +47,8 @@ function Param({ label, value, unit, min, max, disabled, onChange }: {
 
 export function TradingLab() {
   const t = useLabels();
-  const [generations, setGenerations] = useState(20);
+  // Thirty, because that is what the article's numbers were measured at.
+  const [generations, setGenerations] = useState(30);
   const [population, setPopulation] = useState(50);
   const [mutation, setMutation] = useState(15);
   const [run, setRun] = useState<Run | null>(null);

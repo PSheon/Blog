@@ -3,6 +3,7 @@ title: 從菜鳥到鳥霸王：讓 50 隻小鳥自己學會 Flappy Bird
 description: 給五十隻小鳥各一顆只有六個權重的大腦，加上優勝劣汰，多半二十幾代之內牠們就能連過一百根管子。然後打開那顆大腦，看牠到底學到了什麼。
 seoTitle: "讓 50 隻小鳥自己學會 Flappy Bird"
 date: 2025-03-23
+updated: 2026-09-20
 tags: [ai-agent, neuroevolution, from-scratch]
 no: 2
 interactive: true
@@ -32,7 +33,7 @@ import { FlappyLab } from "./components";
 
 第一代的五十隻鳥，六個權重全是亂數，大部分一開場就撞牆。
 
-```ts title="content/posts/ai-flappy-bird/components/world.ts"
+```ts title="簡化自 content/posts/ai-flappy-bird/components/world.ts"
 const population = new Population({
   shape: [2, 2, 1], // 2 個輸入、2 個隱藏神經元、1 個輸出
   size: 50,
