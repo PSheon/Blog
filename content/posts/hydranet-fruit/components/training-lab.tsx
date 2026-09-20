@@ -43,6 +43,9 @@ interface Session {
   maskCurve: number[];
 }
 
+/** Images per optimiser step. */
+const BATCH = 8;
+
 function measure(s: Session): View {
   let box = 0, mask = 0, fromMask = 0;
   const predictions: Prediction[] = [];
@@ -111,7 +114,8 @@ export function TrainingLab() {
         return;
       }
       const t0 = performance.now(), deadline = t0 + 11;
-      do s.net.step(Array.from({ length: 8 }, () => s.source.next(s.rng)));
+      // One image at a time: a whole batch of 8 is ~15 ms, which overran this 11 ms budget on every single frame.
+      do s.net.feed(s.source.next(s.rng), BATCH);
       while (performance.now() < deadline);
       s.trainMs += performance.now() - t0;
     };

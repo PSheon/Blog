@@ -97,4 +97,19 @@ describe("HydraNet", () => {
     expect(after.box).toBeGreaterThan(0.6);
     expect(after.mask).toBeGreaterThan(0.45);
   }, 60_000);
+
+  it("trains identically whether a batch arrives whole or one image at a time", () => {
+    const make = () => new HydraNet({ heads: "both", skip: "slim", boxWeight: 1 }, mulberry32(5));
+    const whole = make(), piecewise = make(), rng = mulberry32(6);
+    for (let step = 0; step < 5; step++) {
+      const batch = Array.from({ length: 8 }, () => shapeScene(rng));
+      const a = whole.step(batch);
+      let b: ReturnType<HydraNet["feed"]> = null;
+      for (const scene of batch) b = piecewise.feed(scene, 8);
+      expect(b).toEqual(a);
+    }
+    expect(piecewise.seen).toBe(whole.seen);
+    const probe = shapeScene(rng);
+    expect(Array.from(piecewise.predict(probe.image).mask)).toEqual(Array.from(whole.predict(probe.image).mask));
+  });
 });

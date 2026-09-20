@@ -49,10 +49,10 @@ export function HeadsRace() {
       while (net.seen < SAMPLES) {
         if (cancel.current) return;
         const deadline = performance.now() + 12;
+        // One image at a time (batches of 8, as before): a whole batch is ~15 ms and never fitted the 12 ms budget.
         do {
-          const batch = Array.from({ length: 8 }, () => source.next(data));
-          const t0 = performance.now();
-          net.step(batch);
+          const scene = source.next(data), t0 = performance.now();
+          net.feed(scene, 8);
           trainMs += performance.now() - t0;
         } while (performance.now() < deadline && net.seen < SAMPLES);
         setProgress({ heads, done: net.seen / SAMPLES });
