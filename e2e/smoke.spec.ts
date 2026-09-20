@@ -396,18 +396,30 @@ test("a diffusion model trains in the page and its instruments share it", async 
   expect(errors).toEqual([]);
 });
 
-test("an article that has been opened once works offline, and its model still trains", async ({ page, context }) => {
+test("one visit is enough to read offline: the first page, an article reached by a link, and the app's start URL", async ({ page, context }) => {
   test.setTimeout(120_000);
-  await page.goto("/en/posts/transformer-from-scratch");
-  // Wait for the worker to take control, then load once more through it so that the page's assets are cached.
-  await page.evaluate(async () => { await navigator.serviceWorker.ready; if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })); });
-  await page.reload({ waitUntil: "networkidle" });
+  // Has the worker been handed this page and every script it loaded? (It sees none of them on a first visit.)
+  const kept = () => page.evaluate(async () => {
+    if (!(await caches.match(location.pathname))) return false;
+    const scripts = performance.getEntriesByType("resource").map((entry) => entry.name).filter((url) => url.includes("/_next/static/") && url.endsWith(".js"));
+    return scripts.length > 0 && (await Promise.all(scripts.map((url) => caches.match(url)))).every(Boolean);
+  });
+  await page.goto("/en");
+  await expect.poll(kept, { timeout: 30_000 }).toBe(true);
+  // A client-side navigation fetches an RSC payload, not the HTML that a reload asks for. That has to be kept too.
+  await page.locator('main a[href="/en/posts/transformer-from-scratch"]').first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
+  await expect.poll(kept, { timeout: 30_000 }).toBe(true);
 
   await context.setOffline(true);
   await page.reload();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
   await page.getByTestId("tf-train").click();
   await expect.poll(async () => Number((await page.getByTestId("tf-steps").textContent())!.replace(/,/g, "")), { timeout: 60_000 }).toBeGreaterThan(20);
+
+  // "/" is where the installed app starts. It is a redirect by language, which cannot be cached; the home page can.
+  await page.goto("/");
+  await expect(page.getByTestId("post-bento")).toBeVisible();
 
   // A page never visited has nothing cached: the reader gets the offline page, not the browser's error.
   await page.goto("/en/posts/ai-flappy-bird");
@@ -417,7 +429,7 @@ test("an article that has been opened once works offline, and its model still tr
 
 test("the site can be installed: a manifest with icons, and a worker script that is never cached", async ({ request }) => {
   const manifest = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifest).toMatchObject({ display: "standalone", start_url: "/" });
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/", id: "/", lang: "zh-Hant-TW" });
   for (const icon of manifest.icons) expect((await request.get(icon.src)).headers()["content-type"]).toBe("image/png");
   expect((await request.get("/sw.js")).headers()["cache-control"]).toContain("no-cache");
 });
