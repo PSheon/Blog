@@ -170,7 +170,8 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         </div>
         <PostBento
           locale={locale}
-          rows={toRows(posts, locale)}
+          // The newest article has its own card right above; the index starts with the one before it.
+          rows={toRows(posts.filter((p) => p.slug !== latest?.slug), locale)}
           tags={getAllTags(locale).map((x) => x.tag)}
           labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
         />
