@@ -1,7 +1,7 @@
 import type * as THREE from "three";
 import { type Outcome, START } from "./outcomes";
 import { compose } from "./se2";
-import { CYAN_HEX, PINK_HEX, VIOLET_HEX, setPoints, stubs } from "./stage3d";
+import { CYAN_HEX, PINK_HEX, VIOLET_HEX, followInk, setPoints, stubs } from "./stage3d";
 
 type Three = typeof THREE;
 
@@ -10,6 +10,8 @@ export class OutcomesView {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly camera: THREE.PerspectiveCamera;
   private readonly scenes: THREE.Scene[] = [];
+  private readonly ink: THREE.Color;
+  private readonly unfollow: () => void;
 
   constructor(private readonly T: Three, private readonly canvas: HTMLCanvasElement) {
     this.renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -19,11 +21,14 @@ export class OutcomesView {
     this.camera.up.set(0, 0, 1);
     this.camera.position.set(10, 7 - 19, 24);
     this.camera.lookAt(10, 6.4, 0);
+    this.ink = new T.Color(getComputedStyle(canvas).color);
+    // Drawn once per result, not per frame: a change of theme has to ask for the picture again.
+    this.unfollow = followInk(T, canvas, () => this.scenes.filter(Boolean), this.ink, () => this.render());
   }
 
   /** Build (or rebuild) the scene in cell `i` from a finished run. */
   show(i: number, o: Outcome) {
-    const T = this.T, scene = new T.Scene(), ink = new T.Color(getComputedStyle(this.canvas).color);
+    const T = this.T, scene = new T.Scene(), ink = this.ink;
     const grid = new T.GridHelper(60, 30, ink, ink);
     grid.rotation.x = Math.PI / 2; grid.position.set(10, 7, 0);
     (grid.material as THREE.Material).transparent = true; (grid.material as THREE.Material).opacity = 0.1;
@@ -61,6 +66,7 @@ export class OutcomesView {
   }
 
   dispose() {
+    this.unfollow();
     this.renderer.dispose();
   }
 }

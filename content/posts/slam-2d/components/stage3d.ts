@@ -8,12 +8,43 @@ import type { Segment } from "./world";
 type Three = typeof THREE;
 export const CYAN_HEX = 0x79dafa, PINK_HEX = 0xff6e96, VIOLET_HEX = 0xb9a5ff;
 
+/**
+ * Keep a scene in the page's ink colour when the theme changes. The grid, the walls and the map lines take their
+ * colour from the canvas's CSS `color`, but three.js copies it at creation, so a theme switch has to be pushed in:
+ * every material still wearing the old ink gets the new one, and a grid's baked vertex colours are rewritten.
+ * `ink` itself is updated in place, so whatever is built later comes out right too. Returns the way to stop.
+ */
+export function followInk(T: Three, canvas: HTMLCanvasElement, scenes: () => THREE.Scene[], ink: THREE.Color, after?: () => void): () => void {
+  canvas.dataset.ink = ink.getHexString(); // what the scene is drawn in, so a test can tell without reading pixels
+  const observer = new MutationObserver(() => {
+    const next = new T.Color(getComputedStyle(canvas).color);
+    if (next.equals(ink)) return;
+    for (const scene of scenes()) scene.traverse((node) => {
+      const obj = node as THREE.Mesh, colours = obj.geometry?.getAttribute("color");
+      if (node instanceof T.GridHelper && colours) {
+        for (let i = 0; i < colours.count; i++) colours.setXYZ(i, next.r, next.g, next.b);
+        colours.needsUpdate = true;
+      }
+      for (const material of [obj.material].flat()) {
+        const colour = (material as THREE.MeshStandardMaterial | undefined)?.color;
+        if (colour?.equals(ink)) colour.copy(next);
+      }
+    });
+    ink.copy(next);
+    canvas.dataset.ink = ink.getHexString();
+    after?.();
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  return () => observer.disconnect();
+}
+
 /** A z-up three.js scene on one canvas: lights, a faint floor grid in the page's ink colour, and resize handling. */
 export class Stage3D {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   readonly ink: THREE.Color;
+  private readonly unfollow: () => void;
 
   constructor(readonly T: Three, readonly canvas: HTMLCanvasElement, { fov = 38, grid = [10, 7] as [number, number] } = {}) {
     this.renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true });
@@ -22,6 +53,7 @@ export class Stage3D {
     this.camera = new T.PerspectiveCamera(fov, 2, 0.1, 150);
     this.camera.up.set(0, 0, 1);
     this.ink = new T.Color(getComputedStyle(canvas).color);
+    this.unfollow = followInk(T, canvas, () => [this.scene], this.ink);
     this.scene.add(new T.HemisphereLight(0xffffff, 0x222244, 2.4));
     const sun = new T.DirectionalLight(0xffffff, 1.6);
     sun.position.set(-6, -10, 14);
@@ -89,6 +121,7 @@ export class Stage3D {
   }
 
   dispose() {
+    this.unfollow();
     this.renderer.dispose();
   }
 }

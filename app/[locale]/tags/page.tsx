@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/tags">):
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale);
-  return { title: t.tags.title, description: t.tags.description, ...sharedMetadata(locale, "/tags") };
+  return { title: t.tags.title, description: t.tags.description, ...sharedMetadata(locale, "/tags", { siteCard: true }) };
 }
 
 export default async function TagsPage({ params }: PageProps<"/[locale]/tags">) {

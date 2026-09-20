@@ -3,7 +3,7 @@ const zh = {
     title: "paul.notebook — 從零實作機器學習模型",
     description: "Paul 的實驗筆記：從零實作機器學習模型，每一篇都能在瀏覽器裡訓練、拆開、弄壞。電腦視覺、強化學習、Transformer、擴散模型與機器人。",
   },
-  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁", skip: "跳到主要內容" },
+  nav: { posts: "文章", tags: "標籤", menu: "選單", home: "首頁", skip: "跳到主要內容", close: "關閉選單", loading: "頁面載入中" },
   search: {
     open: "搜尋",
     placeholder: "搜尋全文：試試「池化」或「突變」…",

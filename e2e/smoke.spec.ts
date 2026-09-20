@@ -128,6 +128,10 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
     expect(await href('link[rel="alternate"][type="application/rss+xml"]')).toContain(`${path.slice(0, 3)}/feed.xml`);
     expect(new URL((await page.locator('meta[property="og:url"]').getAttribute("content"))!).pathname).toBe(path);
     await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute("content", "paul.notebook");
+    // Every page shares with a picture: its own card for the home page and an article, the site's for the rest.
+    const card = new URL((await page.locator('meta[property="og:image"]').first().getAttribute("content"))!).pathname;
+    expect(card).toBe(path.includes("/posts/") ? `${path}/opengraph-image` : `${path.slice(0, 3)}/opengraph-image`);
+    await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute("content", "summary_large_image");
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /.{20,}/);
     await expect(page.locator("h1")).toHaveCount(1);
   });
@@ -291,8 +295,7 @@ test("phone header: menu left, mark centred, search right; drawer holds navigati
 
 test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page }) => {
   const response = await page.goto("/en/posts/hydranet-fruit");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "hydranet-fruit is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(120_000);
   const errors = watchErrors(page);
 
@@ -476,4 +479,23 @@ test("the home index is a short bento: at most six tiles, each saying what its a
   expect(await tiles.count()).toBeLessThanOrEqual(6);
   if (!isMobile) return;
   for (const tile of await tiles.all()) await expect(tile.locator("p.leading-relaxed")).toBeVisible();
+});
+
+test("a 3D figure follows the theme: switching to light re-inks a scene that was built in the dark", async ({ page, isMobile }) => {
+  test.skip(isMobile, "the theme buttons are in the footer on wide screens and in the menu on a phone; one is enough");
+  await page.goto("/zh/posts/slam-2d");
+  const figure = page.locator('[data-instrument="slam / wheels"]'), canvas = figure.locator("canvas");
+  await figure.scrollIntoViewIfNeeded();
+  // The scene records the ink it is drawn in; it has to keep up with the CSS colour of its canvas.
+  const drawn = () => canvas.getAttribute("data-ink"), page_ink = () => canvas.evaluate((el) => {
+    const [r, g, b] = getComputedStyle(el).color.match(/[\d.]+/g)!.map(Number);
+    return [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+  });
+  await page.getByRole("button", { name: "深色" }).first().click();
+  await expect.poll(drawn, { timeout: 20_000 }).not.toBeNull();
+  const dark = await drawn();
+  expect(dark).toBe(await page_ink());
+  await page.getByRole("button", { name: "淺色" }).first().click();
+  await expect.poll(drawn, { timeout: 10_000 }).not.toBe(dark);
+  expect(await drawn()).toBe(await page_ink());
 });

@@ -60,8 +60,16 @@ is no real-user data, because Speed Insights is not switched on in the Vercel da
    a locale. The manifest also lacks `id` and `lang`, and mixes a zh name with an en description.
 6. **404s under `/zh/*` and `/en/*` server-render an empty shell.** Verified with curl. The response is a 404 with
    `<html id="__next_error__">`, no `lang`, the home page's `<title>`, and no h1. The designed 404 appears only after
-   JS runs. A top-level `/nope` renders correctly. The cause is a guess: `[...rest]/page.tsx` combined with
-   `dynamicParams = false`.
+   JS runs. A top-level `/nope` renders correctly through `global-not-found.tsx`.
+   - Cause, found by experiment afterwards. The root layout lives under `[locale]`, so the app root has no layout and
+     no not-found. When `notFound()` reaches Next's server pass, it looks for a root-level not-found to render, finds
+     none, and sends the error shell (`getErrorRSCPayload` in `app-render.js`). The client then draws
+     `[locale]/not-found.tsx`. The status is still 404 and the response still carries noindex.
+   - Tried, no effect: `dynamicParams = true` on the pages; removing `dynamicParams = false` from the layout, which
+     only removes the `NoFallbackError` log line; `globalNotFound: false`; removing the `PageSwap` wrapper.
+   - Options. (a) Accept it: only no-JS readers and the tab title lose. (b) Answer unknown URLs from `proxy.ts` with
+     a rewrite to a real 404 page, which means the proxy must know every slug and tag. (c) Move `<html>` into an
+     `app/layout.tsx`, which then cannot know the locale for `lang` on the server. Not fixed; (a) for now.
 7. **HydraNet (77) and CNN (81) are the slow pages.** The largest element is the lead paragraph, held back 2–3 s by
    script work during hydration. HydraNet has 208 ms and 115 ms long tasks in the shared chunk. Item 1 removes part of
    that. The rest is their own demos starting before anyone scrolls to them; SLAM's lazy start fixed the same problem.

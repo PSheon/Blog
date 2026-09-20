@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/tags/[ta
   const { locale, tag } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale), posts = getAllPosts(locale).filter((p) => p.tags.includes(tag));
-  return { title: t.tags.tagged(tag), description: t.tags.taggedLead(tag, posts.length), ...sharedMetadata(locale, `/tags/${tag}`) };
+  return { title: t.tags.tagged(tag), description: t.tags.taggedLead(tag, posts.length), ...sharedMetadata(locale, `/tags/${tag}`, { siteCard: true }) };
 }
 
 export default async function TagPage({ params }: PageProps<"/[locale]/tags/[tag]">) {

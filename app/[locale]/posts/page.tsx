@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/posts">)
   const { locale } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale);
-  return { title: t.posts.title, description: t.posts.description, ...sharedMetadata(locale, "/posts") };
+  return { title: t.posts.title, description: t.posts.description, ...sharedMetadata(locale, "/posts", { siteCard: true }) };
 }
 
 export default async function PostsPage({ params }: PageProps<"/[locale]/posts">) {

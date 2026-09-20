@@ -75,6 +75,8 @@ export function AlignLab() {
     <div ref={root} className="grid gap-4 text-sm">
       <canvas
         ref={view}
+        role="img"
+        aria-label={t.picAlign}
         className="aspect-[16/9] w-full cursor-grab touch-none rounded-md border border-border text-foreground active:cursor-grabbing"
         onPointerDown={(e) => { stop(); drag.current = floor(live.current?.stage, e); e.currentTarget.setPointerCapture(e.pointerId); }}
         onPointerMove={(e) => {
