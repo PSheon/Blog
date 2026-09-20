@@ -1,4 +1,5 @@
 import type { BufferGeometry } from "three";
+import { ASSET_VERSION } from "./sim";
 
 const ASSETS = "/lite3/visual";
 /** Which mesh each MuJoCo body wears; index = body id (0 is the world). Right thighs are mirrored, as in the MJCF. */
@@ -43,7 +44,7 @@ export class Lite3View {
     const [three, { STLLoader }] = await Promise.all([import("three"), import("three/examples/jsm/loaders/STLLoader.js")]);
     const loader = new STLLoader();
     const names = ["torso", "hip", "thigh", "shank"];
-    const loaded = await Promise.all(names.map((n) => loader.loadAsync(`${ASSETS}/${n}.stl`)));
+    const loaded = await Promise.all(names.map((n) => loader.loadAsync(`${ASSETS}/${n}.bin?v=${ASSET_VERSION}`)));
     const geometry = new Map<string, BufferGeometry>(names.map((n, i) => [n, loaded[i]]));
     geometry.forEach((g) => g.computeVertexNormals());
 

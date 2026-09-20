@@ -1,0 +1,15 @@
+# PD gains: mean forward speed over 10 s at a commanded 0.5 m/s (x displacement / 10), torso height at the end
+kp 10 kd 1: 0.01 m/s, height 0.21 m, fell null
+kp 20 kd 1: 0.24 m/s, height 0.30 m, fell null
+kp 30 kd 1: 0.47 m/s, height 0.32 m, fell null
+kp 60 kd 1: 0.66 m/s, height 0.35 m, fell null
+kp 100 kd 1: 0.80 m/s, height 0.36 m, fell null
+kp 30 kd 0.2: 0.62 m/s, height 0.32 m, fell null
+kp 30 kd 3: 0.31 m/s, height 0.32 m, fell null
+# Torso tilt: worst over 0.3–8 s, sampled every 10 ms. Shoves last 0.1 s and land at t = 2 s.
+walk 0.5 m/s: worst tilt 1.9°, fell null
+run 2 m/s: worst tilt 4.3°, fell null
+walk + turn 1.5 rad/s: worst tilt 3.0°, fell null
+shove +175 N: worst tilt 5.5°, fell null
+shove -175 N: worst tilt 5.8°, fell null
+shove -200 N: worst tilt 6.4°, fell null

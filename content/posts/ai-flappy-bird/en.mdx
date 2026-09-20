@@ -1,9 +1,10 @@
 ---
-title: "The fantastic journey of neural network evolution: 50 birds teach themselves Flappy Bird"
-description: Nobody shows these birds how to fly. Give each one a brain of six weights, add survival of the fittest, and a few dozen generations later they glide through every pipe.
+title: "From rookie to boss bird: 50 birds teach themselves Flappy Bird"
+description: Give each of fifty birds a brain of only six weights, add survival of the fittest, and usually within twenty-odd generations they clear a hundred pipes in a row. Then open that brain and see what it actually learned.
 seoTitle: "50 birds teach themselves Flappy Bird"
-seoDescription: "Nobody shows these birds how to fly. Give each a brain of six weights, add survival of the fittest, and dozens of generations later they clear every pipe."
+seoDescription: "Give each of fifty birds a brain of six weights, add survival of the fittest, and within twenty-odd generations they clear a hundred pipes. Then open the brain."
 date: 2025-03-23
+updated: 2026-09-20
 tags: [ai-agent, neuroevolution, from-scratch]
 no: 2
 interactive: true
@@ -11,7 +12,7 @@ interactive: true
 
 import { FlappyLab } from "./components";
 
-When you see those little birds miraculously navigating through obstacles on your screen, you might wonder: "How did these cyber birds get so smart?" Today, let's lift the veil on Flappy Bird and follow the evolutionary journey that turns clumsy beginners into elegant flyers.
+The network in [the previous entry](/en/posts/cnn-from-scratch) was trained with gradient descent: measure the error, then push every weight a little in the right direction. This entry uses none of that. There are no gradients here, no backpropagation and no loss function. The only feedback is how long a bird stayed alive.
 
 The fifty birds below are evolving in your browser right now. Watch them hit the wall for a few generations, then turn the speed up.
 
@@ -19,123 +20,72 @@ The fifty birds below are evolving in your browser right now. Watch them hit the
   <FlappyLab />
 </Instrument>
 
-## What is neuroevolution?
+## A brain of six numbers
 
-If you've never heard of neuroevolution, don't worry. It sounds like something from a sci-fi movie, but the concept is surprisingly simple.
+The drawing on the right of the instrument is everything a bird has:
 
-Imagine this:
+- **Two inputs**: the bird's height and the height of the next opening.
+- **Two hidden neurons.**
+- **One output**: above 0.5, the bird flaps.
 
-- **Neural networks**: computer programs mimicking the brain
-- **Genetic algorithms**: processes mimicking Darwin's survival of the fittest
-- **Neuroevolution**: the brilliant idea of combining the two
+The network has no biases, so its connections carry six weights in all: 2 × 2 + 2 × 1. Putting a neural network and evolution together is called neuroevolution. Instead of computing how each weight should change, you keep a crowd of individuals with different weights and let the ones that do well leave offspring.
 
-Simply put, you let a group of electronic bird brains compete against each other and allow the best performers to pass their genes to the next generation. Just like real biological evolution, but millions of times faster!<Sidenote>There are no gradients here, no backpropagation and no loss function. The only feedback is how long a bird stayed alive.</Sidenote>
+## How one generation becomes the next
 
-### Bird brain anatomy, simplified
+In the first generation all six weights of all fifty birds are random, and most birds hit the wall straight away.
 
-Our AI birds have an extremely simple brain, the one drawn on the right of the instrument above:
-
-- **Input**: just two neurons, receiving the bird's height and the height of the next opening
-- **Hidden layer**: two neurons to process that
-- **Output**: one neuron; above 0.5, the bird flaps
-
-That's it! Six weights in total, no deep learning, no convolutions. But don't underestimate this bird brain. It can work miracles!
-
-## From rookie to bird champion: the secret of evolution
-
-### Step 1: a random free-for-all
-
-```ts title="content/posts/ai-flappy-bird/components/world.ts"
-// Start with 50 completely random birds
+```ts title="simplified from content/posts/ai-flappy-bird/components/world.ts"
 const population = new Population({
   shape: [2, 2, 1], // 2 inputs, 2 hidden neurons, 1 output
   size: 50,
 });
 ```
 
-Initially, all birds are rookies, acting completely at random. It's like throwing 50 beginners into a pole-dancing class and seeing who lasts longest without breaking a leg. Most will crash tragically, but a few will get lucky.
-
-### Step 2: eugenics (not the evil kind)
+Once every bird is dead, they are ranked by how long they lived, and the next generation is produced:
 
 ```ts title="lib/ml/neuroevolution.ts"
-elitism: 0.2,    // keep the best 20% unchanged
-randomRate: 0.2, // make 20% completely random (avoids local optima)
-                 // the remaining 60% are children of good birds
+elitism: 0.2,    // the best 20% are kept unchanged
+randomRate: 0.2, // 20% are brand-new random individuals, so the flock can't get stuck on one habit
+                 // the remaining 60% are children of the birds that were kept
 ```
 
-We do a few things:
-
-- Keep the best-performing birds (long live elitism!)
-- Introduce some brand-new random birds (fresh blood!)
-- Let elite birds "mate" to produce offspring (don't overthink it… we only mix their neural weights)
-
-### Step 3: mutate genes, create the future
-
-```ts title="lib/ml/neuroevolution.ts"
-mutationRate: 0.1,  // each weight has a 10% chance of mutating
-mutationRange: 0.5, // by at most ±0.5
-```
-
-To avoid inbreeding, we randomly alter some connection weights. This is like genetic mutation in nature: sometimes it creates superpowers, sometimes… well, disasters.
-
-## AI bird behaviour studies: strange but effective strategies
-
-After dozens of generations, you'll notice these birds develop some interesting habits:
-
-- **Panic bird**: always jumps at the last moment, as if it had a serious procrastination problem.
-- **Super-conservative bird**: stays in the middle of the screen, like an accountant who never takes risks.
-- **Rhythm-master bird**: develops an almost musical rhythm that makes you want to add a soundtrack.
-- **Cheating bird?**: sometimes it looks as if they've found a loophole in the game, but it's only the algorithm optimising.
-
-<Callout type="insight" title="Watch the brain, not only the bird">
-Successful bird brains tend to look alike: at least one hidden neuron receives "bird height" and "gap height" through lines of opposite colours. That is a way of computing "am I above or below the opening?", and flapping when below. Six numbers, and what they learn is a subtraction.
-</Callout>
-
-## Why does something this simple work?
-
-You might ask: "Can an AI really learn a game this easily?"
-
-Yes! Because:
-
-- **The problem is straightforward**: Flappy Bird has a simple state and very few actions.
-- **Mass trial and error**: a computer can try thousands of times in a short while, which beats you practising for hundreds of hours.
-- **Survival of the fittest**: one of nature's oldest learning rules works just as well on virtual birds.
-
-Evolution doesn't guarantee success, though.<Sidenote>I ran 12 different random seeds for 60 generations each: 11 learned within twenty-odd generations, and one population got stuck in the same bad habit and never made it past the third pipe.</Sidenote> If the score refuses to climb, press Restart and begin with a new set of ancestors.
-
-## What's distinctive in the implementation
+"Children" means something plain. A bird's genome is that array of six numbers. Two birds make a chick by taking each position from one parent or the other with equal probability; each number then has a 10% chance of being nudged at random by at most ±0.5:
 
 ```ts title="lib/ml/neuroevolution.ts" {4,5}
 private breed(a: Float32Array, b: Float32Array): Float32Array {
-  const child = Float32Array.from(a); // copy the first parent's genes
+  const child = Float32Array.from(a);
   for (let i = 0; i < child.length; i++) {
-    if (rng() <= 0.5) child[i] = b[i]; // crossover: 50% chance of the second parent's gene
+    if (rng() <= 0.5) child[i] = b[i]; // crossover: 50% chance of the other parent's number
     if (rng() <= mutationRate) child[i] += rng() * mutationRange * 2 - mutationRange; // mutation
   }
   return child;
 }
 ```
 
-This code is the system's DNA laboratory, mixing the genes of two successful networks to produce the next generation. It's like blending the brain wiring of two smart birds and adding a dash of mutation seasoning.<Sidenote>A genome is just a `Float32Array`. The same `Population` is reused by the trading agents in the next article, with a slightly larger network and return on investment as the score.</Sidenote>
+Those three pieces of code are the whole algorithm.<Sidenote>The same `Population` is reused by [the trading bots in the next entry](/en/posts/trading-agent), with a slightly larger network and return on investment as the score instead of time survived.</Sidenote>
 
-## Conclusion: AI dancing with Darwin
+## Open the brain: what it learned is a subtraction
 
-Next time you see those little birds gliding through pipes, remember: they weren't programmed to do that, they *learned* to. Through countless generations of failure and selection, from random flailing to precise control, these virtual creatures demonstrate a simple yet profound truth:
+Once the birds fly well, look at the drawing on the right of the instrument. Brains that evolved successfully tend to look alike: at least one hidden neuron receives "bird height" and "gap height" through lines of **opposite colours**, one positive and one negative.
 
-> Sometimes the secret to success isn't clever design, but enough chances to try and the ability to adapt.
+One positive plus one negative computes "my height minus the height of the opening": am I above the opening or below it? Below, so flap. This is no coincidence. Both inputs are positive numbers between 0 and 1, so a neuron whose two weights share a sign can only measure how large the two are together; it cannot tell which is higher. Comparing them takes one positive and one negative.<Sidenote>I ran 40 random seeds for 60 generations each, and 35 learned. Of those 35 graduating birds, 33 have at least one hidden neuron like this. Take it with a pinch of salt: six purely random weights meet the condition 75% of the time by chance. The script and its output are in `docs/research/evolution-seeds/`.</Sidenote>
 
-If a flock of pixel birds can learn a game through simple evolution, do we humans learn our skills in a similar way? Perhaps each of us is a neuroevolution experiment run by our own genes and experiences…
+Six numbers, and what they learned is a subtraction. That subtraction is not in any line of code. It is simply the one combination of six numbers, out of all of them, that lived longest.
 
-All right, deep-thinking time is over. Go back up, set the speed to max, and let's see how good those little guys get after a few more generations!
+## Evolution doesn't guarantee success
+
+I ran 12 different random seeds for 60 generations each: 10 graduated within 22 generations, one took until generation 43, and in one the whole population got stuck in the same bad habit and never cleared more than 3 pipes in all 60 generations. With 40 seeds, 5 never learned.
+
+This is the usual weakness of evolutionary methods. With no gradient to say which way is better, evolution can only stumble on better individuals by luck. If the whole flock looks alike and all of it is bad, the 20% of fresh blood takes a long time to turn things round. If the score refuses to climb, press Restart and begin with a new set of ancestors.
+
+It works here because the problem is small: two inputs, one action, six numbers. The space to search is small enough that shooting blind still hits. With more parameters, the chance of stumbling on a good solution falls quickly, and that is usually where gradient descent wins.
 
 ## Further reading
 
-If you're interested in the mathematics behind neuroevolution and more technical detail:
-
-- Kenneth O. Stanley's NEAT paper: [NeuroEvolution of Augmenting Topologies](https://en.wikipedia.org/wiki/Neuroevolution_of_augmenting_topologies)
-- [*The Quest for Artificial Intelligence*](https://www.cambridge.org/core/books/quest-for-artificial-intelligence/32C727961B24223BBB1B3511F44F343E), Nils J. Nilsson
-- [*Evolutionary Optimization Algorithms*](https://www.wiley.com/en-mx/Evolutionary+Optimization+Algorithms-p-9780470937419), Dan Simon
+- NEAT (NeuroEvolution of Augmenting Topologies): [Wikipedia entry](https://en.wikipedia.org/wiki/Neuroevolution_of_augmenting_topologies). The network in this entry has a fixed shape and only its weights evolve; NEAT evolves the shape as well.
+- Nils J. Nilsson, [*The Quest for Artificial Intelligence*](https://www.cambridge.org/core/books/quest-for-artificial-intelligence/32C727961B24223BBB1B3511F44F343E)
+- Dan Simon, [*Evolutionary Optimization Algorithms*](https://www.wiley.com/en-mx/Evolutionary+Optimization+Algorithms-p-9780470937419)
 
 ---
 
-*This article first appeared on my previous site in March 2025. The interactive parts were rewritten from scratch in TypeScript when it moved into this notebook.*
+*This article first appeared on my previous site in March 2025. The interactive parts were rewritten from scratch in TypeScript when it moved into this notebook, and the text was rewritten in September 2026.*

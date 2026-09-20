@@ -1,0 +1,12 @@
+12,000 shape images, 300 test scenes per condition, seeds 1 2 3 (mask grid 16)
+normal box                                           0.83  0.83  0.79   mean 0.81
+normal mask                                          0.71  0.78  0.73   mean 0.74
+two: box vs box around both                          0.35  0.33  0.38   mean 0.35
+two: box vs the better-matching single object        0.51  0.56  0.52   mean 0.53
+two: box centre inside neither object                0.36  0.25  0.31   mean 0.31
+two: mask vs both masks                              0.67  0.74  0.70   mean 0.70
+two: box taken from the mask vs box around both      0.79  0.82  0.80   mean 0.80
+contrast +0.3 box                                    0.72  0.72  0.66   mean 0.70
+contrast +0.3 mask                                   0.54  0.59  0.39   mean 0.50
+contrast +0.15 box                                   0.41  0.41  0.39   mean 0.40
+contrast +0.15 mask                                  0.21  0.14  0.02   mean 0.12

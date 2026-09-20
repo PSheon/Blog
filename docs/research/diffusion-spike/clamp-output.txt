@@ -1,0 +1,8 @@
+step 0 (level 100, sqrt(alpha_bar) = 6.1e-17): 100.0% clamped
+step 1 (level 98, sqrt(alpha_bar) = 3.1e-2): 62.0% clamped
+step 2 (level 95, sqrt(alpha_bar) = 7.8e-2): 23.0% clamped
+step 3 (level 93, sqrt(alpha_bar) = 1.1e-1): 9.3% clamped
+step 4 (level 90, sqrt(alpha_bar) = 1.6e-1): 2.4% clamped
+step 5 (level 88, sqrt(alpha_bar) = 1.9e-1): 0.9% clamped
+step 6 (level 85, sqrt(alpha_bar) = 2.3e-1): 0.3% clamped
+step 7 (level 83, sqrt(alpha_bar) = 2.6e-1): 0.1% clamped

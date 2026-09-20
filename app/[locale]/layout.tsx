@@ -5,6 +5,10 @@ import "../globals.css";
 import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
 import { SiteHeader } from "@/components/site/header";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { NavProgress } from "@/components/site/nav-progress";
+import { ServiceWorker } from "@/components/site/service-worker";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAllTags } from "@/lib/content/posts";
 import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
@@ -23,6 +27,15 @@ export const viewport: Viewport = {
     { media: "(prefers-color-scheme: light)", color: "#fbfbfe" },
   ],
 };
+
+/**
+ * The service worker runs on production only: a Vercel preview is a throwaway origin, and `next dev` must never be
+ * cached. NEXT_PUBLIC_SERVICE_WORKER=off is the kill switch: pages then unregister it and empty its caches.
+ */
+const SERVICE_WORKER =
+  process.env.NEXT_PUBLIC_SERVICE_WORKER !== "off" &&
+  process.env.NODE_ENV === "production" &&
+  (!process.env.VERCEL || process.env.VERCEL_ENV === "production");
 
 export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Promise<Metadata> {
   const { locale } = await params;
@@ -52,7 +65,7 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
               href="#content"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
             >
-              {locale === "zh" ? "跳到主要內容" : "Skip to content"}
+              {t.nav.skip}
             </a>
             <SiteHeader
               locale={locale}
@@ -72,6 +85,13 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
             </main>
             <SiteFooter locale={locale} t={t} />
         </ThemeProvider>
+        {/* Real-visitor numbers: page views without cookies, and Core Web Vitals from actual devices. Their scripts
+            are served by Vercel itself (/_vercel/…), so anywhere else they would only 404 into the console. Both
+            also have to be switched on once in the project's dashboard. */}
+        <NavProgress label={locale === "zh" ? "頁面載入中" : "Loading page"} />
+        <ServiceWorker enabled={SERVICE_WORKER} />
+        {process.env.VERCEL && <Analytics />}
+        {process.env.VERCEL && <SpeedInsights />}
       </body>
     </html>
   );

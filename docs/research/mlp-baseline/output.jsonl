@@ -1,0 +1,12 @@
+{"hidden": 11, "params": 8755, "times_cnn": 1.0, "seed": 0, "best_test": 93.43}
+{"hidden": 11, "params": 8755, "times_cnn": 1.0, "seed": 1, "best_test": 93.8}
+{"hidden": 11, "params": 8755, "times_cnn": 1.0, "seed": 2, "best_test": 93.64}
+{"hidden": 115, "params": 91435, "times_cnn": 10.1, "seed": 0, "best_test": 97.82}
+{"hidden": 115, "params": 91435, "times_cnn": 10.1, "seed": 1, "best_test": 97.94}
+{"hidden": 115, "params": 91435, "times_cnn": 10.1, "seed": 2, "best_test": 98.04}
+{"hidden": 256, "params": 203530, "times_cnn": 22.4, "seed": 0, "best_test": 98.08}
+{"hidden": 256, "params": 203530, "times_cnn": 22.4, "seed": 1, "best_test": 98.15}
+{"hidden": 256, "params": 203530, "times_cnn": 22.4, "seed": 2, "best_test": 98.09}
+{"hidden": 512, "params": 407050, "times_cnn": 44.7, "seed": 0, "best_test": 98.23}
+{"hidden": 512, "params": 407050, "times_cnn": 44.7, "seed": 1, "best_test": 98.28}
+{"hidden": 512, "params": 407050, "times_cnn": 44.7, "seed": 2, "best_test": 98.27}

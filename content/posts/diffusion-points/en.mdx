@@ -1,0 +1,154 @@
+---
+title: "How a cloud of noise becomes an apple: training a 3-D diffusion model in the browser"
+description: "Pick two fruit and press Train. A diffusion model written from scratch learns, in your browser, to pull a cloud of coloured 3-D noise into those two fruit, colours included. Then we take apart what it learned."
+seoTitle: "3-D diffusion in your browser: noise to fruit"
+seoDescription: "Pick two fruit and press Train: a from-scratch diffusion model learns in your browser to turn coloured 3-D noise into fruit. Then we take apart what it learned."
+date: 2026-09-20
+tags: [generative, diffusion, from-scratch]
+no: 7
+interactive: true
+---
+
+import { FieldLab, GuidanceLab, NoiseLab, StepsLab, TrainLab } from "./components";
+
+An image-generating AI starts from a picture that is pure noise and wipes the noise away a little at a time until a picture is left. Everyone has heard that sentence. What "wiping away noise" actually means is impossible to tell from the finished picture.
+
+So here is a version small enough to train in front of you. It doesn't paint, it sculpts fruit: **a little over three thousand coloured points start as a cloud of noise and settle into the two fruit you choose.** To show both at once, three clouds grow at a time: one for each fruit, and one that is a blend of the two.
+
+Choose your fruit and press Train.
+
+<Instrument fig="01" title="diffusion / train" size="wide" caption="Three point clouds, each with its name underneath: your two fruit at the sides, and the one marked × is what the same model grows when asked for half of each (more on that later). Every four or five seconds all three start again from fresh noise and take 40 steps with whatever the model knows by then.">
+  <TrainLab />
+</Instrument>
+
+At first nothing happens: an untrained model has no idea what fruit is, so after 40 steps the noise is still noise. Once training runs, colour comes first: after about five seconds the left cloud leans towards one colour and the right cloud towards another. At around ten seconds you can make out shapes, and after half a minute the apple has its leaf.<Sidenote>That is the pace on my machine (M-series Mac, Chrome), about 90 training steps per second. Yours will differ. Training and sampling both run in a Web Worker, so scrolling stays smooth; the price is that the two take turns on one core, and the steps/s under the instrument counts only training's share of the time, so it reads higher.</Sidenote>
+
+Let me be clear about what this is and is not. **This model cannot "draw fruit". It has memorised the two fruit you picked.** Those are the only two things it has ever seen, so they are all it can produce, along with things in between. A real image model has seen billions of pictures, and that is what lets it draw combinations it never saw.
+
+But the method of memorising, and of recovering the thing from noise, is the same one those large models use. That method is what this article takes apart. The points land somewhere different every time, because the starting noise differs every time; what the model has stored is not the coordinates of three thousand points but where the fruit is.
+
+## It learned one very dumb thing
+
+From start to finish, training is a single kind of exercise:
+
+1. Take a random point $x_0$ from the surface of a fruit.
+2. Pick a random noise level $t$ and add that much noise to the point.
+3. Show the noisy point to the model and ask: **"What was the noise I just added?"**
+
+Step 2 is one line:
+
+$$
+x_t = \sqrt{\bar\alpha_t}\, x_0 + \sqrt{1 - \bar\alpha_t}\, \varepsilon, \qquad \varepsilon \sim \mathcal{N}(0, I)
+$$
+
+$\bar\alpha_t$ is a table fixed in advance: 1 at level 0 (all original point), nearly 0 at level 100 (all noise). Drag the slider to see what that one line does to a fruit:
+
+<Instrument fig="02" title="diffusion / add noise" caption="No model here, only the sum above. At noise level 100 nothing of the fruit is left.">
+  <NoiseLab />
+</Instrument>
+
+Notice that the formula does not have to be applied level by level: for a point at level 73 you plug in $t = 73$ and you have it. That makes every exercise cheap: draw a point, draw a level, and the question is ready.<Sidenote>Adding noise little by little is how diffusion models are defined; because every level adds Gaussian noise, and many Gaussians stacked are still a Gaussian, you can jump to any level in one go.</Sidenote>
+
+What the model has to learn is to make its answer $\varepsilon_\theta$ as close as possible to the $\varepsilon$ that really went in:
+
+$$
+L = \mathbb{E}_{x_0,\, t,\, \varepsilon}\ \big\| \varepsilon - \varepsilon_\theta(x_t, t) \big\|^2
+$$
+
+That loss is the whole of training. No discriminator, no adversary, just regression.
+
+## What it learned is a map of arrows
+
+"Guess the noise" sounds abstract, but seen from another side it is concrete. If the model says "the noise in this point is $\varepsilon$", then removing that noise means pushing the point along $-\varepsilon$. So what the model really answers is: **standing here in space, which way is the fruit?**
+
+Below, the model you trained is cut open. This is a vertical slice through the middle of your first fruit, and the arrow at every grid point is the way the model would push a point standing there:
+
+<Instrument fig="03" title="diffusion / field" caption="The coloured outline is the real fruit where the slice cuts it. The pinker an arrow, the longer it is. The grid points' colour input is the fruit's average colour, faded as much as a real point's colour would be at that noise level.">
+  <FieldLab />
+</Instrument>
+
+The arrows outside all point at the fruit, which is no surprise. The interesting part comes when you lower the noise level (it is clearest with the apple as the first fruit): **the arrows inside the fruit turn around and point outwards, to the surface**. The model knows the fruit is hollow: points exist only on the surface, so for a point at the very centre of the apple, the nearest home is outside.
+
+At high noise it is the opposite: every arrow points to the same place, roughly the middle of the fruit. The reason deserves a pause, because it explains nearly everything a diffusion model does:
+
+> A very noisy point could have come from anywhere on the fruit's surface. The model cannot know where, and it was trained to minimise squared error. The answer that minimises squared error is always **the average of all the possible answers**, with likelier answers weighing more.
+
+The average of every point on a fruit's surface is the middle of the fruit. So at high noise the best the model can say is "head for the middle". It has not learned badly; that is the correct answer to that exercise.<Sidenote>In mathematical terms the model learns $-\sqrt{1-\bar\alpha_t}\,\nabla_x \log p_t(x)$, the gradient of the log density of the noised data, called the score. The arrows always point towards where points are denser. The research that starts from this view is called score-based modelling, and it turned out to be the same thing as diffusion.</Sidenote>
+
+## Why it takes many steps
+
+Once the model can answer "what is the noise", generating is that same thing in reverse. Start from pure noise $x_T$. At every step ask the model, then work out **what the model currently believes the result is**:
+
+$$
+\hat{x}_0 = \frac{x_t - \sqrt{1 - \bar\alpha_t}\; \varepsilon_\theta(x_t, t)}{\sqrt{\bar\alpha_t}}
+$$
+
+That is just the noising line solved for $x_0$. Then, instead of trusting it outright, go only a little way towards it, down to a lower noise level $s$:
+
+$$
+x_s = \sqrt{\bar\alpha_s}\; \hat{x}_0 + \sqrt{1 - \bar\alpha_s}\; \varepsilon_\theta(x_t, t)
+$$
+
+And ask again from the new position.<Sidenote>This is the DDIM way of stepping: the same starting noise always ends in the same result. The original DDPM also adds a little fresh random noise at every step, which gives more variety and needs more steps. The code does one more thing: it clamps every number of $\hat{x}_0$ to ±1.5.</Sidenote>
+
+Here is one complete run of the model you trained, which you can scrub back and forth. Do try "the model's guess of the result" on the right:
+
+<Instrument fig="04" title="diffusion / steps" caption="One fruit on each side, from the same model as instrument 01. Where the points are is x_t; the model's guess of the result is the x̂₀ of the formula above.">
+  <StepsLab />
+</Instrument>
+
+Pull the slider to about step 4 or 5 and switch to the model's guess. You will see two fuzzy balls, roughly the right colours and with no shape at all. (In the first two or three steps you see not balls but points stuck to the sides of a box: $\bar\alpha_t$ is almost 0 there, so the formula above amounts to dividing by zero, and the smallest error in the model's answer is blown up to the ±1.5 limit. That is a numerical problem, not the model's answer.) **Nothing is broken; this is its best answer at that moment**, the average from the previous section: while the noise is large, the model's guess at the result is the average of the whole fruit, a blob of average colour sitting in the middle.
+
+This is also why it cannot be done in one step. Trust the model's guess completely on the first step and that average blob is what you get. Taking many small steps means trusting it only a little each time and moving to where the noise is smaller, where the range of possible answers is narrower, their average less blurred, and so the next guess more specific. That is how the shape goes from fuzzy to sharp, round after round.
+
+Set the total number of steps to 3 or 5 to see what too few does: every step is too big, and the fine parts (the leaf, the bend of the banana) never get the time to grow.
+
+## Colour is just more coordinates
+
+Each point is not three numbers but six: **x, y, z, red, green, blue**. To the model, colour and position are the same kind of thing, numbers to be recovered from noise, and every $x$ in the formulas above means all six.
+
+So what it learns is not a shape plus a paint job but one object in six dimensions: "a point at this position should have this colour". The points at the top of the apple are green because, in those six dimensions, that position combined with green is where the fruit is. It is also why the colours scramble along with the positions when you raise the noise in instrument 02.
+
+## How it knows which one to grow
+
+One model sculpts two fruit because it is shown two more numbers, $c$: `[1, 0]` means "I want the first", `[0, 1]` means "I want the second". The model goes from $\varepsilon_\theta(x_t, t)$ to $\varepsilon_\theta(x_t, t, c)$ and nothing else changes. During training every point comes with the fruit it was taken from; when sampling you give whichever you want.
+
+Text-to-image models do the same thing, except that $c$ is a long list of numbers computed from a piece of text.
+
+And the third cloud in instrument 01? It is given `[0.5, 0.5]`, **numbers the model never saw in training**. Nobody taught it what "half apple, half banana" looks like, so it has to find a compromise between its two answers by itself. The time I trained apple and banana, what grew was something apple-shaped, banana-coloured, with the leaf still on top. A different pair compromises differently.
+
+### Telling it to listen harder
+
+Real image models use one more trick that nearly everybody relies on, called classifier-free guidance. It has two halves:
+
+- **In training**, one point in ten is deliberately not told which fruit it came from ($c$ is all zeros). So the same model learns two things: how to push when it knows which fruit is wanted, and how to push when it does not.
+- **In sampling**, ask both ways and stretch the difference between the two answers by a factor $w$:
+
+$$
+\tilde\varepsilon = \varepsilon_\theta(x_t, t, \varnothing) + w \cdot \big( \varepsilon_\theta(x_t, t, c) - \varepsilon_\theta(x_t, t, \varnothing) \big)
+$$
+
+The difference between knowing and not knowing is the part of the direction that the condition is responsible for. $w = 1$ leaves it as it is; $w > 1$ exaggerates it.
+
+<Instrument fig="05" title="diffusion / guidance" caption="Every move of the slider samples again from the same starting noise, so the only thing that changes on screen is w.">
+  <GuidanceLab />
+</Instrument>
+
+Pull $w$ down to 0 and the two clouds grow into the same thing, an average fruit somewhere between the two, because the model is not listening to which one you want at all. $w = 1$ is the normal look. Going up, the fruit first becomes more typical and the points tighter, and then it starts to deform: in my run, at $w = 4$ the apple was down to a red rim and the banana had shrunk to a sliver.
+
+Real models face the same trade-off: stronger guidance gives results closer to the textbook answer with less variety, and too much breaks them. In that training run of mine it looked best between 1 and 2; image models commonly default to around 7, because their condition (a piece of text) is far vaguer than "one of two fruit" and has to be listened to much harder.
+
+## How this differs from a real image model
+
+- **It works on points, not pictures.** One piece of data here is a point, six numbers, so a fully connected network of some twenty thousand parameters is enough. For an image model one piece of data is a whole picture, hundreds of thousands of numbers whose relationships matter, so it takes a far larger convolutional or Transformer network, usually not on the pixels themselves but on a compressed latent version of the picture.
+- **It has seen two things.** As said at the start: this is recitation, not invention. The difference comes from the amount of data, not from the method.
+- **Everything else is the same.** The noising formula, the guess-the-noise loss, stepping back a little at a time, steering with a condition, strengthening it with guidance: those five things are the ones inside the image models you use.
+
+## Sources
+
+- Ho, Jain, Abbeel, [*Denoising Diffusion Probabilistic Models*](https://arxiv.org/abs/2006.11239), 2020. Training by adding noise and guessing it.
+- Song, Meng, Ermon, [*Denoising Diffusion Implicit Models*](https://arxiv.org/abs/2010.02502), 2021. The 40-step sampler used here.
+- Nichol, Dhariwal, [*Improved Denoising Diffusion Probabilistic Models*](https://arxiv.org/abs/2102.09672), 2021. How the noise levels are spaced (the cosine schedule).
+- Song, Sohl-Dickstein, Kingma, Kumar, Ermon, Poole, [*Score-Based Generative Modeling through Stochastic Differential Equations*](https://arxiv.org/abs/2011.13456), 2021. The map-of-arrows (score) view, and why it is the same thing as diffusion.
+- Ho, Salimans, [*Classifier-Free Diffusion Guidance*](https://arxiv.org/abs/2207.12598), 2022. The guidance strength $w$. The paper writes the formula as $(1+w)\,\varepsilon_\theta(x_t, t, c) - w\,\varepsilon_\theta(x_t, t, \varnothing)$, so its $w$ is 1 smaller than the one here; this article uses the form later implementations settled on.
+- Luo, Hu, [*Diffusion Probabilistic Models for 3D Point Cloud Generation*](https://arxiv.org/abs/2103.01458), 2021. Diffusion applied to 3-D point clouds.

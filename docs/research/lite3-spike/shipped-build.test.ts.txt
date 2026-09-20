@@ -1,0 +1,25 @@
+// Numbers quoted in the Lite3 article, measured on the build that ships (convex-hull collision meshes in public/lite3).
+// Run: copy to tests/lite3/zz-shipped.test.ts, `pnpm vitest run tests/lite3/zz-shipped --reporter=verbose --silent=false`, delete the copy.
+import { readFile } from "node:fs/promises";
+import { it } from "vitest";
+import { Lite3Sim } from "@/content/posts/lite3-walking/components/sim";
+
+const D = { command: [0.5, 0, 0], kp: 30, kd: 1, blind: null, latency: 0, noise: 0, friction: 1 };
+const deg = (rad: number) => (rad * 180) / Math.PI;
+
+it("shipped build", async () => {
+  const sim = await Lite3Sim.load(async (p) => new Uint8Array(await readFile(`public/lite3/${p}`)));
+  const lines: string[] = ["# PD gains: mean forward speed over 10 s at a commanded 0.5 m/s (x displacement / 10), torso height at the end"];
+  for (const [kp, kd] of [[10, 1], [20, 1], [30, 1], [60, 1], [100, 1], [30, 0.2], [30, 3]]) {
+    Object.assign(sim.knobs, D, { kp, kd }); sim.reset(); sim.advance(10_000);
+    lines.push(`kp ${kp} kd ${kd}: ${(sim.position[0] / 10).toFixed(2)} m/s, height ${sim.position[2].toFixed(2)} m, fell ${sim.fellAt}`);
+  }
+  lines.push("# Torso tilt: worst over 0.3–8 s, sampled every 10 ms. Shoves last 0.1 s and land at t = 2 s.");
+  for (const [name, knobs, push] of [["walk 0.5 m/s", {}, 0], ["run 2 m/s", { command: [2, 0, 0] }, 0], ["walk + turn 1.5 rad/s", { command: [1.5, 0, 1.5] }, 0], ["shove +175 N", {}, 175], ["shove -175 N", {}, -175], ["shove -200 N", {}, -200]] as const) {
+    Object.assign(sim.knobs, D, knobs); sim.reset();
+    let worst = 0;
+    for (let t = 0; t < 8000; t += 10) { if (t === 2000 && push) sim.push(push); sim.advance(10); if (t >= 300) worst = Math.max(worst, sim.tilt); }
+    lines.push(`${name}: worst tilt ${deg(worst).toFixed(1)}°, fell ${sim.fellAt}`);
+  }
+  console.log("\n" + lines.join("\n"));
+}, 300_000);

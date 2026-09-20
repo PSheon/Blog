@@ -67,33 +67,33 @@
  */
 :root {
   --background: #fbfbfe;
-  --foreground: #1c2033;
+  --foreground: #12162a;
   --card: #ffffff;
-  --card-foreground: #1c2033;
+  --card-foreground: #12162a;
   --popover: #ffffff;
-  --popover-foreground: #1c2033;
-  --primary: #086c99;
+  --popover-foreground: #12162a;
+  --primary: #065a82;
   --primary-foreground: #fbfbfe;
   --secondary: #eceef5;
   --secondary-foreground: #1c2033;
-  --muted: #f0f1f7;
-  --muted-foreground: #565b78;
+  --muted: #e9ebf4;
+  --muted-foreground: #40455f;
   --accent: #e6e8f3;
   --accent-foreground: #1c2033;
   --destructive: #b3261e;
-  --border: #1c20331f;
-  --input: #1c203333;
-  --ring: #086c99;
-  --signal: #086c99;
+  --border: #12162a38;
+  --input: #12162a52;
+  --ring: #065a82;
+  --signal: #065a82;
   --signal-2: #c2255c;
   --signal-3: #6347d9;
-  --panel: #f4f5fa;
-  --rule: #1c203326;
-  --grid: #1c203314;
+  --panel: #eef0f8;
+  --rule: #12162a40;
+  --grid: #12162a1a;
   --line-width: 1px;
   --glow-a: #79dafa26;
   --glow-b: #ff6e961a;
-  --chart-1: #086c99;
+  --chart-1: #065a82;
   --chart-2: #c2255c;
   --chart-3: #6347d9;
   --chart-4: #4b5072;
@@ -107,6 +107,27 @@
   --sidebar-accent-foreground: var(--accent-foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
+}
+
+/* Navigation progress: creeps towards 90 % and waits there; the page arriving removes it. */
+@keyframes nav-progress {
+  from { transform: scaleX(0.05); }
+  to { transform: scaleX(0.9); }
+}
+.nav-progress-bar {
+  animation: nav-progress 8s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-progress-bar { animation: none; transform: scaleX(0.6); }
+}
+
+/*
+ * Greyscale antialiasing thins every stroke. On a dark page that is what you want; on a light one it makes the
+ * system CJK serif, already hairline-thin, hard to read. Light theme gets the platform's default smoothing back.
+ */
+html:not(.dark) {
+  -webkit-font-smoothing: auto;
+  -moz-osx-font-smoothing: auto;
 }
 
 .dark {
@@ -166,6 +187,18 @@
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
+  }
+  /*
+   * Anything you can press shows the hand. Browsers give buttons the arrow, which on a page full of instruments
+   * leaves the reader guessing what is live. One rule here instead of a class on every control, so a new article's
+   * buttons get it without anyone remembering; `:where` keeps it at zero specificity, so a utility such as
+   * `cursor-crosshair` on the drawing pad still wins.
+   */
+  :where(button, summary, select, label[for], [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="option"], [role="menuitem"], input:is([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="file"])) {
+    cursor: pointer;
+  }
+  :where(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: not-allowed;
   }
   ::selection {
     background: color-mix(in oklab, var(--signal) 35%, transparent);
@@ -260,6 +293,39 @@
 
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Light behind the latest-article card: the hero's glow again, flatter and in the gradient's other end. */
+  .card-glow {
+    position: absolute;
+    inset: -18% -6%;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(ellipse closest-side, color-mix(in oklab, var(--signal-2) 16%, transparent) 0%, color-mix(in oklab, var(--signal-3) 9%, transparent) 45%, transparent 100%);
+    opacity: 0.8;
+  }
+  :root:not(.dark) .card-glow {
+    opacity: 0.35;
+  }
+
+  /* A packet travelling the see → act rail. Transform only, so it never touches layout; still for reduced motion. */
+  .rail-pulse {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 7rem;
+    height: 1px;
+    translate: 0 -50%;
+    background: linear-gradient(90deg, transparent, var(--signal-3), transparent);
+    animation: rail-pulse 7s linear infinite;
+  }
+  @keyframes rail-pulse {
+    from { transform: translateX(-7rem); opacity: 0; }
+    8%, 92% { opacity: 1; }
+    to { transform: translateX(var(--rail-w, 80rem)); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rail-pulse { display: none; }
   }
 
   /* ---------- Long-form prose ----------

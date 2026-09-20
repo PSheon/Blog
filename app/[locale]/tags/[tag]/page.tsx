@@ -30,7 +30,7 @@ export default async function TagPage({ params }: PageProps<"/[locale]/tags/[tag
   return (
     <div className="mx-auto w-full max-w-7xl px-5 sm:px-8">
       <PageHeader title={`#${tag}`} lead={t.tags.count(posts.length)}>
-        <Link href={`/${locale}/tags`} className="mt-4 inline-block text-sm text-signal underline-offset-4 hover:underline">
+        <Link href={`/${locale}/tags`} className="mt-4 inline-flex min-h-6 items-center text-sm text-signal underline-offset-4 hover:underline">
           {t.tags.title}
         </Link>
       </PageHeader>

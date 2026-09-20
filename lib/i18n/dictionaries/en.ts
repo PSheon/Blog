@@ -2,11 +2,11 @@ import type { Dictionary } from "./zh";
 
 const en: Dictionary = {
   meta: {
-    title: "paul.notebook — machines that see, agents that act",
+    title: "paul.notebook — machine learning models, built from scratch",
     description:
-      "Paul's lab notebook: interactive, hands-on articles that take apart computer vision, LLMs and multi-agent systems.",
+      "Paul's lab notebook: machine learning models built from scratch that you can train, take apart and break in your browser. Computer vision, reinforcement learning, Transformers, diffusion and robots.",
   },
-  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home" },
+  nav: { posts: "Posts", tags: "Tags", menu: "Menu", home: "Home", skip: "Skip to content" },
   search: {
     open: "Search",
     placeholder: "Search the full text: try “pooling” or “mutation”…",
@@ -25,7 +25,14 @@ const en: Dictionary = {
   locale: { label: "Language", switch: "Switch language" },
   hero: {
     eyebrow: "Lab notebook",
-    tagline: ["See", "Think", "Act"],
+    title: "Machine learning models, built from scratch",
+    subtitle: "Train them, take them apart and break them, right in your browser",
+    topics: [
+      { word: "See", tag: "computer-vision" },
+      { word: "Think", tag: "llm" },
+      { word: "Generate", tag: "generative" },
+      { word: "Act", tag: "ai-agent" },
+    ],
     intro:
       "I'm Paul. I build machines that see and agents that act. This notebook takes models apart in writing — every article ships with instruments you can operate right in the browser, all written from scratch in TypeScript.",
     ctaPrimary: "Read the latest",
@@ -36,8 +43,9 @@ const en: Dictionary = {
     instrumentMore: "How does it work?",
   },
   home: {
-    featured: "Featured",
-    topics: "Browse by theme: see, think, act",
+    latest: "Latest",
+    readouts: { posts: "articles", interactive: "you can play with", operators: "hand-written operators" },
+    topics: "Browse by theme: see, think, generate, act",
     index: "Notebook index",
     indexLead: "Newest first.",
     all: "All",
@@ -50,6 +58,8 @@ const en: Dictionary = {
     minutes: (n: number) => `${n} min`,
     published: "Published",
     updated: "Updated",
+    readingTime: "Reading time",
+    mathLabel: "Equation, scrolls sideways",
     toc: "On this page",
     backToTop: "Back to top",
     fallback: "This article is only available in 中文 for now.",
@@ -86,6 +96,7 @@ const en: Dictionary = {
     rss: "RSS",
     source: "Source for this site",
     about: "Paul's lab notebook. Every article comes with instruments you can operate right in the browser.",
+    colophon: "Every model in this notebook is written from scratch and runs right here, in your browser.",
     browse: "Browse",
     elsewhere: "Elsewhere",
     preferences: "Preferences",

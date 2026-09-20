@@ -1,0 +1,59 @@
+seed 1: graduates in generation 8
+seed 2: graduates in generation 15
+seed 3: graduates in generation 22
+seed 4: graduates in generation 10
+seed 5: never (best 3 pipes)
+seed 6: graduates in generation 43
+seed 7: graduates in generation 13
+seed 8: graduates in generation 7
+seed 9: graduates in generation 8
+seed 10: graduates in generation 11
+seed 11: graduates in generation 7
+seed 12: graduates in generation 18
+seed 13: graduates in generation 52
+seed 14: graduates in generation 39
+seed 15: graduates in generation 11
+seed 16: graduates in generation 59
+seed 17: graduates in generation 4
+seed 18: graduates in generation 28
+seed 19: graduates in generation 44
+seed 20: graduates in generation 12
+seed 21: never (best 18 pipes)
+seed 22: never (best 6 pipes)
+seed 23: graduates in generation 8
+seed 24: graduates in generation 7
+seed 25: graduates in generation 25
+seed 26: never (best 3 pipes)
+seed 27: graduates in generation 18
+seed 28: graduates in generation 24
+seed 29: graduates in generation 23
+seed 30: graduates in generation 11
+seed 31: graduates in generation 9
+seed 32: graduates in generation 11
+seed 33: graduates in generation 45
+seed 34: graduates in generation 13
+seed 35: never (best 55 pipes)
+seed 36: graduates in generation 39
+seed 37: graduates in generation 27
+seed 38: graduates in generation 34
+seed 39: graduates in generation 15
+seed 40: graduates in generation 7
+seeds 1-12: 11 graduate within 60 generations, 10 before generation 30, median 11
+seeds 1-40: 35 graduate within 60, 27 before generation 30, median 15
+graduating birds with a hidden neuron whose two input weights have opposite signs: 33 of 35
+buy and hold: 34.33%
+--- 20 generations, population 50, mutation 15%
+seed 1: generation 1 40.39%, generation 20 43.64%, 118 buys (85 before July), 65 sells (58 at a profit), cash left $1092
+seed 2: generation 1 39.48%, generation 20 42.11%, 79 buys (69 before July), 24 sells (20 at a profit), cash left $438
+seed 3: generation 1 40.00%, generation 20 41.54%, 99 buys (75 before July), 43 sells (38 at a profit), cash left $131
+seed 4: generation 1 39.11%, generation 20 43.82%, 98 buys (74 before July), 46 sells (42 at a profit), cash left $1360
+seed 5: generation 1 40.33%, generation 20 42.95%, 71 buys (64 before July), 14 sells (12 at a profit), cash left $21
+seed 6: generation 1 41.04%, generation 20 41.80%, 74 buys (66 before July), 18 sells (15 at a profit), cash left $156
+--- 30 generations, population 50, mutation 15%
+seed 1: generation 1 40.39%, generation 30 43.64%, 118 buys (85 before July), 65 sells (58 at a profit), cash left $1092
+seed 2: generation 1 39.48%, generation 30 43.14%, 79 buys (68 before July), 22 sells (18 at a profit), cash left $41
+seed 3: generation 1 40.00%, generation 30 42.91%, 109 buys (81 before July), 54 sells (49 at a profit), cash left $518
+seed 4: generation 1 39.11%, generation 30 43.94%, 101 buys (77 before July), 46 sells (41 at a profit), cash left $621
+seed 5: generation 1 40.33%, generation 30 43.47%, 87 buys (71 before July), 31 sells (28 at a profit), cash left $324
+seed 6: generation 1 41.04%, generation 30 43.14%, 93 buys (69 before July), 36 sells (31 at a profit), cash left $40
+2000 untrained random bots: 13.2% beat buy and hold, median 3.4%, best 41.2%

@@ -1,0 +1,35 @@
+/**
+ * Measurements behind "how many steps until 100%" in article 004 (transformer-from-scratch).
+ * Kept as .txt under docs/research/transformer-steps/; to re-run, copy to tests/_probe/transformer-steps.test.ts and
+ *   pnpm vitest run tests/_probe/transformer-steps.test.ts
+ * Seeded with mulberry32, so step counts are identical on every machine; milliseconds are not.
+ * Accuracy is 40 fresh random problems, checked every 5 steps (every 25 for sorting). The check draws
+ * from the same generator as training, as the instrument does.
+ */
+import { test } from "vitest";
+import { mulberry32 } from "@/lib/ml";
+import { Trainer, type TaskName } from "@/content/posts/transformer-from-scratch/components/task";
+
+test("004: first step at which 40 of 40 fresh problems are answered correctly", () => {
+  const tasks: [TaskName, number, number][] = [["reverse", 5, 300], ["copy", 5, 300], ["sort", 25, 2000]];
+  for (const [task, every, limit] of tasks) {
+    const first: (number | string)[] = [];
+    const loss100: string[] = [];
+    let ms = 0, steps = 0;
+    for (let seed = 1; seed <= 5; seed++) {
+      const trainer = new Trainer(task, mulberry32(seed));
+      let hit: number | null = null;
+      while (trainer.steps < limit && hit === null) {
+        const t0 = performance.now();
+        trainer.step();
+        ms += performance.now() - t0;
+        steps++;
+        if (trainer.steps % every === 0 && trainer.accuracy(40) === 1) hit = trainer.steps;
+      }
+      while (trainer.steps < 100) trainer.step();
+      first.push(hit ?? `not within ${limit}`);
+      loss100.push(trainer.losses[99].toFixed(3));
+    }
+    console.log(`${task}: first 100% at step ${first.join(", ")} (seeds 1-5); loss at step 100: ${loss100.join(", ")}; ${(ms / steps).toFixed(1)} ms per step on this machine`);
+  }
+}, 600_000);

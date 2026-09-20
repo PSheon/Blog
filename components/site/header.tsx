@@ -19,7 +19,7 @@ export function SiteHeader({ locale, t, tags }: Props) {
     { href: `/${locale}/tags`, label: t.nav.tags },
   ];
   const logo = (
-    <Link href={`/${locale}`} className="flex items-center gap-2.5" aria-label={`${site.name} — ${t.nav.home}`}>
+    <Link href={`/${locale}`} className="flex min-h-6 items-center gap-2.5" aria-label={`${site.name} — ${t.nav.home}`}>
       <KernelMark className="size-4" />
       <span className="font-mono text-sm font-medium tracking-tight">{site.name}</span>
     </Link>
@@ -31,7 +31,7 @@ export function SiteHeader({ locale, t, tags }: Props) {
 
       {/* Phone: menu on the left, the mark centred, search on the right. Equal side columns keep the mark centred. */}
       <div className="grid h-14 grid-cols-[2.5rem_1fr_2.5rem] items-center px-3 md:hidden">
-        <MobileNav locale={locale} links={links} t={t} />
+        <MobileNav locale={locale} links={links} t={{ nav: t.nav, locale: t.locale, theme: t.theme, footer: { preferences: t.footer.preferences } }} />
         <div className="justify-self-center">{logo}</div>
         <SearchIconButton label={t.search.open} />
       </div>

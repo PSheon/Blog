@@ -1,0 +1,24 @@
+/**
+ * Measurement behind the remark in article 007 (diffusion-points) that the model's guess x̂₀ is a box, not a blob,
+ * in the first two or three of 40 sampling steps. Kept as .txt under docs/research/diffusion-spike/; to re-run, copy to
+ * tests/_probe/diffusion-clamp.test.ts and run  pnpm vitest run tests/_probe/diffusion-clamp.test.ts
+ */
+import { test } from "vitest";
+import { mulberry32 } from "@/lib/ml";
+import { ALPHA_BAR, DIMS, PointDiffusion, gaussian, schedule } from "@/content/posts/diffusion-points/components/diffusion";
+import { apple, banana } from "@/content/posts/diffusion-points/components/shapes";
+
+test("007: share of x̂₀ coordinates sitting on the ±1.5 clamp at each of the 40 sampling steps", () => {
+  const rng = mulberry32(1), model = new PointDiffusion(2, 96, rng);
+  for (let i = 0; i < 3000; i++) model.train([apple, banana]);
+  const n = 1000, x = Float64Array.from({ length: n * DIMS }, () => gaussian(rng)), levels = schedule(40);
+  const wanted = () => [1, 0];
+  const rows: string[] = [];
+  for (let s = 0; s + 1 < levels.length; s++) {
+    const guess = model.guess(x, levels[s], wanted);
+    const clamped = guess.filter((v) => Math.abs(v) === 1.5).length / guess.length;
+    if (s < 8) rows.push(`step ${s} (level ${levels[s]}, sqrt(alpha_bar) = ${Math.sqrt(ALPHA_BAR[levels[s]]).toExponential(1)}): ${(clamped * 100).toFixed(1)}% clamped`);
+    model.denoise(x, levels[s], levels[s + 1], wanted);
+  }
+  console.log(rows.join("\n"));
+}, 600_000);

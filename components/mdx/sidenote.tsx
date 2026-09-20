@@ -17,7 +17,8 @@ export function Sidenote({ children }: { children: ReactNode }) {
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
-        className="sidenote-ref mx-0.5 rounded-sm align-super font-mono text-[0.65em] leading-none text-signal xl:pointer-events-none"
+        // The number itself is about 7×12 px. The invisible ::before (::after is the number, see globals.css) gives a finger 25×26 px without moving a glyph.
+        className="sidenote-ref relative mx-0.5 rounded-sm align-super font-mono text-[0.65em] leading-none text-signal before:absolute before:-inset-x-[9px] before:-inset-y-[7px] before:content-[''] xl:pointer-events-none"
       >
         <span className="sr-only">note </span>
       </button>

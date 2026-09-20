@@ -21,6 +21,19 @@ export class Mat {
   }
 }
 
+/** Connections for Tape.tapConv, one entry per tap, as parallel arrays. */
+export interface TapList {
+  src: Int32Array;
+  dst: Int32Array;
+  /** Offset of the source cell from the target cell, in lattice rows and columns. */
+  dr: Int32Array;
+  dc: Int32Array;
+  /** Fixed signed strength (synapse count × sign of the transmitter). */
+  weight: Float64Array;
+  /** Which learned gain scales this tap. */
+  pair: Int32Array;
+}
+
 export class Tape {
   private readonly backwardOps: (() => void)[] = [];
 
@@ -491,6 +504,92 @@ export class Tape {
       for (let i = 0; i < n; i++) pred.grad[i] += (scale * Math.sign(pred.data[i] - targets[i])) / n;
     });
     return total / n;
+  }
+
+  // ---------------------------------------------------------------------------------------------
+  // Ops for a network whose wiring is given rather than learned (the fly motion pathway): channels are
+  // cell types on a lattice, connections are a short list of "taps", and time is unrolled on the tape.
+  // ---------------------------------------------------------------------------------------------
+
+  /**
+   * Sparse convolution over a list of taps. Tap i says: every cell of channel `dst[i]` at lattice position
+   * (r, c) listens to channel `src[i]` at (r + dr[i], c + dc[i]) with fixed signed strength `weight[i]`,
+   * scaled by a learned gain shared by all taps of the same `pair[i]`. Gains are stored as logarithms so
+   * they stay positive: a synapse may get stronger or weaker, but never change sign.
+   * x: [Cin, h·w], logGains: [1, pairs] → [cOut, h·w]. Positions outside the lattice count as silent.
+   */
+  tapConv(x: Mat, logGains: Mat, taps: TapList, { h, w, cOut }: { h: number; w: number; cOut: number }): Mat {
+    if (x.cols !== h * w) throw new Error(`tapConv: input has ${x.cols} cells, expected ${h}×${w}`);
+    const hw = h * w, out = new Mat(cOut, hw), X = x.data, O = out.data;
+    const gains = Float64Array.from(logGains.data, Math.exp);
+    const visit = (fn: (i: number, o: number, xi: number, r0: number, r1: number, c0: number, c1: number) => void) => {
+      for (let i = 0; i < taps.src.length; i++) {
+        const dr = taps.dr[i], dc = taps.dc[i];
+        fn(i, taps.dst[i] * hw, taps.src[i] * hw + dr * w + dc, Math.max(0, -dr), Math.min(h, h - dr), Math.max(0, -dc), Math.min(w, w - dc));
+      }
+    };
+    visit((i, o, xi, r0, r1, c0, c1) => {
+      const k = taps.weight[i] * gains[taps.pair[i]];
+      for (let r = r0; r < r1; r++) for (let c = c0, at = r * w; c < c1; c++) O[o + at + c] += k * X[xi + at + c];
+    });
+    this.record(() => {
+      const G = out.grad, dX = x.grad;
+      visit((i, o, xi, r0, r1, c0, c1) => {
+        const k = taps.weight[i] * gains[taps.pair[i]];
+        let acc = 0;
+        for (let r = r0; r < r1; r++)
+          for (let c = c0, at = r * w; c < c1; c++) {
+            const g = G[o + at + c];
+            acc += g * X[xi + at + c];
+            dX[xi + at + c] += g * k;
+          }
+        logGains.grad[taps.pair[i]] += acc * k; // d/d(log gain) of k·Σ = k·Σ
+      });
+    });
+    return out;
+  }
+
+  /**
+   * One Euler step of a leaky integrator, per channel: V ← V + (dt/τ)·(drive + rest − V).
+   * τ is learned as log τ and never allowed below dt, where the step would overshoot.
+   */
+  leak(v: Mat, drive: Mat, logTau: Mat, rest: Mat, dt: number): Mat {
+    const { rows, cols } = v, out = new Mat(rows, cols);
+    const k = Float64Array.from(logTau.data, (lt) => dt / Math.max(Math.exp(lt), dt));
+    for (let r = 0; r < rows; r++)
+      for (let i = r * cols; i < (r + 1) * cols; i++) out.data[i] = v.data[i] + k[r] * (drive.data[i] + rest.data[r] - v.data[i]);
+    this.record(() => {
+      for (let r = 0; r < rows; r++) {
+        let gSum = 0, gPull = 0;
+        for (let i = r * cols; i < (r + 1) * cols; i++) {
+          const g = out.grad[i];
+          v.grad[i] += g * (1 - k[r]);
+          drive.grad[i] += g * k[r];
+          gSum += g;
+          gPull += g * (drive.data[i] + rest.data[r] - v.data[i]);
+        }
+        rest.grad[r] += gSum * k[r];
+        if (Math.exp(logTau.data[r]) > dt) logTau.grad[r] -= gPull * k[r]; // dk/d(log τ) = −k
+      }
+    });
+    return out;
+  }
+
+  /** Mean of each channel over the listed cells (all of them if omitted): [C, n] → [1, C]. */
+  meanRows(x: Mat, cells?: ArrayLike<number>): Mat {
+    const { rows, cols } = x, n = cells ? cells.length : cols, out = new Mat(1, rows);
+    for (let r = 0; r < rows; r++) {
+      let s = 0;
+      for (let j = 0; j < n; j++) s += x.data[r * cols + (cells ? cells[j] : j)];
+      out.data[r] = s / n;
+    }
+    this.record(() => {
+      for (let r = 0; r < rows; r++) {
+        const g = out.grad[r] / n;
+        for (let j = 0; j < n; j++) x.grad[r * cols + (cells ? cells[j] : j)] += g;
+      }
+    });
+    return out;
   }
 
   /** Σ aᵢ·wᵢ with constant w — a scalar probe, used to test gradients. */

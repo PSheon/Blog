@@ -133,11 +133,67 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
   });
 }
 
+test("a URL that matches nothing gets the site's own 404, not the framework's", async ({ page }) => {
+  const response = await page.goto("/zh/no-such-page/at-all");
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+  await expect(page.getByRole("banner")).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+});
+
+test("URLs outside both locales get the site's own 404 too, styled and themed", async ({ page }) => {
+  for (const url of ["/no-such-page", "/no-such/page/at-all"]) {
+    const response = await page.goto(url);
+    expect(response?.status()).toBe(404);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+    // The framework's fallback is black on white; ours carries the stylesheet and the default dark theme.
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(7, 9, 24)");
+  }
+});
+
+test("the home page describes the blog to search engines and has an icon iOS can use", async ({ page }) => {
+  await page.goto("/en");
+  const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').first().textContent())!);
+  expect(ld).toMatchObject({ "@type": "Blog", inLanguage: "en", author: { "@type": "Person" } });
+  expect(ld.blogPost.length).toBeGreaterThan(3);
+  const icon = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
+  expect((await page.request.get(icon!)).headers()["content-type"]).toBe("image/png");
+});
+
+test("on a phone the hero instrument is on the first screen and small controls are easy to hit", async ({ page, isMobile }) => {
+  test.skip(!isMobile, "phone layout");
+  await page.goto("/zh");
+  const figure = await page.locator("figure[data-instrument]").first().boundingBox();
+  expect(figure!.y).toBeLessThan(page.viewportSize()!.height * 0.5);
+
+  // A sidenote marker is a 7×12 px digit; a tap 9 px off its centre still has to open the note.
+  await page.goto("/zh/posts/diffusion-points");
+  const marker = page.locator("button.sidenote-ref").first();
+  await marker.scrollIntoViewIfNeeded();
+  const box = (await marker.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2 + 9, box.y + box.height / 2 + 8);
+  await expect(marker).toHaveAttribute("aria-expanded", "true");
+  // Sliders: the touchable row is at least 24 px tall, not the 12 px of the thumb.
+  const control = await page.locator("[data-slot=slider] > div").first().boundingBox();
+  expect(control!.height).toBeGreaterThanOrEqual(24);
+});
+
+test("maths is drawn once: the TeX source kept for screen readers stays invisible", async ({ page }) => {
+  await page.goto("/zh/posts/lite3-walking");
+  const hidden = page.locator(".katex-mathml");
+  expect(await hidden.count()).toBeGreaterThan(5);
+  // KaTeX ships the MathML copy clipped to a pixel; without its stylesheet every formula shows up twice.
+  for (const box of await hidden.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()).map((r) => [r.width, r.height]))) {
+    expect(Math.max(...box)).toBeLessThanOrEqual(1);
+  }
+});
+
 test("an article describes itself to search engines as a BlogPosting with an image", async ({ page }) => {
   await page.goto("/en/posts/lite3-walking");
   const ld = JSON.parse((await page.locator('script[type="application/ld+json"]').textContent())!);
   expect(ld).toMatchObject({ "@type": "BlogPosting", inLanguage: "en", keywords: expect.stringContaining("robotics") });
-  expect((await page.request.get(ld.image)).headers()["content-type"]).toBe("image/png");
+  // The absolute URL carries the canonical origin, which is not where the test server listens.
+  expect((await page.request.get(new URL(ld.image).pathname)).headers()["content-type"]).toBe("image/png");
 });
 
 test("flappy birds evolve past the first generation", async ({ page }) => {
@@ -222,8 +278,10 @@ test("a HydraNet learns to box and mask emoji fruit in the page", async ({ page 
   await page.getByTestId("hy-train").click();
   // Works with emoji or with the shape fallback (headless Linux has no colour emoji font).
   await expect.poll(async () => Number(await page.getByTestId("hy-box").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.6);
+  // The two heads do not learn at the same pace, and on the shape fallback the mask trails the box: wait for it
+  // too instead of reading it the moment the box is good enough (that failed on CI and, once, locally).
+  await expect.poll(async () => Number(await page.getByTestId("hy-mask").textContent()), { timeout: 90_000 }).toBeGreaterThan(0.4);
   await page.getByTestId("hy-train").click();
-  expect(Number(await page.getByTestId("hy-mask").textContent())).toBeGreaterThan(0.4);
   expect(errors).toEqual([]);
 });
 
@@ -246,21 +304,124 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
 
   // One robot, one canvas: it moves to whichever instrument is on screen.
   await senses.scrollIntoViewIfNeeded();
-  await senses.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await expect(senses).toHaveAttribute("data-here", "true");
+  await senses.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+  await expect(senses).toHaveAttribute("data-here", "true", { timeout: 20_000 });
   await expect(page.getByTestId("lite3-stage")).toHaveCount(1);
   await page.getByRole("button", { name: /蒙住: 關節角度/ }).click();
   await expect(senses).toContainText("倒了", { timeout: 15_000 });
 
   // A 400 N shove always topples it (measured: everything from 275 N up does).
   const push = page.locator('[data-stage="push"]');
-  await push.evaluate((el) => el.scrollIntoView({ block: "center" }));
-  await expect(push).toHaveAttribute("data-here", "true");
+  await push.evaluate((el) => el.scrollIntoView({ block: "center", behavior: "instant" }));
+  await expect(push).toHaveAttribute("data-here", "true", { timeout: 20_000 });
   await page.locator('[data-instrument="lite3 / push"]').getByRole("slider").focus();
   await page.keyboard.press("End");
   await page.getByTestId("lite3-push-away").click();
   await expect(page.getByTestId("lite3-push-log")).toContainText("400 N", { timeout: 5_000 });
   await expect(page.getByTestId("lite3-push-log")).toContainText("倒了", { timeout: 15_000 });
   await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  expect(errors).toEqual([]);
+});
+
+test("a diffusion model trains in the page and its instruments share it", async ({ page }) => {
+  const response = await page.goto("/zh/posts/diffusion-points");
+  expect(response?.status()).toBe(200);
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
+  await page.getByTestId("diffusion-train").click();
+  await expect.poll(async () => Number((await page.getByTestId("diffusion-steps").textContent())!.replace(/,/g, "")), { timeout: 90_000 }).toBeGreaterThan(200);
+  await page.getByTestId("diffusion-train").click();
+
+  // The step-by-step instrument samples from the model trained above, not from one of its own.
+  // …and it refreshes by itself on scrolling into view: it once showed a run from before Train was pressed.
+  await page.getByTestId("diffusion-sample").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("diffusion-steps-note")).toContainText(/訓練了 [\d,]{3,} 步/, { timeout: 20_000 });
+  // An early guess of the result is a blob, and the instrument says that this is right.
+  await page.getByTestId("diffusion-guess").click();
+  await page.locator('[data-instrument="diffusion / steps"]').getByRole("slider").focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("diffusion-guess-hint")).toContainText("平均");
+
+  // Choosing another fruit throws the model away: it knows nothing about the new one.
+  await page.locator('[data-instrument="diffusion / train"]').getByRole("button", { name: "草莓" }).first().click();
+  await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
+  expect(errors).toEqual([]);
+});
+
+test("an article that has been opened once works offline, and its model still trains", async ({ page, context }) => {
+  test.setTimeout(120_000);
+  await page.goto("/en/posts/transformer-from-scratch");
+  // Wait for the worker to take control, then load once more through it so that the page's assets are cached.
+  await page.evaluate(async () => { await navigator.serviceWorker.ready; if (!navigator.serviceWorker.controller) await new Promise((resolve) => navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true })); });
+  await page.reload({ waitUntil: "networkidle" });
+
+  await context.setOffline(true);
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
+  await page.getByTestId("tf-train").click();
+  await expect.poll(async () => Number((await page.getByTestId("tf-steps").textContent())!.replace(/,/g, "")), { timeout: 60_000 }).toBeGreaterThan(20);
+
+  // A page never visited has nothing cached: the reader gets the offline page, not the browser's error.
+  await page.goto("/en/posts/ai-flappy-bird");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("offline");
+  await context.setOffline(false);
+});
+
+test("the site can be installed: a manifest with icons, and a worker script that is never cached", async ({ request }) => {
+  const manifest = await (await request.get("/manifest.webmanifest")).json();
+  expect(manifest).toMatchObject({ display: "standalone", start_url: "/" });
+  for (const icon of manifest.icons) expect((await request.get(icon.src)).headers()["content-type"]).toBe("image/png");
+  expect((await request.get("/sw.js")).headers()["cache-control"]).toContain("no-cache");
+});
+
+test.describe("navigation progress", () => {
+  // Requests answered by the service worker never reach page.route, so this one test runs without it.
+  test.use({ serviceWorkers: "block" });
+
+  test("a slow navigation shows a progress bar, which goes away on arrival", async ({ page }) => {
+    // Hold back everything about the posts page, prefetches included, until the bar has been seen. A navigation
+    // that is already prefetched is instant and, rightly, never shows it.
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    await page.route(/\/en\/posts(\?|$)/, async (route) => { await gate; await route.continue(); });
+    await page.goto("/en");
+    await page.locator('main a[href="/en/posts"]').first().click();
+    await expect(page.getByTestId("nav-progress")).toBeVisible();
+    release();
+    await expect(page).toHaveURL(/\/en\/posts$/);
+    await expect(page.getByTestId("nav-progress")).toHaveCount(0);
+  });
+});
+
+test("a car maps a corridor, closes the loop, and takes a failure mode from the comparison below", async ({ page }) => {
+  const response = await page.goto("/zh/posts/slam-2d");
+  expect(response?.status()).toBe(200);
+  test.setTimeout(240_000);
+  await page.emulateMedia({ reducedMotion: "reduce" }); // the hand-off below scrolls; don't make it a smooth scroll
+  const errors = watchErrors(page);
+  const number = async (id: string) => Number((await page.getByTestId(id).first().textContent())!.match(/[\d.]+/)![0]);
+
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+  await page.getByTestId("slam-autopilot").scrollIntoViewIfNeeded();
+  await page.getByTestId("slam-autopilot").click();
+  // One lap on autopilot: the first loop closure pulls the estimate back onto the truth.
+  await expect.poll(() => number("slam-closures"), { timeout: 150_000 }).toBeGreaterThan(0);
+  await expect.poll(() => number("slam-error"), { timeout: 20_000 }).toBeLessThan(0.5);
+
+  // The four outcomes are worked out in the page once they scroll into view.
+  const cards = page.locator('[data-instrument="slam / four ways to fail"]');
+  await cards.scrollIntoViewIfNeeded();
+  await expect(cards).not.toContainText("計算中", { timeout: 120_000 });
+  const withCamera = Number((await page.getByTestId("slam-outcome-camera").textContent())!.match(/([\d.]+) m/)![1]);
+  const without = Number((await page.getByTestId("slam-outcome-drift").textContent())!.match(/([\d.]+) m/)![1]);
+  expect(withCamera).toBeLessThan(0.5);
+  expect(without).toBeGreaterThan(3);
+
+  // A card hands its setting to the car at the top of the article.
+  await page.getByTestId("slam-outcome-wrong").getByRole("button").click();
+  await expect(page.getByTestId("slam-preset")).toContainText("認錯一次");
   expect(errors).toEqual([]);
 });
