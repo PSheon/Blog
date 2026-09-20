@@ -14,6 +14,6 @@ rasteriser: 6231 frames/s (48x48, 2x2 supersampled, one thread)
 ```
 
 - The expert reads the true state and re-decides every step. Up to 2 % slip it never fails in 1000 episodes; at 10 % it runs out of its 80 steps in 11.5 % of them.
-- Roughly four in five slips happen past a quarter turn or over the tray, so a dropped board often lands the wanted way up: at 2 % slip, 372 of 1000 episodes finished through a drop rather than a placement. Worth a sentence in the article.
+- A dropped board that was past a quarter turn lands the wanted way up, so some episodes finish through a drop: at 2 % slip, 804 episodes needed a grasp, all 804 succeeded, and only 628 ended with a placement — the other 176 ended with a lucky drop. Worth a sentence in the article.
 - One instruction in five is already satisfied (804 of 1000 episodes involve a grasp at all).
 - The rasteriser draws the 48 × 48 view at 6 200 frames a second on one thread; the plan needs about 4 000 to keep a GPU fed, so one worker is nearly enough and two are plenty.
