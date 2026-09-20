@@ -477,3 +477,35 @@ test("the home index is a short bento: at most six tiles, each saying what its a
   if (!isMobile) return;
   for (const tile of await tiles.all()) await expect(tile.locator("p.leading-relaxed")).toBeVisible();
 });
+
+test("a city of people runs in the page: the clock moves, the three heads differ, the Overseer follows and replays", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (r) => requests.push(r.url()));
+  const response = await page.goto("/zh/posts/city-of-agents");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "city-of-agents is still a draft");
+  test.setTimeout(120_000);
+  const errors = watchErrors(page);
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+
+  // The two 2-D figures work the simulation out in the page. A fixed timetable sends everyone out in the same ten minutes.
+  await page.getByTestId("modes-fsm").scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("modes-fsm")).toContainText("100%", { timeout: 60_000 });
+  await expect(page.getByTestId("modes-utility")).toContainText("%", { timeout: 60_000 });
+  await expect(page.getByTestId("modes-utility")).not.toContainText("100%");
+
+  // The Overseer: the table fills, a row follows a person, the record replays and comes back.
+  await page.getByTestId("city-play").scrollIntoViewIfNeeded();
+  const table = page.getByTestId("city-table");
+  await expect(table.locator("button").first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("city-events").locator("li").nth(3)).toBeVisible({ timeout: 30_000 });
+  await table.locator("button").nth(1).click();
+  await expect(page.getByRole("status").filter({ hasText: "正在跟拍" })).toBeVisible();
+  const thumb = page.getByTestId("city-timeline").locator('input[type="range"]');
+  await thumb.focus();
+  await page.keyboard.press("Home");
+  await expect(page.getByTestId("city-live")).toBeEnabled();
+  await page.getByTestId("city-live").click();
+  await expect(page.getByTestId("city-live")).toBeDisabled();
+  expect(errors).toEqual([]);
+});

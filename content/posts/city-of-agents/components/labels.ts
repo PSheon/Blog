@@ -30,6 +30,10 @@ const zh = {
   timeline: "時間軸", timelineHint: "拖回去看任一時刻；畫面只用事件記錄推回去，不重新模擬", live: "回到現在", replay: "重播",
   recordFrom: "記錄起點", modeMark: "規則在這裡改過",
   peak: "出發尖峰", peakHint: "過去 24 小時裡，最擠的 10 分鐘有多少比例的人同時出發", histogram: "過去 24 小時每 10 分鐘的出發人數",
+  needsChart: "一個人三天裡的四條需求；虛線是門檻，過了門檻那件事才會被考慮。底下的色帶是他當時在做什麼。",
+  anotherPerson: "換一個人", threshold: "門檻", day: "第", dayUnit: "天", walking: "走路",
+  optionA: "選項 A", optionB: "選項 B", need: "需求", walk: "要走幾分鐘", utilityOf: "效用", wins: "勝出", formula: "效用 = 需求² − 0.1 × 路程（小時）",
+  computing: "計算中…", modesChart: "同樣 300 個人、同一座城市，第二天每 10 分鐘各有多少比例的人在做什麼", peakShort: "最擠的 10 分鐘", tripsPerDay: "每人每天出門", tripsUnit: "趟",
   names: ["阿凱", "小美", "志明", "春嬌", "阿土", "佩君", "冠宇", "怡君", "家豪", "雅婷", "承恩", "宜蓁", "柏翰", "欣怡", "俊傑", "淑芬", "建宏", "美玲", "宗翰", "詩涵", "信宏", "惠雯", "文傑", "佳穎", "明哲", "筱涵", "國華", "雅雯", "子軒", "思妤", "彥廷", "郁婷", "哲瑋", "靜宜", "育成", "婉婷", "志豪", "曉玲", "政憲", "珮瑜"],
 };
 
@@ -61,6 +65,10 @@ const en: typeof zh = {
   timeline: "Timeline", timelineHint: "Drag back to any moment; the picture is worked out from the event record, not re-simulated", live: "Back to now", replay: "replay",
   recordFrom: "record starts", modeMark: "the rules changed here",
   peak: "Departure peak", peakHint: "share of people who set off in the busiest ten minutes of the last 24 hours", histogram: "departures per ten minutes over the last 24 hours",
+  needsChart: "One person's four needs over three days; the dashed line is the threshold a need has to pass before its action is considered. The strip below is what they were doing.",
+  anotherPerson: "Another person", threshold: "threshold", day: "day", dayUnit: "", walking: "walking",
+  optionA: "Option A", optionB: "Option B", need: "need", walk: "minutes on foot", utilityOf: "utility", wins: "wins", formula: "utility = need² − 0.1 × walk (hours)",
+  computing: "computing…", modesChart: "The same 300 people in the same city: what share of them is doing what, in each ten minutes of day two", peakShort: "busiest ten minutes", tripsPerDay: "trips per person per day", tripsUnit: "",
   names: ["Kai", "Mei", "Ming", "Jiao", "Tu", "Pei", "Yu", "Yi", "Hao", "Ting", "En", "Zhen", "Han", "Xin", "Jie", "Fen", "Hong", "Ling", "Zong", "Shi", "Xinh", "Wen", "Wei", "Ying", "Zhe", "Xiao", "Hua", "Ya", "Xuan", "Si", "Yan", "Yuting", "Zhewei", "Jing", "Cheng", "Wan", "Zhihao", "Lin", "Xian", "Peiyu"],
 };
 
