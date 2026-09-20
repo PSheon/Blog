@@ -1,4 +1,22 @@
-import { type Page, expect, test } from "@playwright/test";
+import { type Page, expect, test as base } from "@playwright/test";
+
+/**
+ * An article's instruments hydrate a moment after the page (their code is a chunk of its own), and a click that
+ * lands before that is lost. A reader never clicks within 200 ms of the page appearing; a test does. So every
+ * navigation here waits until each instrument in the page has come alive.
+ */
+const test = base.extend({
+  page: async ({ page }, run) => {
+    const goto = page.goto.bind(page), reload = page.reload.bind(page);
+    const alive = () => page.waitForFunction(() => [...document.querySelectorAll("[data-lab]")].every((lab) => {
+      const first = lab.firstElementChild;
+      return !first || Object.keys(first).some((key) => key.startsWith("__reactFiber"));
+    }), null, { timeout: 20_000 });
+    page.goto = async (...args) => { const response = await goto(...args); await alive(); return response; };
+    page.reload = async (...args) => { const response = await reload(...args); await alive(); return response; };
+    await run(page);
+  },
+});
 
 /** Fail a test on any console error or uncaught exception. */
 function watchErrors(page: Page): string[] {

@@ -116,6 +116,11 @@ Rules inside an instrument:
 
 ### A new article also needs
 
+- Its instruments exported twice: `components/labs.ts` re-exports them plainly, and `components/index.ts` (the one the
+  MDX imports) is a `"use client"` file of `next/dynamic` wrappers over `./labs`. Copy an existing pair. All articles
+  share one route, and Next gives a route the client code of everything it can render, so plain re-exports ship every
+  article's instruments with every article (measured: 292 KB gzip of page scripts, 203 KB after the split). A
+  `dynamic()` in a server file does not split; it has to be a client file.
 - A cover drawing in `components/site/post-cover.tsx` (`viewBox="0 0 160 100"`, the three signal variables only,
   deterministic — no `Math.random()`; it is hydrated). Until it has one, it gets the generic constellation.
 - Optionally a live preview for the "latest" card: a component registered in `components/site/post-previews.tsx`
@@ -193,6 +198,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm build
 - [ ] Looked at in a real browser: 1440 and 390 wide, dark and light, console read once.
 - [ ] `draft: true` removed from both files; date set; `no` is the next number.
 - [ ] Both pages added to `pages` in `e2e/a11y.spec.ts`; a smoke test for the main instrument in `e2e/smoke.spec.ts`.
+- [ ] `components/labs.ts` + the lazy `components/index.ts`; no other article's test ids in this page's scripts.
 - [ ] Cover drawing added to `post-cover.tsx`.
 - [ ] Numbers in the text re-read against their source.
 - [ ] Merged into `dev`; `main` only through a pull request.

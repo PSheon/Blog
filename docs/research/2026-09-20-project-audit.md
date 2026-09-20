@@ -41,7 +41,12 @@ is no real-user data, because Speed Insights is not switched on in the Vercel da
    - Experiment A, an explicit `slug → () => import(...)` map: no change, 17 scripts and 292 KB.
    - Experiment B, `slam-2d/components/index.ts` as a client file exporting `next/dynamic` wrappers with SSR left on:
      the trading article fell to 16 scripts and 272 KB, and the SLAM page still server-rendered its seven instruments.
-   - Doing this for all eight should bring a text-only page load to about 215 KB (estimate). The Next docs say the
+   - Done the same day for all eight, as one chunk per article (`components/labs.ts`, with `components/index.ts` the
+     lazy client wrappers). Every article: 13 page scripts, 203 KB gzip, down from 17 and 292 KB, and no other
+     article's test ids in its scripts. Instruments are still server-rendered. They come alive 0.3–0.5 s after the
+     page on a throttled slow-4G phone profile (1.6 Mbps, 150 ms RTT, 4× CPU). A test that clicks inside that window
+     loses the click, so the E2E fixture now waits for `[data-lab]` to hydrate.
+   - The estimate made before doing it: all eight should bring a text-only page load to about 215 KB (estimate). The Next docs say the
      split only happens when a client file does the lazy import.
 2. **SLAM's 3D views ignore a theme switch.** Verified in the browser. Switching dark to light leaves the grid and
    lidar rays in their dark-theme colours, nearly invisible on the light background, until a reload. The ink colour is
