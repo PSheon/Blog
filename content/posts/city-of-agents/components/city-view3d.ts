@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import { type Action, type Building, type City, hourOf, PARAMS, type Rect, sunAltitude, windowsLit, type World } from "./sim";
+import { type Action, type Building, type City, hourOf, PARAMS, type Rect, sunAltitude, windowsLit } from "./sim";
 
 type Three = typeof THREE;
 
@@ -16,6 +16,8 @@ const C = {
 /** People are drawn about twice life size: at the distance the whole city is seen from, life size is two pixels. */
 const PERSON = 2.2;
 export type PeopleColors = Record<Action | "idle", string>;
+/** What the view needs to draw everyone: positions now and one tick ago, which way they face, what they are up to. */
+export type PeopleFrame = { count: number; x: Float64Array; y: Float64Array; px: Float64Array; py: Float64Array; heading: Float64Array; action: (Action | null)[]; walking: Uint8Array };
 
 const hash01 = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 const smooth = (x: number) => { const t = Math.min(1, Math.max(0, x)); return t * t * (3 - 2 * t); };
@@ -34,6 +36,8 @@ export class CityView {
   /** Draw calls of the last frame, shadow pass included. */
   calls = 0;
   orbit = 0.6;
+  /** The person the camera follows, or −1 for the view of the whole city. */
+  follow = -1;
 
   private readonly root: THREE.Group;
   private readonly sun: THREE.DirectionalLight;
@@ -50,6 +54,11 @@ export class CityView {
   private readonly tmp: { a: THREE.Color; b: THREE.Color };
   private readonly lightDir: THREE.Vector3;
   private readonly up: THREE.Vector3;
+  private readonly origin: THREE.Vector3;
+  private readonly followAt: THREE.Vector3;
+  private readonly lookAt: THREE.Vector3;
+  private readonly cameraAt: THREE.Vector3;
+  private eased = false;
   private readonly personMatrix: THREE.Matrix4;
   private readonly personTurn: THREE.Quaternion;
   private readonly personLean: THREE.Quaternion;
@@ -66,13 +75,14 @@ export class CityView {
     this.scene = new T.Scene();
     this.sky = new T.Color(C.night);
     this.scene.background = this.sky;
-    this.fog = new T.FogExp2(C.night, 0.35 / city.size);
+    this.fog = new T.FogExp2(C.night, 0.28 / city.size);
     this.scene.fog = this.fog;
     this.camera = new T.PerspectiveCamera(32, 2, 1, city.size * 6);
     this.camera.up.set(0, 0, 1);
     this.tmp = { a: new T.Color(), b: new T.Color() };
     this.lightDir = new T.Vector3(0, 0, 1);
     this.up = new T.Vector3(0, 0, 1);
+    this.origin = new T.Vector3(); this.followAt = new T.Vector3(); this.lookAt = new T.Vector3(); this.cameraAt = new T.Vector3();
     this.personMatrix = new T.Matrix4(); this.personTurn = new T.Quaternion(); this.personAt = new T.Vector3();
     this.personLean = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), 0.16);
     this.personScale = new T.Vector3(PERSON, PERSON, PERSON);
@@ -217,22 +227,23 @@ export class CityView {
    * Places everyone between their position one tick ago (`px`, `py`) and now, `alpha` of the way. Walking is drawn, not
    * simulated: the body bobs once per stride and leans into the walk.
    */
-  updatePeople(world: World, px: Float64Array, py: Float64Array, alpha: number): void {
+  updatePeople(f: PeopleFrame, alpha: number): void {
     const people = this.people;
     if (!people) return;
     const m = this.personMatrix, q = this.personTurn, lean = this.personLean, s = this.personScale, at = this.personAt;
     let recolored = false;
-    for (const a of world.agents) {
-      const i = a.id, x = px[i] + (world.x[i] - px[i]) * alpha, y = py[i] + (world.y[i] - py[i]) * alpha, walking = a.state === "traveling";
-      if (walking) people.stride[i] += Math.hypot(world.x[i] - px[i], world.y[i] - py[i]) * 0.02 + 0.12;
+    for (let i = 0; i < f.count; i++) {
+      const x = f.px[i] + (f.x[i] - f.px[i]) * alpha, y = f.py[i] + (f.y[i] - f.py[i]) * alpha, walking = f.walking[i] === 1;
+      if (walking) people.stride[i] += 0.16;
+      if (i === this.follow) this.followAt.set(x - this.city.size / 2, y - this.city.size / 2, 0);
       const bob = walking ? Math.abs(Math.sin(people.stride[i])) * 0.22 * PERSON : 0;
-      q.setFromAxisAngle(this.up, world.heading[i]);
+      q.setFromAxisAngle(this.up, f.heading[i]);
       if (walking) q.multiply(lean);
       m.compose(at.set(x, y, 0.26 + 0.55 * PERSON + bob), q, s);
       people.bodies.setMatrixAt(i, m);
-      m.compose(at.set(x + (walking ? Math.cos(world.heading[i]) * 0.12 * PERSON : 0), y + (walking ? Math.sin(world.heading[i]) * 0.12 * PERSON : 0), 0.26 + 1.38 * PERSON + bob), q, s);
+      m.compose(at.set(x + (walking ? Math.cos(f.heading[i]) * 0.12 * PERSON : 0), y + (walking ? Math.sin(f.heading[i]) * 0.12 * PERSON : 0), 0.26 + 1.38 * PERSON + bob), q, s);
       people.heads.setMatrixAt(i, m);
-      const key = a.action ?? "idle";
+      const key = f.action[i] ?? "idle";
       if (people.shown[i] !== key) { people.shown[i] = key; people.bodies.setColorAt(i, people.colors[key]); people.heads.setColorAt(i, people.colors[key]); recolored = true; }
     }
     people.bodies.instanceMatrix.needsUpdate = true; people.heads.instanceMatrix.needsUpdate = true;
@@ -276,6 +287,25 @@ export class CityView {
 
   // ── camera and frame ──────────────────────────────────────────────────────
 
+  /** True while the camera is still easing towards where it should be, so a paused scene keeps drawing until it gets there. */
+  get settling(): boolean { return this.camera.position.distanceToSquared(this.cameraAt) > 0.01; }
+
+  /**
+   * The person nearest to a point of the canvas (client coordinates), within `tolerance` CSS pixels, or −1. People are a
+   * few pixels across from above, so this is a nearest-on-screen search and not a ray against their boxes.
+   */
+  pick(clientX: number, clientY: number, f: PeopleFrame, tolerance = 28): number {
+    const rect = this.canvas.getBoundingClientRect(), v = this.personAt, half = this.city.size / 2;
+    let best = -1, bestD = tolerance;
+    for (let i = 0; i < f.count; i++) {
+      v.set(f.x[i] - half, f.y[i] - half, 2).project(this.camera);
+      if (v.z > 1) continue;
+      const d = Math.hypot(rect.left + ((v.x + 1) / 2) * rect.width - clientX, rect.top + ((1 - v.y) / 2) * rect.height - clientY);
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
   /** `dt` in real seconds; `orbiting` false holds the camera still (reduced motion). */
   render(dt: number, orbiting: boolean): void {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight, ratio = this.renderer.getPixelRatio();
@@ -286,17 +316,23 @@ export class CityView {
       this.camera.updateProjectionMatrix();
     }
     if (orbiting) this.orbit += dt * 0.04;
-    // 45° down on the whole city; a narrow canvas stands further back so the city still fits.
-    const distance = this.city.size * 1.5 * Math.max(1, 1.2 / this.camera.aspect), flat = distance * Math.SQRT1_2;
-    this.camera.position.set(Math.cos(this.orbit) * flat, Math.sin(this.orbit) * flat, flat);
-    this.camera.lookAt(0, 0, 0);
-    this.aimLight(0, 0, this.city.size * 0.75);
+    // 45° down on the whole city (a narrow canvas stands further back so it still fits), or down at street level
+    // behind one person. The camera eases between the two rather than cutting.
+    const following = this.follow >= 0, distance = following ? 46 : this.city.size * 1.5 * Math.max(1, 1.2 / this.camera.aspect);
+    const flat = distance * (following ? 0.9 : Math.SQRT1_2), height = following ? 17 : distance * Math.SQRT1_2, ease = this.eased ? 1 - Math.exp(-dt * 3.5) : 1;
+    this.lookAt.lerp(following ? this.followAt : this.origin, ease);
+    this.cameraAt.set(this.lookAt.x + Math.cos(this.orbit) * flat, this.lookAt.y + Math.sin(this.orbit) * flat, height);
+    this.camera.position.lerp(this.cameraAt, ease);
+    this.camera.lookAt(this.lookAt.x, this.lookAt.y, following ? 2 : 0);
+    this.eased = true;
+    this.aimLight(this.lookAt.x, this.lookAt.y, Math.min(this.city.size * 0.75, Math.max(70, this.camera.position.distanceTo(this.lookAt) * 0.8)));
     this.renderer.render(this.scene, this.camera);
     this.calls = this.renderer.info.render.calls;
   }
 
   /** The shadow map covers `reach` around the point being looked at, not the whole map. */
-  private aimLight(x: number, y: number, reach: number): void {
+  private aimLight(x: number, y: number, wanted: number): void {
+    const reach = Math.round(wanted / 10) * 10; // the shadow camera is only rebuilt in steps
     const d = this.lightDir, far = reach * 3, cam = this.sun.shadow.camera;
     this.sun.target.position.set(x, y, 0);
     this.sun.position.set(x + d.x * far * 0.5, y + d.y * far * 0.5, d.z * far * 0.5);

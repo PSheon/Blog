@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   type Agent, type AgentInfo, type Log, type Needs, type Rect, type SimEvent,
-  applyEvent, choose, cloneSnapshot, departureHistogram, eligible, findPath, generateCity, initialSnapshot, needsAt, PARAMS, peakDepartureShare,
-  record, snapshotAt, stepNeeds, sunAltitude, sunIntegral, utility, windowsLit, World,
+  applyEvent, arrivalsAfter, choose, cursorAt, cloneSnapshot, departureHistogram, eligible, findPath, generateCity, initialSnapshot, needsAt, PARAMS, peakDepartureShare,
+  record, replayPositions, snapshotAt, stepNeeds, sunAltitude, sunIntegral, utility, windowsLit, World,
 } from "@/content/posts/city-of-agents/components/sim";
 
 const SEEDS = [1, 2, 3, 7, 42, 2026];
@@ -248,5 +248,25 @@ describe("overseer", () => {
       expect(snap.place).toBe(a.place);
       derived.forEach((v, n) => expect(v).toBeCloseTo(a.needs[n], 6));
     });
+  });
+
+  it("puts people back where they were: exactly for those at a place, within a few steps for those walking", () => {
+    const world = new World(generateCity(4, 6), { agents: 120 }), ctx = { infos: world.agents as AgentInfo[], params: PARAMS };
+    const log: Log = { base: initialSnapshot(ctx.infos, world.agents.map((a) => a.needs), world.t, world.mode, world.duty), events: [], dropped: 0 };
+    world.onEvent = (e) => record(log, e, ctx, 1e9);
+    const frames: { t: number; x: Float64Array; y: Float64Array; walking: boolean[] }[] = [];
+    for (let k = 0; k < 1440; k++) { world.tick(); if (k % 180 === 60) frames.push({ t: world.t, x: Float64Array.from(world.x), y: Float64Array.from(world.y), walking: world.agents.map((a) => a.state === "traveling") }); }
+    const x = new Float64Array(120), y = new Float64Array(120), heading = new Float64Array(120), errors: number[] = [];
+    for (const frame of frames) {
+      const cursor = cursorAt(log, frame.t), snapshot = snapshotAt(log, cursor, ctx);
+      replayPositions(world.city, world.paths, snapshot, ctx, arrivalsAfter(log, cursor, snapshot), frame.t, x, y, heading);
+      frame.walking.forEach((walking, i) => {
+        const error = Math.hypot(x[i] - frame.x[i], y[i] - frame.y[i]);
+        if (walking) errors.push(error); else expect(error).toBeLessThan(1e-9);
+      });
+    }
+    errors.sort((a, b) => a - b);
+    expect(errors.length).toBeGreaterThan(20);
+    expect(errors[Math.floor(errors.length * 0.9)]).toBeLessThan(PARAMS.walkSpeed * 2);
   });
 });

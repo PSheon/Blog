@@ -5,7 +5,8 @@ import type { Params } from "./params";
 import type { Action, AgentState, Mode, Needs, SimEvent } from "./types";
 
 /** What the record knows about one person: their last event, and the needs it carried. */
-export type AgentSnap = { state: AgentState; action: Action | null; place: number; goal: number; from: number; since: number; needs: Needs };
+/** `x`, `y`, `node`: where the current walk started (only meaningful while travelling). */
+export type AgentSnap = { state: AgentState; action: Action | null; place: number; goal: number; from: number; since: number; needs: Needs; x: number; y: number; node: number };
 export type Snapshot = { t: number; mode: Mode; duty: boolean; agents: AgentSnap[] };
 /** `base` is the state before `events[0]`: events that fell off the front of the record were folded into it. */
 export type Log = { base: Snapshot; events: SimEvent[]; dropped: number };
@@ -14,7 +15,7 @@ export type Context = { infos: AgentInfo[]; params: Params };
 export const EVENT_LIMIT = 5000;
 
 export function initialSnapshot(infos: AgentInfo[], needs: Needs[], t: number, mode: Mode, duty: boolean): Snapshot {
-  return { t, mode, duty, agents: infos.map((info, i) => ({ state: "idle", action: null, place: info.home, goal: -1, from: -1, since: t, needs: [...needs[i]] as Needs })) };
+  return { t, mode, duty, agents: infos.map((info, i) => ({ state: "idle", action: null, place: info.home, goal: -1, from: -1, since: t, needs: [...needs[i]] as Needs, x: 0, y: 0, node: -1 })) };
 }
 
 export const cloneSnapshot = (s: Snapshot): Snapshot => ({ ...s, agents: s.agents.map((a) => ({ ...a, needs: [...a.needs] as Needs })) });
@@ -45,7 +46,7 @@ export function applyEvent(snapshot: Snapshot, e: SimEvent, ctx: Context): Snaps
   }
   const a = snapshot.agents[e.agent];
   a.needs = [...e.needs] as Needs; a.since = e.t;
-  if (e.type === "departed") { a.state = "traveling"; a.action = e.action; a.goal = e.place; a.from = e.from; a.place = -1; }
+  if (e.type === "departed") { a.state = "traveling"; a.action = e.action; a.goal = e.place; a.from = e.from; a.place = -1; a.x = e.x ?? 0; a.y = e.y ?? 0; a.node = e.node ?? -1; }
   else if (e.type === "arrived") { a.state = "idle"; a.place = e.place; a.goal = -1; }
   else if (e.type === "started") { a.state = "acting"; a.action = e.action; a.place = e.place; }
   else { a.state = "idle"; a.action = null; } // finished, idle
