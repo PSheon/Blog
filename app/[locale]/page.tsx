@@ -1,8 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Instrument } from "@/components/lab/instrument";
-import { HeroInstrumentLazy } from "@/components/site/hero-instrument-lazy";
+import { HeroStations } from "@/components/site/hero-stations";
 import { PostBento } from "@/components/site/post-bento";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { PostCover } from "@/components/site/post-cover";
@@ -90,24 +89,17 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
 
         <div style={{ "--i": 2 } as React.CSSProperties} className="reveal relative order-2">
           <div className="hero-glow" aria-hidden />
-        <Instrument
-          title={t.hero.instrumentTitle}
-          figureClassName="my-0"
-          live
-          caption={
-            <>
-              {t.hero.instrumentCaption}{" "}
-              <Link
-                href={`/${locale}/posts/cnn-from-scratch`}
-                className="text-signal underline decoration-signal/40 underline-offset-4 hover:decoration-signal"
-              >
-                {t.hero.instrumentMore}
-              </Link>
-            </>
-          }
-        >
-          <HeroInstrumentLazy hint={t.hero.instrumentHint} />
-        </Instrument>
+        <HeroStations
+          label={t.hero.stationsLabel}
+          hint={t.hero.instrumentHint}
+          t={{ think: t.hero.think, generate: t.hero.generate, act: t.hero.act }}
+          stations={[
+            { key: "see", word: t.hero.topics[0].word, color: RAIL_COLORS[0], title: t.hero.instrumentTitle, caption: t.hero.instrumentCaption, more: t.hero.instrumentMore, href: `/${locale}/posts/cnn-from-scratch` },
+            { key: "think", word: t.hero.topics[1].word, color: RAIL_COLORS[1], ...t.hero.stations.think, href: `/${locale}/posts/transformer-from-scratch` },
+            { key: "generate", word: t.hero.topics[2].word, color: RAIL_COLORS[2], ...t.hero.stations.generate, href: `/${locale}/posts/diffusion-points` },
+            { key: "act", word: t.hero.topics[3].word, color: RAIL_COLORS[3], ...t.hero.stations.act, href: `/${locale}/posts/ai-flappy-bird` },
+          ]}
+        />
         </div>
       </section>
 

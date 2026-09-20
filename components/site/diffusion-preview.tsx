@@ -24,7 +24,7 @@ function mulberry(seed: number) {
  * here: it is the picture of what the trained one does, light enough for the home page (2-D canvas,
  * no three.js). Colours are diffused along with the positions, as in the article.
  */
-export default function DiffusionPreview() {
+export default function DiffusionPreview({ className = "block aspect-[8/5] w-full" }: { className?: string }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const still = useReducedMotion();
 
@@ -116,5 +116,5 @@ export default function DiffusionPreview() {
     };
   }, [still]);
 
-  return <canvas ref={ref} className="block aspect-[8/5] w-full" aria-hidden />;
+  return <canvas ref={ref} className={className} aria-hidden />;
 }

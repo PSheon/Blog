@@ -578,3 +578,29 @@ test("a city of people runs in the page: the clock moves, the three heads differ
   await expect(page.getByTestId("city-live")).toBeDisabled();
   expect(errors).toEqual([]);
 });
+
+test("the hero is four stations: each tab shows a different live model and the page does not move", async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto("/zh");
+  await expect(page.getByTestId("hero-prediction")).toHaveText("7", { timeout: 20_000 });
+  const figure = page.locator("figure[data-instrument]").first(), height = async () => Math.round((await figure.locator("[role=tabpanel]").boundingBox())!.height);
+  const before = await height();
+
+  // Think: a Transformer trains from random weights until it writes the digits backwards.
+  await page.getByTestId("hero-tab-think").click();
+  await expect(page.getByTestId("hero-think-output")).toHaveText("951413", { timeout: 60_000 });
+  expect(await height()).toBe(before);
+  // Arrow keys move between the tabs, as a tablist should.
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("hero-tab-generate")).toHaveAttribute("aria-selected", "true");
+  await expect(figure.locator("[role=tabpanel] canvas:visible")).toHaveCount(1);
+  expect(await height()).toBe(before);
+  await page.keyboard.press("ArrowRight");
+  await expect(page.getByTestId("hero-tab-act")).toHaveAttribute("aria-selected", "true");
+  await expect(figure.locator("figcaption a")).toHaveAttribute("href", "/zh/posts/ai-flappy-bird");
+  expect(await height()).toBe(before);
+  // Back to the classifier: it kept its state underneath.
+  await page.getByTestId("hero-tab-see").click();
+  await expect(page.getByTestId("hero-prediction")).toHaveText("7");
+  expect(errors).toEqual([]);
+});
