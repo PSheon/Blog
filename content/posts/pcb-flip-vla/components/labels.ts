@@ -15,6 +15,9 @@ const zh = {
   states: { done: "沒事做／回原位", open: "鬆開夾爪", rise: "先抬高", above: "移到板邊上方", level: "把夾爪轉平", descend: "下降", grasp: "夾住", lift: "抬起", roll: "翻轉", over: "移回托盤上方", lower: "放下", release: "鬆開" },
   events: { grasped: "夾住了", missed: "夾歪了，板子被推開", placed: "放好了", dropped: "掉回托盤", lost: "掉到托盤外", slipped: "滑掉了", jammed: "卡住（太低就翻）" },
   lastEvent: "剛剛發生",
+  who: "誰在操作", expert: "專家（看得到真實狀態）", model: "模型（只學過專家示範，只看右邊的小圖）",
+  loading: "下載模型（1.9 MB）…", inference: "模型每步推論", ms: "ms · CPU",
+  wouldDo: "專家此刻會",
 };
 
 const en: typeof zh = {
@@ -30,6 +33,9 @@ const en: typeof zh = {
   states: { done: "idle / going home", open: "opening the gripper", rise: "rising first", above: "moving above the edge", level: "levelling the jaws", descend: "descending", grasp: "grasping", lift: "lifting", roll: "rolling", over: "moving back over the tray", lower: "lowering", release: "releasing" },
   events: { grasped: "grasped", missed: "bad pinch, the board was shoved", placed: "placed", dropped: "dropped into the tray", lost: "dropped outside the tray", slipped: "slipped", jammed: "jammed (rolled too low)" },
   lastEvent: "just happened",
+  who: "Who is driving", expert: "the expert (sees the true state)", model: "the model (trained on expert demonstrations only; sees the small picture only)",
+  loading: "Fetching the model (1.9 MB)…", inference: "inference per step", ms: "ms · CPU",
+  wouldDo: "the expert would be",
 };
 
 export type Labels = typeof zh;
