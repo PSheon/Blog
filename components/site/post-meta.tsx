@@ -2,8 +2,28 @@ import Link from "next/link";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
-export function EntryNo({ no, className }: { no: number; className?: string }) {
-  return <span className={cn("font-mono tabular", className)}>№ {String(no).padStart(3, "0")}</span>;
+/**
+ * The article's number, and beside it a mark if the article is a draft. Drafts are left out of production builds and
+ * listed only by `next dev`, where they used to look exactly like published articles: nothing on the page said so.
+ * The mark rides on the number because the number is on every surface an article appears on.
+ */
+export function EntryNo({ no, draft, className }: { no: number; draft?: boolean; className?: string }) {
+  return (
+    // Wraps as two whole pieces: in the index the number has a 4.5rem column, and the mark drops under it.
+    <span className={cn("inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-mono tabular", className)}>
+      <span className="whitespace-nowrap">№ {String(no).padStart(3, "0")}</span>
+      {draft && <DraftMark />}
+    </span>
+  );
+}
+
+/** Both languages at once: it is a note to the author, shown only on their own machine. */
+export function DraftMark({ className }: { className?: string }) {
+  return (
+    <span data-testid="draft-mark" className={cn("inline-block rounded-sm border border-signal-2 bg-signal-2/10 px-1 py-px font-mono text-[0.625rem] leading-tight font-semibold whitespace-nowrap text-signal-2", className)}>
+      草稿 DRAFT
+    </span>
+  );
 }
 
 export function TagLink({ tag, locale, className }: { tag: string; locale: Locale; className?: string }) {
