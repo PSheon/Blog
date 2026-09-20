@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { site } from "@/lib/site";
+import { KernelField } from "./kernel-field";
 import { KernelMark } from "./kernel-mark";
 import { LocaleSwitch } from "./locale-switch";
 import { ThemeToggle } from "./theme-toggle";
@@ -16,7 +17,9 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
   return (
     <footer className="relative mt-24">
       <div className="triad-gradient h-px opacity-60 [mask-image:repeating-linear-gradient(90deg,#000_0_4px,transparent_4px_10px)]" aria-hidden />
-      <div className="mx-auto w-full max-w-7xl px-5 pt-12 pb-6 sm:px-8">
+      {/* The mark, continued: a band of flickering cells that fades into the page before the text starts. */}
+      <KernelField className="pointer-events-none absolute inset-x-0 top-px h-32 w-full text-signal opacity-70 [mask-image:linear-gradient(to_bottom,#000,transparent)]" />
+      <div className="relative mx-auto w-full max-w-7xl px-5 pt-24 pb-6 sm:px-8">
         <div className="grid gap-x-12 gap-y-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
           <div className="grid gap-5">
             <Link href={`/${locale}`} className="flex min-h-6 w-fit items-center gap-2.5">

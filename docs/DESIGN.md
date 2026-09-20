@@ -191,3 +191,21 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm e2e && pnpm build
 - [ ] Cover drawing added to `post-cover.tsx`.
 - [ ] Numbers in the text re-read against their source.
 - [ ] Merged into `dev`; `main` only through a pull request.
+
+## Motion borrowed from Magic UI (2026-09-20)
+
+Paul asked for a more modern feel with magicui.design as the reference. The patterns are rebuilt in plain CSS and
+three tiny client components; **no animation library is installed** (Magic UI's own components need `motion`,
+and the site's budget is ~0.5 MB a page). Each one has to say something, as in section 1:
+
+| Pattern (Magic UI name) | Where | What it says | Code |
+| --- | --- | --- | --- |
+| Border Beam | the hero's live classifier (`<Instrument live>`) | this instrument is running right now | `.border-beam` in globals.css |
+| Magic Card spotlight | the latest-article card, post index rows | the thing under your pointer is a door | `.spotlight` + `components/site/spotlight.tsx` (one listener, mouse/pen only) |
+| Number Ticker | the three hero readouts | a readout settling; the numbers are counted, not typed | `components/site/number-ticker.tsx` |
+| Flickering Grid | the footer's top band | the 3×3 mark continued as a feature map | `components/site/kernel-field.tsx` (one canvas, ~11 fps, paused off screen) |
+| Blur Fade | the hero only: title, subtitle, instrument, once on load | one orchestrated moment; nothing else on the site fades in | `.reveal` with `--i` |
+| Animated Beam | the rail under the hero | the see → act path carries a signal | `.rail-pulse` (already there) |
+
+Rules: every one of them stands still under `prefers-reduced-motion`; none may move layout (CLS stays 0); do not
+add entrance animations to sections or cards, and do not add a second beam, shimmer or glow to the same screen.
