@@ -612,3 +612,35 @@ test("the hero is four stations: each tab shows a different live model and the p
   await expect(page.getByTestId("hero-prediction")).toHaveText("7");
   expect(errors).toEqual([]);
 });
+
+for (const locale of ["zh", "en"] as const) {
+  test(`the hero instrument fits its screen in ${locale}: no tab, panel or picture is cut off at any station`, async ({ page }) => {
+    await page.goto(`/${locale}`);
+    // The narrowest phones as well as whatever this project's viewport is: four English tab names in one line once
+    // made the instrument 434 px wide on a 390 px screen.
+    const widths = [page.viewportSize()!.width, 320];
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 800 });
+      for (const key of ["see", "think", "generate", "act"]) {
+        await page.getByTestId(`hero-tab-${key}`).click();
+        const problems = await page.evaluate(() => {
+          const figure = document.getElementById("hero-instrument")!, box = figure.querySelector(".overflow-hidden")!.getBoundingClientRect();
+          const panel = figure.querySelector("[role=tabpanel]")!, p = panel.getBoundingClientRect(), found: string[] = [];
+          if (box.left < -0.5 || box.right > window.innerWidth + 0.5) found.push(`instrument ${Math.round(box.left)}..${Math.round(box.right)} on a ${window.innerWidth} px screen`);
+          if (document.documentElement.scrollWidth > window.innerWidth) found.push("the page scrolls sideways");
+          for (const tab of figure.querySelectorAll("[role=tab]")) {
+            const t = tab.getBoundingClientRect();
+            if (t.right > box.right + 0.5 || t.left < box.left - 0.5 || tab.scrollWidth > tab.clientWidth + 1) found.push(`tab cut off: ${tab.textContent}`);
+          }
+          for (const el of panel.querySelectorAll("*")) {
+            if (getComputedStyle(el).visibility === "hidden") continue;
+            const b = el.getBoundingClientRect();
+            if (b.width && b.height && (b.right > p.right + 1 || b.bottom > p.bottom + 1)) found.push(`${el.tagName.toLowerCase()} sticks out of the panel`);
+          }
+          return [...new Set(found)];
+        });
+        expect(problems, `${width} px, ${key}`).toEqual([]);
+      }
+    }
+  });
+}

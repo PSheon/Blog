@@ -50,7 +50,7 @@ const en: Dictionary = {
     },
     think: { steps: "Training steps", input: "Problem", output: "The model writes", attention: "Which digit each answer looks at", again: "Learn it again" },
     generate: { note: "A replay of the diffusion process; no model runs here" },
-    act: { generation: "Generation", alive: "Still flying", best: "Most pipes cleared" },
+    act: { generation: "Generation", alive: "Still flying", best: "Most pipes" },
   },
   home: {
     latest: "Latest",

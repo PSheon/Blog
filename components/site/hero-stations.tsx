@@ -51,15 +51,22 @@ export function HeroStations({ stations, label, hint, t }: Props) {
   };
 
   return (
-    <figure id="hero-instrument" className="not-prose my-0 scroll-mt-24" data-instrument={current.title}>
+    <figure id="hero-instrument" className="not-prose my-0 min-w-0 scroll-mt-24" data-instrument={current.title}>
       <div className="relative">
         <CornerMarks />
         <div className="relative overflow-hidden rounded-md border border-border bg-panel">
           <span className="border-beam" aria-hidden />
-          <div className="flex items-center gap-3 border-b border-border py-1 pr-1.5 pl-3.5">
-            <span className="size-1.5 shrink-0 rounded-full" style={{ background: current.color }} aria-hidden />
-            <span className="label min-w-0 flex-1 truncate text-foreground">{current.title}</span>
-            <div role="tablist" aria-label={label} className="flex shrink-0 items-center gap-0.5">
+          {/*
+            Sized by the instrument, not the screen (a container query): it is half the page on a laptop and the whole
+            of it on a phone. With room, the name and the four tabs share a line. Without (under 30rem: every phone,
+            and a 1024 px laptop in English), the tabs take a line of their own in four equal parts. They must never
+            set the instrument's width: "See Think Generate Act" in one line pushed it past the edge of a phone.
+          */}
+          <div className="@container border-b border-border">
+          <div className="flex flex-wrap items-center gap-x-3 px-1.5 py-1">
+            <span className="ml-2 size-1.5 shrink-0 rounded-full" style={{ background: current.color }} aria-hidden />
+            <span className="label min-w-0 flex-1 truncate py-1.5 text-foreground">{current.title}</span>
+            <div role="tablist" aria-label={label} className="grid w-full grid-cols-4 gap-0.5 @[30rem]:flex @[30rem]:w-auto @[30rem]:shrink-0 @[30rem]:items-center">
               {stations.map((s, i) => (
                 <button
                   key={s.key}
@@ -73,7 +80,7 @@ export function HeroStations({ stations, label, hint, t }: Props) {
                   onKeyDown={(e) => { if (e.key === "ArrowRight") move(i, 1); else if (e.key === "ArrowLeft") move(i, -1); }}
                   data-testid={`hero-tab-${s.key}`}
                   className={cn(
-                    "flex min-h-8 cursor-pointer items-center gap-1.5 rounded-sm px-2 font-heading text-sm font-semibold transition-colors",
+                    "flex min-h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-1 font-heading text-sm font-semibold whitespace-nowrap transition-colors @[30rem]:px-2",
                     s.key === active ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
@@ -82,6 +89,7 @@ export function HeroStations({ stations, label, hint, t }: Props) {
                 </button>
               ))}
             </div>
+          </div>
           </div>
           <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${active}`} className="dot-grid relative p-4 font-sans sm:p-5">
             <ErrorBoundary fallback={<p className="py-10 text-center text-sm text-muted-foreground">This instrument hit an error. The rest of the page is unaffected.</p>}>

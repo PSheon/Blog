@@ -87,7 +87,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           </dl>
         </div>
 
-        <div style={{ "--i": 2 } as React.CSSProperties} className="reveal relative order-2">
+        <div style={{ "--i": 2 } as React.CSSProperties} className="reveal relative order-2 min-w-0">
           <div className="hero-glow" aria-hidden />
         <HeroStations
           label={t.hero.stationsLabel}
