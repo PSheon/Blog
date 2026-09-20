@@ -188,6 +188,18 @@ html:not(.dark) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+  /*
+   * Anything you can press shows the hand. Browsers give buttons the arrow, which on a page full of instruments
+   * leaves the reader guessing what is live. One rule here instead of a class on every control, so a new article's
+   * buttons get it without anyone remembering; `:where` keeps it at zero specificity, so a utility such as
+   * `cursor-crosshair` on the drawing pad still wins.
+   */
+  :where(button, summary, select, label[for], [role="button"], [role="tab"], [role="switch"], [role="checkbox"], [role="radio"], [role="option"], [role="menuitem"], input:is([type="checkbox"], [type="radio"], [type="range"], [type="button"], [type="submit"], [type="reset"], [type="file"])) {
+    cursor: pointer;
+  }
+  :where(:disabled, [aria-disabled="true"], [data-disabled]) {
+    cursor: not-allowed;
+  }
   ::selection {
     background: color-mix(in oklab, var(--signal) 35%, transparent);
   }

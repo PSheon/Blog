@@ -93,7 +93,7 @@ export function RemoteLab() {
               aria-hidden
             />
           </div>
-          <label className="flex items-center gap-2 text-muted-foreground">
+          <label className="flex min-h-6 items-center gap-2 text-muted-foreground">
             <input type="checkbox" checked={strafe} onChange={(e) => setStrafe(e.target.checked)} />
             {t.strafe}
           </label>

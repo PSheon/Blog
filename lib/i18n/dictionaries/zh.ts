@@ -43,7 +43,7 @@ const zh = {
   },
   home: {
     latest: "最新文章",
-    readouts: { posts: "篇文章", interactive: "篇可以動手玩", libraries: "個第三方 ML 套件，全部自己寫" },
+    readouts: { posts: "篇文章", interactive: "篇可以動手玩", operators: "個手寫運算子" },
     topics: "依主題瀏覽：看見、思考、生成、行動",
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
