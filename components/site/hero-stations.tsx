@@ -80,11 +80,13 @@ export function HeroStations({ stations, label, hint, t }: Props) {
                   onKeyDown={(e) => { if (e.key === "ArrowRight") move(i, 1); else if (e.key === "ArrowLeft") move(i, -1); }}
                   data-testid={`hero-tab-${s.key}`}
                   className={cn(
-                    "flex min-h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-1 font-heading text-sm font-semibold whitespace-nowrap transition-colors @[30rem]:px-2",
+                    // The text scales with the instrument on a narrow one: a quarter of a 320 px phone is 68 px, and "Generate" in a
+                    // wide fallback serif (Linux, some Android) did not fit at 14 px. The dot goes first, under 24rem.
+                    "flex min-h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-0.5 font-heading text-[clamp(0.6875rem,3.5cqw,0.875rem)] font-semibold whitespace-nowrap transition-colors @[30rem]:px-2 @[30rem]:text-sm",
                     s.key === active ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <span className="size-1.5 rounded-full" style={{ background: s.color, boxShadow: s.key === active ? `0 0 10px ${s.color}` : undefined }} aria-hidden />
+                  <span className="hidden size-1.5 shrink-0 rounded-full @[24rem]:block" style={{ background: s.color, boxShadow: s.key === active ? `0 0 10px ${s.color}` : undefined }} aria-hidden />
                   {s.word}
                 </button>
               ))}
