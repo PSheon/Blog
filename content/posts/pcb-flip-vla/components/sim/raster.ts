@@ -6,8 +6,9 @@ import { nestCentre, type World } from "./world";
 export type CameraShift = { yaw: number; pitch: number; dx: number; dy: number; dz: number };
 export const NO_SHIFT: CameraShift = { yaw: 0, pitch: 0, dx: 0, dy: 0, dz: 0 };
 
-type Rgb = [number, number, number];
-type Box = { c: Vec3; u: Vec3; v: Vec3; n: Vec3; h: Vec3; top: Rgb; bottom?: Rgb; side?: Rgb };
+export type Rgb = [number, number, number];
+/** An oriented box: centre, three unit axes, half sizes along them, and the colours of its top, bottom and sides. */
+export type Box = { c: Vec3; u: Vec3; v: Vec3; n: Vec3; h: Vec3; top: Rgb; bottom?: Rgb; side?: Rgb };
 
 const C = {
   sky: [24, 28, 44] as Rgb, bench: [196, 198, 208] as Rgb, tray: [70, 76, 96] as Rgb, rail: [120, 128, 150] as Rgb,
@@ -65,15 +66,20 @@ export function sceneBoxes(world: World): Box[] {
  * reader without WebGL all get exactly the same pixels.
  */
 export function render(world: World, shift: CameraShift = NO_SHIFT, size: number = PARAMS.image, supersample: number = PARAMS.supersample): Uint8Array {
+  return renderBoxes(sceneBoxes(world), PARAMS.camera, shift, size, supersample);
+}
+
+/** The same rasteriser for any scene and any camera: the head-camera study (docs/research/head-camera) draws its own. */
+export function renderBoxes(boxes: Box[], camera: { eye: Vec3; target: Vec3; fov: number }, shift: CameraShift = NO_SHIFT, size: number = PARAMS.image, supersample: number = PARAMS.supersample): Uint8Array {
   const W = size * supersample, depth = new Float32Array(W * W).fill(Infinity), rgb = new Float32Array(W * W * 3);
   for (let i = 0; i < W * W; i++) { rgb[i * 3] = C.sky[0]; rgb[i * 3 + 1] = C.sky[1]; rgb[i * 3 + 2] = C.sky[2]; }
-  const { eye: e0, target, fov } = PARAMS.camera, eye: Vec3 = [e0[0] + shift.dx, e0[1] + shift.dy, e0[2] + shift.dz], Z: Vec3 = [0, 0, 1];
+  const { eye: e0, target, fov } = camera, eye: Vec3 = [e0[0] + shift.dx, e0[1] + shift.dy, e0[2] + shift.dz], Z: Vec3 = [0, 0, 1];
   let f = unit(add(target, e0, -1));
   f = turn(f, Z, shift.yaw); const right0 = unit(cross(f, Z)); f = turn(f, right0, shift.pitch);
   const right = unit(cross(f, Z)), up = cross(right, f), focal = 1 / Math.tan(((fov / 2) * Math.PI) / 180);
   const project = (p: Vec3): Vec3 => { const d = add(p, eye, -1), z = dot(d, f); return [(0.5 + (0.5 * focal * dot(d, right)) / z) * W, (0.5 - (0.5 * focal * dot(d, up)) / z) * W, z]; };
 
-  for (const box of sceneBoxes(world)) {
+  for (const box of boxes) {
     const corner = (a: number, b: number, c: number) => add(add(add(box.c, box.u, a * box.h[0]), box.v, b * box.h[1]), box.n, c * box.h[2]);
     const faces: [Vec3, Vec3[], Rgb][] = [
       [box.n, [corner(-1, -1, 1), corner(1, -1, 1), corner(1, 1, 1), corner(-1, 1, 1)], box.top],
