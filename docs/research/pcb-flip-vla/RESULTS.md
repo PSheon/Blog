@@ -309,3 +309,54 @@ Best model so far on every column, and flat across the camera shift (90.0 % stra
 **Not a fair comparison yet.** The other recipes had 4 000–5 000 steps. Before the article says "camera randomisation also
 helps with shoves", BC, DART and plain DAgger need the same 12 000 steps; it may be that all of them were under-trained
 and that part of DAgger's lead over BC shrinks. That rerun is the first thing to do (about 16 minutes each).
+
+## Stage 1, third pass — every recipe at the same 12 000 steps (2026-09-21, the main session)
+
+The handover's first worry: the second pass compared 4 000–5 000 steps with each other and then a 12 000-step model beat
+them all, so "DAgger 82.7 % against BC 35.7 %" might have been a budget, not a method. Same data as the second pass
+(`vla-work/bc`, `dart`, `bc-cam`, and `bc` + `dagger-r1…r5`), each trained once from scratch for 12 000 steps
+(`vla-work/rerun-12k.sh`; 15–18 minutes a model on MPS with the GPU to itself), one seed, 300 episodes, 249 real tasks.
+
+```
+bc [165 s]
+  nothing: 54.6% (136/249, 30 steps; nothing-to-do 51/51)
+  slip 1 %: 49.4% (123/249, 30 steps; nothing-to-do 51/51)
+  one shove: 9.6% (24/249, 60 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 5.2% (13/249, 59 steps; nothing-to-do 51/51)
+  board turned back: 1.2% (3/249, 66 steps; nothing-to-do 51/51)
+  camera 5° off: 9.6% (24/249, 33 steps; nothing-to-do 51/51)
+dart [167 s]
+  nothing: 57.8% (144/249, 33 steps; nothing-to-do 51/51)
+  slip 1 %: 55.4% (138/249, 33 steps; nothing-to-do 51/51)
+  one shove: 2.8% (7/249, 62 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 1.6% (4/249, 58 steps; nothing-to-do 51/51)
+  board turned back: 6.4% (16/249, 41 steps; nothing-to-do 51/51)
+  camera 5° off: 1.6% (4/249, 29 steps; nothing-to-do 51/51)
+dagger [128 s]
+  nothing: 98.4% (245/249, 35 steps; nothing-to-do 51/51)
+  slip 1 %: 98.8% (246/249, 36 steps; nothing-to-do 51/51)
+  one shove: 97.2% (242/249, 45 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 73.9% (184/249, 50 steps; nothing-to-do 51/51)
+  board turned back: 97.6% (243/249, 34 steps; nothing-to-do 51/51)
+  camera 5° off: 0.0% (0/249, 0 steps; nothing-to-do 51/51)
+bc+camrand [177 s]
+  nothing: 57.8% (144/249, 31 steps; nothing-to-do 51/51)
+  slip 1 %: 51.8% (129/249, 31 steps; nothing-to-do 51/51)
+  one shove: 5.2% (13/249, 68 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 2.0% (5/249, 76 steps; nothing-to-do 51/51)
+  board turned back: 6.0% (15/249, 41 steps; nothing-to-do 51/51)
+  camera 5° off: 56.2% (140/249, 30 steps; nothing-to-do 51/51)
+   Duration  640.26s (tests 100%)
+```
+
+- **It was the method.** Three times the training took BC from 35.7 % to 54.6 % with nobody interfering and left it at
+  9.6 % after one shove and 1.2 % when the board is turned back. DAgger on the aggregate: 98.4 %, 97.2 %, 97.6 %.
+  Extra steps help a model do what its data shows and do nothing for what its data never shows.
+- **DART is BC** (57.8 % / 2.8 % shoved), now at a fair budget too. The explanation (its data still contains no missed
+  grasp) is still reasoning; the count is still owed.
+- **The camera is a separate axis, as before.** DAgger: 0 % with the camera 5° off. BC with a shaken camera: 56.2 %
+  there, equal to its own 57.8 % untouched, and as helpless as BC when shoved (5.2 %). The second pass's
+  camera-randomised DAgger at 12 000 steps (90 % / 90 % / 82.3 % / 93.6 %) remains the only model good on every column.
+- Still one seed and no error bars. Checkpoints not exported: the article changed direction the same day (see
+  `docs/research/head-camera/RESULTS.md`), and these numbers are here because whichever article is written will want
+  to say what three times the training does and does not buy.
