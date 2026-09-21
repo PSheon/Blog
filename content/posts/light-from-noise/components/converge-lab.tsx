@@ -18,9 +18,9 @@ const DOUBLING_MS = 450;
 interface Seen { spp: number; mrays: number; error: number | null; steps: number; triangles: number; buildMs: number; gpu: string }
 
 /** A log-log plot of the error against the sample count, with the −½ slope it should follow drawn through its first point. */
-function ErrorChart({ points, label, x, y, slope }: { points: [number, number][]; label: string; x: string; y: string; slope: string }) {
-  const W = 320, H = 200, pad = { l: 34, r: 10, t: 10, b: 26 }, xMax = Math.max(64, ...points.map((p) => p[0])), lx = (v: number) => pad.l + (Math.log2(Math.max(1, v)) / Math.log2(xMax)) * (W - pad.l - pad.r);
-  const errors = points.map((p) => p[1]).filter((e) => e > 0), top = Math.max(1, ...errors) * 1.2, bottom = Math.min(top / 64, ...errors) * 0.8, ly = (v: number) => pad.t + (Math.log(top / Math.max(v, bottom)) / Math.log(top / bottom)) * (H - pad.t - pad.b);
+function ErrorChart({ points, ghost, ghostName, label, x, y, slope }: { points: [number, number][]; /** the run before this one, to compare with */ ghost: [number, number][]; ghostName: string; label: string; x: string; y: string; slope: string }) {
+  const W = 320, H = 200, pad = { l: 34, r: 10, t: 10, b: 26 }, xMax = Math.max(64, ...points.map((p) => p[0]), ...ghost.map((p) => p[0])), lx = (v: number) => pad.l + (Math.log2(Math.max(1, v)) / Math.log2(xMax)) * (W - pad.l - pad.r);
+  const errors = [...points, ...ghost].map((p) => p[1]).filter((e) => e > 0), top = Math.max(1, ...errors) * 1.2, bottom = Math.min(top / 64, ...errors) * 0.8, ly = (v: number) => pad.t + (Math.log(top / Math.max(v, bottom)) / Math.log(top / bottom)) * (H - pad.t - pad.b);
   const first = points.find((p) => p[0] >= 2 && p[1] > 0), guide = first ? [first[0], xMax].map((n) => `${lx(n).toFixed(1)},${ly(first[1] * Math.sqrt(first[0] / n)).toFixed(1)}`).join(" ") : "";
   const ticks = [1, 4, 16, 64, 256, 1024, 4096, 16384].filter((n) => n <= xMax);
   return (
@@ -35,6 +35,8 @@ function ErrorChart({ points, label, x, y, slope }: { points: [number, number][]
       <text x={4} y={pad.t + 8} className="fill-muted-foreground font-mono text-[9px]">↑ {y}</text>
       {guide && <polyline points={guide} fill="none" className="stroke-muted-foreground" strokeWidth={1} strokeDasharray="3 3" />}
       {guide && first && <text x={lx(xMax) - 4} y={ly(first[1] * Math.sqrt(first[0] / xMax)) - 5} textAnchor="end" className="fill-muted-foreground font-mono text-[9px]">{slope}</text>}
+      {ghost.length > 1 && <polyline points={ghost.filter((p) => p[1] > 0).map((p) => `${lx(p[0]).toFixed(1)},${ly(p[1]).toFixed(1)}`).join(" ")} fill="none" className="stroke-signal-2" strokeWidth={1.4} strokeLinejoin="round" opacity={0.75} />}
+      {ghost.length > 1 && <text x={lx(ghost[0][0]) + 4} y={ly(ghost[0][1]) - 5} className="fill-muted-foreground text-[9px]">{ghostName}</text>}
       <polyline points={points.filter((p) => p[1] > 0).map((p) => `${lx(p[0]).toFixed(1)},${ly(p[1]).toFixed(1)}`).join(" ")} fill="none" className="stroke-signal" strokeWidth={1.6} strokeLinejoin="round" />
     </svg>
   );
@@ -48,14 +50,15 @@ function ErrorChart({ points, label, x, y, slope }: { points: [number, number][]
 export function ConvergeLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const [seen, setSeen] = useState<Seen | null>(null), [points, setPoints] = useState<[number, number][]>([]);
-  const [triangles, setTriangles] = useState<number>(SIZES[0]), [bounces, setBounces] = useState<number>(16);
+  const [triangles, setTriangles] = useState<number>(SIZES[0]), [bounces, setBounces] = useState<number>(16), [ask, setAsk] = useState(false), [ghost, setGhost] = useState<{ points: [number, number][]; asked: boolean }>({ points: [], asked: false });
   // What the frame loop carries between frames. Reset whenever the picture starts over.
   const track = useRef({ rays: 0, steps: 0, at: 0, mrays: 0, perRay: 0, error: null as number | null, next: 2, history: [] as [number, number][] });
   const fresh = () => { track.current = { rays: 0, steps: 0, at: performance.now(), mrays: 0, perRay: 0, error: null, next: 2, history: [] }; setPoints([]); setSeen(null); };
 
+  const asking = useRef(false); // what the switch says now: `configure` may run before React has rendered it
   const tracer = useTracer(root, canvas, {
     triangles, size: SIZE, doublingMs: DOUBLING_MS, budgetMs: BUDGET_MS,
-    configure: (r) => { r.bounces = bounces; },
+    configure: (r) => { r.bounces = bounces; r.strategy = asking.current ? 3 : 1; },
     afterFrame: async (r, built) => {
       const k = track.current;
       if (r.samples < k.next / 2) Object.assign(k, { rays: 0, steps: 0, at: performance.now(), error: null, next: 2, history: [] }); // the picture was restarted under us
@@ -92,7 +95,7 @@ export function ConvergeLab() {
             <Readout label={t.triangles} value={seen ? seen.triangles.toLocaleString() : "–"} tone="plain" />
             <Readout label={t.build} value={seen ? seen.buildMs.toFixed(0) : "–"} unit={t.ms} tone="plain" />
           </div>
-          <ErrorChart points={points} label={t.chart} x={t.chartX} y={t.chartY} slope={t.slope} />
+          <ErrorChart points={points} ghost={ghost.points} ghostName={ghost.asked ? t.askLampOn : t.askLampOff} label={t.chart} x={t.chartX} y={t.chartY} slope={t.slope} />
           {seen && <p className="label normal-case">{t.gpu}: {seen.gpu}</p>}
         </div>
       </div>
@@ -101,7 +104,7 @@ export function ConvergeLab() {
         <Transport status={status} live={live} onToggle={tracer.toggle} onRestart={() => { fresh(); tracer.restart(); }} t={t} />
         <div className="flex items-center gap-2" role="group" aria-label={t.triangles}>
           <span className="label">{t.triangles}</span>
-          {SIZES.map((n) => <Button key={n} size="sm" variant={triangles === n ? "default" : "outline"} disabled={unavailable} onClick={() => { fresh(); setTriangles(n); tracer.rebuild(); }} data-testid={`light-tris-${n}`}>{compact(n)}</Button>)}
+          {SIZES.map((n) => <Button key={n} size="sm" variant={triangles === n ? "default" : "outline"} disabled={unavailable} onClick={() => { fresh(); setGhost({ points: [], asked: false }); setTriangles(n); tracer.rebuild(); }} data-testid={`light-tris-${n}`}>{compact(n)}</Button>)}
         </div>
         <div className="flex items-center gap-2" role="group" aria-label={t.bounces}>
           <span className="label">{t.bounces}</span>
@@ -111,6 +114,8 @@ export function ConvergeLab() {
             </Button>
           ))}
         </div>
+        {/* The same picture, the same samples; the only change is that every hit also asks the lamp. The curve of the run before stays on the chart. */}
+        <Button size="sm" variant={ask ? "default" : "outline"} aria-pressed={ask} disabled={!live} onClick={() => { setGhost({ points, asked: ask }); asking.current = !ask; setAsk(!ask); fresh(); tracer.restart(); }} data-testid="light-ask">{t.askLamp}</Button>
       </div>
       <p className="text-muted-foreground">{t.measured}</p>
       {unavailable && <Button size="sm" variant="outline" className="justify-self-start" onClick={tracer.rebuild}>{t.restart}</Button>}

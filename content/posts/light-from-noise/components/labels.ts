@@ -25,6 +25,9 @@ const zh = {
   endedOutside: "從開口飛出去了：黑的", endedTired: "彈到沒力了還沒碰到燈：黑的",
   colourOne: "這一條算出來的顏色", colourMean: "{n} 條的平均", colourGpu: "GPU 那張圖上這個像素的顏色",
   shootOne: "再射一條", shootMany: "射 100 條", pathHint: "點畫面上任何一個地方，換一個像素。路徑是在你的 CPU 上用同一套演算法算的，線的顏色是光走到那裡還剩下的顏色。",
+  askLamp: "直接問燈", askLampOff: "上一次（沒問燈）", askLampOn: "上一次（有問燈）",
+  materialPicture: "三顆球的房間：左邊霧面，中間的材質由你決定，右邊玻璃",
+  kind: "中間那顆球", matte: "霧面", metal: "金屬", glass: "玻璃", roughness: "粗糙度", ior: "折射率",
   measured: "誤差怎麼量的：奇數樣本和偶數樣本各自累積成一張圖，兩張圖差距的一半就是這張圖的誤差，不需要參考圖。數字是相對於整張圖的平均亮度：10% 表示一個像素平均還差平均亮度的一成。",
 };
 
@@ -48,6 +51,9 @@ const en: typeof zh = {
   endedOutside: "left through the open side: black", endedTired: "ran out of bounces before finding the light: black",
   colourOne: "The colour this one path gives", colourMean: "The mean of {n} paths", colourGpu: "This pixel in the GPU's picture",
   shootOne: "Shoot one more", shootMany: "Shoot 100", pathHint: "Click anywhere on the picture to choose another pixel. The paths are traced on your CPU by the same algorithm; a line's colour is what the light is still worth when it gets there.",
+  askLamp: "Ask the lamp", askLampOff: "last run (not asking)", askLampOn: "last run (asking)",
+  materialPicture: "A room with three balls: matte on the left, yours to change in the middle, glass on the right",
+  kind: "The middle ball", matte: "Matte", metal: "Metal", glass: "Glass", roughness: "Roughness", ior: "Index of refraction",
   measured: "How the error is measured: odd and even samples build two pictures of their own; half the gap between them is this picture's error. No reference image is needed. The number is relative to the picture's mean brightness: 10% means a typical pixel is still a tenth of the average brightness off.",
 };
 

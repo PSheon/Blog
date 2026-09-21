@@ -753,26 +753,3 @@ test("the playground is flown through while it is path traced, or the figure say
   await page.keyboard.up("w");
   expect(errors).toEqual([]);
 });
-
-test("four ways of looking for the lamp race in the page and agree on the answer, or the figures say why they cannot", async ({ page }) => {
-  const response = await page.goto("/zh/posts/light-sampling");
-  test.skip(response?.status() === 404, "light-sampling is still a draft");
-  const errors = watchErrors(page);
-  const figure = page.locator('[data-instrument="sampling / race"]');
-  await figure.scrollIntoViewIfNeeded();
-  const adapter = await page.evaluate(async () => { const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu; return gpu ? Boolean(await gpu.requestAdapter()) : false; });
-  if (!adapter) {
-    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the race was not run; only the messages were checked" });
-    for (const name of ["sampling / race", "sampling / material", "sampling / both"]) await expect(page.locator(`[data-instrument="${name}"]`).getByTestId("light-status")).toContainText(/WebGPU/);
-    expect(errors).toEqual([]);
-    return;
-  }
-  await figure.getByTestId("light-toggle").click();
-  const rows = async () => (await figure.getByTestId("sampling-race-table").locator("tbody tr").allInnerTexts()).map((row) => row.split("\t").map((cell) => parseFloat(cell)));
-  await expect.poll(async () => (await rows())[3][1], { timeout: 30_000 }).toBeGreaterThan(0);
-  await page.waitForTimeout(4000);
-  const table = await rows(), means = table.map((row) => row[3]);
-  expect(Math.max(...means) - Math.min(...means)).toBeLessThan(0.02); // a method may change the noise, never the answer
-  expect(table[2][1]).toBeLessThan(table[1][1] * 0.5); // asking the lamp is far quieter than hoping
-  expect(errors).toEqual([]);
-});

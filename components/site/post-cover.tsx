@@ -272,24 +272,6 @@ function Light() {
   );
 }
 
-/** № 012: from one point on the floor, many rays guess at random and most miss; one goes straight to the lamp. */
-function Sampling() {
-  const next = rng(12), guesses: [number, number][] = [];
-  for (let i = 0; i < 9; i++) { const a = Math.PI * (0.08 + 0.84 * next()); guesses.push([r1(62 + Math.cos(a) * 46), r1(84 - Math.sin(a) * (30 + next() * 26))]); }
-  return (
-    <>
-      <path d="M12 84 H148" stroke={DIM} strokeWidth={1} />
-      <path d="M104 14 H134 L130 20 H108 Z" fill={S} />
-      {guesses.map(([x, y], i) => <path key={i} d={`M62 84 L${x} ${y}`} stroke={DIM} strokeWidth={1} strokeDasharray="2 3" />)}
-      {guesses.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={1.4} fill={DIM} />)}
-      <path d="M62 84 L119 20" stroke={S2} strokeWidth={1.6} />
-      <circle cx={62} cy={84} r={3} fill="var(--background)" stroke={S} strokeWidth={1.4} />
-      <circle cx={34} cy={72} r={11} fill="none" stroke={S3} strokeWidth={1.2} />
-      <path d="M27 66 q5 -5 11 -2" fill="none" stroke={S3} strokeWidth={1} />
-    </>
-  );
-}
-
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -302,7 +284,6 @@ const covers: Record<string, () => ReactNode> = {
   "city-of-agents": City,
   "task-scheduler": Scheduler,
   "light-from-noise": Light,
-  "light-sampling": Sampling,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {
