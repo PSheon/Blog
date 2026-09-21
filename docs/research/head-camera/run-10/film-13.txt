@@ -1,0 +1,2 @@
+film seed 13: as trained 15.5 (wrong 4.0) | only the named block 21.5 (wrong 2.5) | instruction switched at step 8 23.0 (wrong 3.0) | named block moved at step 8 21.5 (wrong 3.5) | pitch 5° 12.0 (wrong 6.0) | yaw 10° 14.0 (wrong 7.5) | noise 0.05 14.0 (wrong 5.0) | light 70 % 11.5 (wrong 3.5)
+== film: 10000 steps of 16, 300 s, 2270 parameters

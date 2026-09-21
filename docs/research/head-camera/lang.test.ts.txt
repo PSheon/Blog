@@ -1,0 +1,217 @@
+/**
+ * Language spike (run 10): two blocks on the bench, red and yellow, and an instruction that names one. The head camera,
+ * arm and recipe are the head-camera spike's (spike.test.ts.txt): keep looking, camera shaken ±10°, noise and light varied,
+ * aux head. Only the instruction is new, and three ways to hand it to the network are compared:
+ *   none  no instruction at all: the control, it can only guess (≈ 50 % at best)
+ *   late  a learned word vector (8 numbers) joins the keypoints before the dense layers
+ *   film  the word vector sets a scale and a shift for each of the 16 channels of the second convolution (FiLM, as
+ *         RT-1 conditions its EfficientNet): the instruction changes what the network looks for, not only what it does
+ * The aux head says where the hand and the NAMED block are in the picture.
+ *
+ *   mkdir -p tests/headcam && cp docs/research/head-camera/lang.test.ts.txt tests/headcam/lang.test.ts
+ *   HL_MODES=none,late,film HL_SEEDS=11 HL_STEPS=10000 HL_OUT=/some/dir \
+ *     pnpm exec vitest run tests/headcam/lang.test.ts --disable-console-intercept; rm -r tests/headcam
+ */
+import { describe, it } from "vitest";
+import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
+import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/pcb-flip-vla/components/sim";
+const SIZE = 32, HALF = SIZE / 2, K = 8, HIDDEN = 32;
+// A humanoid's arm hangs from a shoulder beside its head, not under it: the camera is 22 cm to the arm's left. Seen from
+// straight above the base (the first run), the forearm hid the hand.
+const HEAD = { eye: [-0.12, 0.22, 0.62] as Vec3, target: [0.36, 0, 0.02] as Vec3, fov: 58 };
+const Z = 0.055, MAX_STEP = 0.025, TOL = 0.03, MAX_STEPS = 40, HOLD = 3;
+const AREA = { x: [0.22, 0.5], y: [-0.22, 0.22] } as const;
+type Rng = () => number;
+
+const unit = (a: Vec3): Vec3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const flat = (c: Vec3, h: Vec3, top: [number, number, number]): Box => ({ c, u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], h, top });
+
+/** What the evaluation can do to a picture that training never did (run 8). */
+type Look = { distractor?: [number, number]; noise?: number; dim?: number; rng?: Rng };
+function scene(tip: [number, number], block: [number, number], arm: boolean, distractor?: [number, number]): Box[] {
+  const boxes: Box[] = [flat([0.34, 0, -0.01], [0.4, 0.36, 0.01], [196, 198, 208]), flat([block[0], block[1], 0.02], [0.02, 0.02, 0.02], [214, 60, 60])];
+  if (distractor) boxes.push(flat([distractor[0], distractor[1], 0.02], [0.02, 0.02, 0.02], [220, 200, 60])); // a second block, yellow
+  if (!arm) return boxes;
+  const q = solveIK([tip[0], tip[1], Z], 0) as Joints, [shoulder, elbow, wrist, end] = skeleton(q), up: Vec3 = [0, 0, 1];
+  const link = (from: Vec3, to: Vec3, thick: number, top: [number, number, number]) => {
+    const u = unit([to[0] - from[0], to[1] - from[1], to[2] - from[2]]), v = unit(cross(up, u)), n = cross(u, v);
+    boxes.push({ c: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2], u, v, n, h: [Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) / 2, thick, thick], top });
+  };
+  boxes.push(flat([0, 0, shoulder[2] / 2], [0.035, 0.035, shoulder[2] / 2], [52, 56, 70]));
+  link(shoulder, elbow, 0.016, [240, 140, 40]); link(elbow, wrist, 0.014, [240, 140, 40]);
+  link(wrist, end, 0.014, [240, 140, 40]);
+  boxes.push(flat([end[0], end[1], end[2]], [0.022, 0.022, 0.014], [60, 200, 230])); // the hand: a colour nothing else has
+  return boxes;
+}
+
+/** Channel-first, 0…1: what conv2d wants. */
+function picture(tip: [number, number], block: [number, number], arm: boolean, shift: CameraShift, look: Look = {}): Float64Array {
+  const bytes = renderBoxes(scene(tip, block, arm, look.distractor), HEAD, shift, SIZE, 2), n = SIZE * SIZE, out = new Float64Array(3 * n);
+  const gauss = () => { const r = look.rng!; return Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()); };
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) {
+    let v = (bytes[i * 3 + c] / 255) * (look.dim ?? 1);
+    if (look.noise) v += look.noise * gauss();
+    out[c * n + i] = Math.max(0, Math.min(1, v));
+  }
+  return out;
+}
+
+const reachable = (p: [number, number]) => solveIK([p[0], p[1], Z], 0) !== null;
+const somewhere = (rng: Rng): [number, number] => { for (;;) { const p: [number, number] = [AREA.x[0] + rng() * (AREA.x[1] - AREA.x[0]), AREA.y[0] + rng() * (AREA.y[1] - AREA.y[0])]; if (reachable(p)) return p; } };
+const HOME: [number, number] = (() => { const t = tipOf(PARAMS.home as unknown as Joints); return [t[0], t[1]]; })();
+const clip = (v: number) => Math.max(-1, Math.min(1, v));
+const expert = (tip: [number, number], block: [number, number]): [number, number] => [clip((block[0] - tip[0]) / MAX_STEP), clip((block[1] - tip[1]) / MAX_STEP)];
+/** The same pinhole as renderBoxes, for a point: pixel coordinates in −1…1. */
+function project(p: Vec3, shift: CameraShift): [number, number] {
+  const add = (a: Vec3, b: Vec3, k = 1): Vec3 => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k], dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const turn = (a: Vec3, k: Vec3, angle: number): Vec3 => add(add([a[0] * Math.cos(angle), a[1] * Math.cos(angle), a[2] * Math.cos(angle)], cross(k, a), Math.sin(angle)), k, dot(k, a) * (1 - Math.cos(angle)));
+  const up0: Vec3 = [0, 0, 1], eye = add(HEAD.eye, [shift.dx, shift.dy, shift.dz]);
+  let f = unit(add(HEAD.target, HEAD.eye, -1)); f = turn(f, up0, shift.yaw); f = turn(f, unit(cross(f, up0)), shift.pitch);
+  const right = unit(cross(f, up0)), up = cross(right, f), focal = 1 / Math.tan(((HEAD.fov / 2) * Math.PI) / 180), d = add(p, eye, -1), z = dot(d, f);
+  return [(focal * dot(d, right)) / z, (focal * dot(d, up)) / z];
+}
+
+type Mode = "none" | "late" | "film";
+const WORDS = ["red", "yellow"] as const, EMBED = 8, C2 = 16;
+const deg = Math.PI / 180, SHAKE = 10;
+
+/**
+ * Per-row scale and shift: out[c, :] = a[c, :] · (1 + g[c]) + b[c]. Not in lib/ml yet; if the article keeps FiLM it goes
+ * there with a finite-difference test like every other op. Until then it reaches the tape's private record().
+ */
+function film(t: Tape, a: Mat, g: Mat, b: Mat): Mat {
+  const out = new Mat(a.rows, a.cols);
+  for (let c = 0; c < a.rows; c++) for (let j = 0; j < a.cols; j++) out.data[c * a.cols + j] = a.data[c * a.cols + j] * (1 + g.data[c]) + b.data[c];
+  (t as unknown as { record(fn: () => void): void }).record(() => {
+    for (let c = 0; c < a.rows; c++) for (let j = 0; j < a.cols; j++) {
+      const o = out.grad[c * a.cols + j];
+      a.grad[c * a.cols + j] += o * (1 + g.data[c]); g.grad[c] += o * a.data[c * a.cols + j]; b.grad[c] += o;
+    }
+  });
+  return out;
+}
+
+class Net {
+  readonly params: Record<string, Mat> = {};
+  private readonly adam: Adam;
+  private readonly pos: Mat;
+  constructor(readonly mode: Mode, rng: Rng) {
+    const he = (rows: number, fanIn: number) => { const m = new Mat(rows, fanIn), s = Math.sqrt(6 / fanIn); for (let i = 0; i < m.data.length; i++) m.data[i] = (rng() * 2 - 1) * s; return m; };
+    const small = (rows: number, cols: number, s: number) => { const m = new Mat(rows, cols); for (let i = 0; i < m.data.length; i++) m.data[i] = (rng() * 2 - 1) * s; return m; };
+    const P = this.params, inputs = 2 * K + (mode === "late" ? EMBED : 0);
+    P.k1 = he(8, 27); P.b1 = new Mat(1, 8); P.k2 = he(16, 72); P.b2 = new Mat(1, 16); P.k3 = he(K, 16); P.b3 = new Mat(1, K);
+    P.w1 = he(inputs, HIDDEN); for (let i = 0; i < P.w1.data.length; i++) P.w1.data[i] *= Math.sqrt(HIDDEN / inputs); P.c1 = new Mat(1, HIDDEN);
+    P.w2 = he(HIDDEN, 2); for (let i = 0; i < P.w2.data.length; i++) P.w2.data[i] *= Math.sqrt(2 / HIDDEN); P.c2 = new Mat(1, 2);
+    P.wa = he(2 * K, 4); for (let i = 0; i < P.wa.data.length; i++) P.wa.data[i] *= Math.sqrt(4 / (2 * K)); P.ca = new Mat(1, 4);
+    if (mode === "late") P.words = small(WORDS.length, EMBED, 0.5);
+    // FiLM starts as "no change" (scale 1, shift 0) plus a little noise, so the untrained network is the plain one.
+    if (mode === "film") { P.gamma = small(WORDS.length, C2, 0.1); P.beta = small(WORDS.length, C2, 0.1); }
+    this.adam = new Adam(P);
+    this.pos = new Mat(HALF, 1, Float64Array.from({ length: HALF }, (_, i) => ((i + 0.5) / HALF) * 2 - 1));
+  }
+  parameters(): number { return Object.values(this.params).reduce((n, p) => n + p.data.length, 0); }
+  forward(t: Tape, image: Float64Array, word: number) {
+    const P = this.params, x = new Mat(3, SIZE * SIZE, image);
+    const f1 = t.maxPool2(t.relu(t.conv2d(x, P.k1, P.b1, { h: SIZE, w: SIZE, k: 3, inputGrad: false })), { h: SIZE, w: SIZE });
+    let pre = t.conv2d(f1, P.k2, P.b2, { h: HALF, w: HALF, k: 3 });
+    if (this.mode === "film") pre = film(t, pre, t.transpose(t.embed(P.gamma, [word])), t.transpose(t.embed(P.beta, [word])));
+    const f2 = t.relu(pre);
+    const maps = t.scale(t.conv2d(f2, P.k3, P.b3, { h: HALF, w: HALF, k: 1 }), HALF);
+    const kx = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "x" })), this.pos), ky = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "y" })), this.pos);
+    const keys = t.concatCols([t.transpose(kx), t.transpose(ky)]);
+    const input = this.mode === "late" ? t.concatCols([keys, t.embed(P.words, [word])]) : keys;
+    const h = t.relu(t.addRow(t.matmul(input, P.w1), P.c1));
+    return { out: t.addRow(t.matmul(h, P.w2), P.c2), seen: t.addRow(t.matmul(keys, P.wa), P.ca), kx, ky };
+  }
+  step(batch: { image: Float64Array; word: number; want: [number, number]; where: number[] }[], lr: number): number {
+    for (const p of Object.values(this.params)) p.grad.fill(0);
+    let loss = 0;
+    for (const s of batch) {
+      const t = new Tape(), f = this.forward(t, s.image, s.word);
+      loss += t.mse(f.out, s.want, undefined, 1 / batch.length);
+      t.mse(f.seen, s.where, undefined, 1 / batch.length);
+      t.backward();
+    }
+    this.adam.step(lr);
+    return loss / batch.length;
+  }
+  act(image: Float64Array, word: number): [number, number] { const o = this.forward(new Tape(), image, word).out.data; return [o[0], o[1]]; }
+  keypoints(image: Float64Array, word: number): [number, number][] { const f = this.forward(new Tape(), image, word); return Array.from({ length: K }, (_, k) => [f.kx.data[k], f.ky.data[k]] as [number, number]); }
+}
+
+const shaken = (rng: Rng): CameraShift => ({ yaw: (rng() * 2 - 1) * SHAKE * deg, pitch: (rng() * 2 - 1) * SHAKE * deg, dx: 0, dy: (rng() * 2 - 1) * SHAKE * 0.003, dz: (rng() * 2 - 1) * SHAKE * 0.003 });
+/** Two blocks at least 8 cm apart: [red, yellow]. */
+function pair(rng: Rng): [[number, number], [number, number]] {
+  const red = somewhere(rng);
+  for (;;) { const yellow = somewhere(rng); if (Math.hypot(yellow[0] - red[0], yellow[1] - red[1]) > 0.08) return [red, yellow]; }
+}
+function where(tip: [number, number], block: [number, number], shift: CameraShift): number[] {
+  const h = project([tip[0], tip[1], Z], shift), b = project([block[0], block[1], 0.04], shift);
+  return [h[0], -h[1], b[0], -b[1]];
+}
+function sample(rng: Rng) {
+  const [red, yellow] = pair(rng), word = rng() < 0.5 ? 0 : 1, target = word === 0 ? red : yellow, shift = shaken(rng);
+  const look: Look = { distractor: yellow, noise: rng() * 0.1, dim: 0.6 + rng() * 0.6, rng };
+  let tip = somewhere(rng);
+  // A third of the hands near the named block, a sixth near the other one: it must learn to leave the wrong block.
+  const r = rng(), near = r < 1 / 3 ? target : r < 0.5 ? (word === 0 ? yellow : red) : null;
+  if (near) for (let k = 0; k < 20; k++) { const p: [number, number] = [near[0] + (rng() - 0.5) * 0.12, near[1] + (rng() - 0.5) * 0.12]; if (reachable(p)) { tip = p; break; } }
+  return { image: picture(tip, red, true, shift, look), word, want: expert(tip, target), where: where(tip, target, shift) };
+}
+
+/**
+ * switch: the instruction changes to the other word at step 8. one: only the named block is on the bench (the other is
+ * moved off the bench, out of sight). Success is reaching the NAMED block (the one named last); "wrong" counts episodes
+ * that ended holding still on the other one.
+ */
+type Condition = { name: string; shift: CameraShift; noise?: number; dim?: number; moveBlock?: boolean; switchWord?: boolean; one?: boolean };
+function evaluate(net: Net, condition: Condition, episodes: number, seed: number) {
+  const rng = mulberry32(seed);
+  let wins = 0, wrong = 0;
+  for (let e = 0; e < episodes; e++) {
+    let [red, yellow] = pair(rng), word = rng() < 0.5 ? 0 : 1, tip: [number, number] = [...HOME], held = 0, won = false;
+    const OFF: [number, number] = [2, 2];
+    for (let t = 0; t < MAX_STEPS && !won; t++) {
+      if (condition.switchWord && t === 8) word = 1 - word;
+      if (condition.moveBlock && t === 8) { const m = somewhere(rng); if (word === 0) red = m; else yellow = m; }
+      const target = word === 0 ? red : yellow, shownRed = condition.one && word === 1 ? OFF : red, shownYellow = condition.one && word === 0 ? OFF : yellow;
+      const look: Look = { distractor: shownYellow, noise: condition.noise, dim: condition.dim, rng };
+      const a = net.act(picture(tip, shownRed, true, condition.shift, look), net.mode === "none" ? 0 : word);
+      const next: [number, number] = [tip[0] + clip(a[0]) * MAX_STEP, tip[1] + clip(a[1]) * MAX_STEP];
+      if (reachable(next)) tip = next;
+      held = Math.hypot(tip[0] - target[0], tip[1] - target[1]) < TOL ? held + 1 : 0;
+      won = held >= HOLD;
+    }
+    const other = word === 0 ? yellow : red;
+    if (won) wins++; else if (Math.hypot(tip[0] - other[0], tip[1] - other[1]) < TOL) wrong++;
+  }
+  return { success: wins / episodes, wrong: wrong / episodes };
+}
+
+describe("language", () => {
+  it("compares three ways to hand the network an instruction", () => {
+    const STEPS = Number(process.env.HL_STEPS ?? 10000), BATCH = 16, EPISODES = Number(process.env.HL_EPISODES ?? 200);
+    const conditions: Condition[] = [
+      { name: "as trained", shift: NO_SHIFT },
+      { name: "only the named block", shift: NO_SHIFT, one: true },
+      { name: "instruction switched at step 8", shift: NO_SHIFT, switchWord: true },
+      { name: "named block moved at step 8", shift: NO_SHIFT, moveBlock: true },
+      { name: "pitch 5°", shift: { ...NO_SHIFT, pitch: 5 * deg } },
+      { name: "yaw 10°", shift: { ...NO_SHIFT, yaw: 10 * deg } },
+      { name: "noise 0.05", shift: NO_SHIFT, noise: 0.05 },
+      { name: "light 70 %", shift: NO_SHIFT, dim: 0.7 },
+    ];
+    const SEEDS = (process.env.HL_SEEDS ?? "11").split(",").map(Number);
+    for (const mode of (process.env.HL_MODES ?? "none,late,film").split(",") as Mode[]) {
+      for (const seed of SEEDS) {
+        const rng = mulberry32(7 + seed), net = new Net(mode, mulberry32(seed)), t0 = performance.now();
+        for (let step = 1; step <= STEPS; step++) net.step(Array.from({ length: BATCH }, () => sample(rng)), step < STEPS * 0.7 ? 3e-3 : 1e-3);
+        const seconds = (performance.now() - t0) / 1000;
+        const cells = conditions.map((c) => { const r = evaluate(net, c, EPISODES, 99); return `${c.name} ${(r.success * 100).toFixed(1)} (wrong ${(r.wrong * 100).toFixed(1)})`; });
+        console.log(`${mode} seed ${seed}: ${cells.join(" | ")}`);
+        console.log(`== ${mode}: ${STEPS} steps of ${BATCH}, ${seconds.toFixed(0)} s, ${net.parameters()} parameters`);
+      }
+    }
+  }, 7_200_000);
+});

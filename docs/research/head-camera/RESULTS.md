@@ -260,6 +260,30 @@ Same models and evaluation as run 8, aux on, 10 000 steps, seeds 11–15. Run 8'
   things in the same picture.
 - Recipe for the page, unless something beats it: closed + shaken + aux + photo, 10 000 steps.
 
+## Run 10 — language: which block (red or yellow), and three ways to say it (10 000 steps, seeds 11–15, 200 episodes)
+
+Script: `lang.test.ts.txt` (its header has the command). Two blocks, red and yellow, ≥ 8 cm apart; an instruction of one
+word names one. Recipe as run 9 (keep looking, shaken, aux on hand + NAMED block, photo). "none" gets no instruction;
+"late" joins an 8-number word vector to the keypoints before the dense layers; "film" makes the word set a scale and a
+shift for each of the second convolution's 16 channels (the per-channel op is written in the script and checked against
+finite differences; it is not in lib/ml). "wrong" = ended holding still on the other block. Fifteen models at once:
+≈ 300 s each.
+
+| | two blocks | only the named one | instruction switched at step 8 | named block moved | pitch 5° | yaw 10° | noise 0.05 | light 70 % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| none | 15.9 (10–22), wrong 6.2 | 29.1 | 16.0 | 19.7 | 15.4 | 12.5 | 12.3 | 12.2 |
+| late | 25.1 (14–45), wrong 3.8 | 30.0 | 30.5 | 27.4 | 26.3 | 24.2 | 24.3 | 20.4 |
+| film | **47.1 (16–74)**, wrong 1.4 | 51.7 | 56.3 | 52.2 | 50.0 | 47.9 | 47.9 | 39.0 |
+
+- **The order is clear, the sizes are not usable.** FiLM beats late fusion by 22 points and late beats nothing by 9; but
+  FiLM's seeds run from 16 to 74, the same under-training signature as run 4.
+- Failures are rarely the wrong block (FiLM 1.4 %): mostly neither block is reached.
+- "none" is far below the 50 % a guess would give. Unmeasured guess: under MSE the best action with no instruction is the
+  average of the two directions, which leads between the blocks. Worth measuring (where "none" episodes end) because it
+  would be a clean paragraph.
+- Even with only the named block on the bench, all three stay low (29–52 %), which suggests the task with two blocks in training is
+  harder to learn, not just harder to evaluate.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

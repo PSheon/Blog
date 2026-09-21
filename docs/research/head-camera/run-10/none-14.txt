@@ -1,0 +1,2 @@
+none seed 14: as trained 9.5 (wrong 2.5) | only the named block 23.5 (wrong 0.0) | instruction switched at step 8 9.5 (wrong 3.5) | named block moved at step 8 16.5 (wrong 5.0) | pitch 5° 18.0 (wrong 4.5) | yaw 10° 11.5 (wrong 4.0) | noise 0.05 9.5 (wrong 6.5) | light 70 % 10.0 (wrong 0.5)
+== none: 10000 steps of 16, 295 s, 2206 parameters
