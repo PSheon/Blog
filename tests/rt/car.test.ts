@@ -30,6 +30,18 @@ describe("the car", () => {
     world.free();
   });
 
+  it("collides: driven into a parked car, it shoves it along and is slowed down itself", () => {
+    const world = flat(), car = createCar(RAPIER, world, models.models.car, IDENTITY), parked = createCar(RAPIER, world, models.models.car, [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 14]);
+    run(world, car, 2, { throttle: 0, steer: 0, brake: false });
+    const before = parked.body.translation().z;
+    let fastest = 0;
+    for (let i = 0; i < 4 * 60; i++) { car.drive({ throttle: 1, steer: 0, brake: false }, 1 / 60); parked.drive({ throttle: 0, steer: 0, brake: false }, 1 / 60); world.step(); fastest = Math.max(fastest, car.speed()); }
+    expect(parked.body.translation().z - before).toBeGreaterThan(1.5); // the parked car was pushed
+    expect(car.body.translation().z).toBeLessThan(parked.body.translation().z); // and not driven through
+    expect(car.speed()).toBeLessThan(fastest); // the crash cost speed
+    world.free();
+  });
+
   it("turns a basis into the quaternion that gives it back", () => {
     const q = quaternionOf([0, 0, -1, 0, 1, 0, 1, 0, 0]); // a quarter turn about y
     expect(Math.hypot(q.x, q.y, q.z, q.w)).toBeCloseTo(1, 6);
