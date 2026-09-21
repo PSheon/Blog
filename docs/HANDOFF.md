@@ -11,7 +11,7 @@ For whoever picks this up next. Read this, then the memory files under
 | --- | --- |
 | Repo | `/Users/paul_jiang/Desktop/Paul/Blog`, GitHub `PSheon/Blog` (public) |
 | Branches | `dev` is where work happens. `main` is production and moves only through a PR `dev` → `main` that Paul merges (last: PR #10, 2026-09-20) |
-| Production | <https://paul-notebook.vercel.app>, Vercel project `paul-notebook`, deploys `main` |
+| Production | <https://blog.psheon.me> (since 2026-09-21; DNS on Cloudflare, CNAME to Vercel, DNS only). Vercel project `paul-notebook`, deploys `main`. `paul-notebook.vercel.app` redirects 308 to it, path kept. Production env: `NEXT_PUBLIC_SITE_URL=https://blog.psheon.me` |
 | Dev server | `pnpm dev` on :3000 |
 | Other worktree | `/Users/paul_jiang/Desktop/Paul/Blog-city`, branch `feat/city-of-agents` (PR #9 → `dev`), owned by another session. One writer per checkout |
 | Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
@@ -28,7 +28,7 @@ it dull.
 
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
 - A test on a real phone. Nobody has done one.
-- A custom domain and Search Console (steps were given; `NEXT_PUBLIC_SITE_URL` and the verification env vars exist).
+- Search Console (the verification env vars exist). The custom domain is done. Open: should `psheon.me` and `www.psheon.me` redirect to `blog.` instead of serving the site too.
 - What is still open from the last audit: `docs/research/2026-09-20-project-audit.md`.
 
 ## Rules Paul has set (also in memory)
@@ -134,7 +134,7 @@ the per-article split. Numbers, method and what is left: `docs/research/2026-09-
 
 - Windows shows Chinese serif text in PMingLiU (system font trade-off).
 - Going *back* has no page transition (React's default for history navigation).
-- No custom domain; `lib/site.ts` takes the origin from Vercel until `NEXT_PUBLIC_SITE_URL` is set.
+- Moving to `blog.psheon.me` changed every RSS guid (subscribers saw all items once more) and left localStorage and installed PWAs on the old origin. Previews still take their origin from Vercel (`lib/site.ts`).
 - Article 005: "unseen emoji" and cross-OS domain shift are stated as unmeasured guesses.
 - No CSP (what one would need is in the audit). KaTeX is not MathML: switching changes how formulas look.
 - Idea not started: live MNIST training as an upgrade to article 001 (conv backward exists).
