@@ -7,7 +7,7 @@ import { mulberry32 } from "@/lib/ml";
 import { type Match, icp } from "./icp";
 import { useLabels } from "./labels";
 
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { type Pose, between, wrap } from "./se2";
 import { CYAN_HEX, PINK_HEX, type Stage3D, setPoints, stubs, useStage3D } from "./stage3d";
 import { useVisible } from "./use-visible";

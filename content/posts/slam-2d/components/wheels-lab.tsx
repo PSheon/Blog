@@ -8,7 +8,7 @@ import { mulberry32 } from "@/lib/ml";
 import { Car, driveLapsSliced } from "./car";
 import { useLabels } from "./labels";
 import { PINK } from "./paint";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { type Pose, compose } from "./se2";
 import { CYAN_HEX, PINK_HEX, place, setPoints, useStage3D } from "./stage3d";
 import { useReplay } from "./use-replay";

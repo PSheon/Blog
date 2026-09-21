@@ -2,14 +2,21 @@
 
 import { Search as SearchIcon } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { ChunkLoading } from "./chunk-loading";
 import type { Dictionary, Locale } from "@/lib/i18n";
 
 const OPEN_EVENT = "notebook:open-search";
 
 // cmdk + the dialog primitives are ~60 KB gzipped: fetch them when search is first used.
 const loadPalette = () => import("./search-palette");
-const SearchPalette = dynamic(loadPalette, { ssr: false });
+const SearchPalette = dynamic(loadPalette, { ssr: false, loading: () => <ChunkLoading fixed /> });
+
+/** ⌘K on Apple's keyboards, Ctrl K everywhere else. The server cannot know, so it says ⌘K and the client corrects it. */
+const noop = () => () => {};
+function useShortcutLabel(): string {
+  return useSyncExternalStore(noop, () => (/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K"), () => "⌘K");
+}
 
 /** Open the search palette from anywhere (the phone header has its own search button). */
 export function openSearch() {
@@ -38,7 +45,7 @@ interface Props {
 }
 
 export function Search({ locale, tags, t }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false), shortcut = useShortcutLabel();
   // Once true the palette stays mounted, so closing and reopening keeps its loaded index.
   const [wanted, setWanted] = useState(false);
 
@@ -74,11 +81,12 @@ export function Search({ locale, tags, t }: Props) {
         // Warm the chunk as soon as the reader reaches for search, so the click feels instant.
         onPointerEnter={() => void loadPalette()}
         onFocus={() => void loadPalette()}
+        aria-keyshortcuts="Meta+K Control+K /"
         className="glass-2 hidden h-8 w-52 cursor-pointer items-center gap-2 rounded-md px-2.5 text-sm text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground md:flex"
       >
         <SearchIcon className="size-4" aria-hidden />
         <span>{t.open}</span>
-        <kbd className="ml-auto rounded-sm border border-border px-1 font-mono text-[10px] leading-4">⌘K</kbd>
+        <kbd suppressHydrationWarning className="ml-auto rounded-sm border border-border px-1 font-mono text-xs leading-4">{shortcut}</kbd>
       </button>
       {wanted && <SearchPalette locale={locale} tags={tags} t={t} open={open} onOpenChange={setOpen} />}
     </>

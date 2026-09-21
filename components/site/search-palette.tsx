@@ -3,7 +3,7 @@
 import { CornerDownLeft, FileText, Hash, TextSearch } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { Dictionary, Locale } from "@/lib/i18n";
 import { type SearchDoc, type SearchHit, search } from "@/lib/search";
@@ -43,7 +43,7 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [docs, setDocs] = useState<SearchDoc[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState(false), [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +54,7 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [locale, attempt]);
 
   const hits = useMemo(() => (docs ? search(docs, query) : []), [docs, query]);
   const tagHits = useMemo(() => {
@@ -80,18 +80,30 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
         className="top-[12vh] w-[calc(100vw-1.5rem)] max-w-2xl translate-y-0 gap-0 overflow-hidden rounded-xl! border-border bg-popover/95 p-0 backdrop-blur-xl sm:top-[16vh] sm:max-w-2xl"
       >
         {/* We rank results ourselves (lib/search.ts); cmdk only handles keyboard navigation. */}
-        <Command shouldFilter={false} loop className="bg-transparent">
+        <Command shouldFilter={false} loop label={t.open} className="bg-transparent">
           <CommandInput value={query} onValueChange={setQuery} placeholder={t.placeholder} className="h-12 text-base" />
           <CommandList className="max-h-[min(60vh,28rem)] scroll-py-2 p-1.5">
             {searching && docs && hits.length === 0 && tagHits.length === 0 && (
-              <CommandEmpty className="py-10 text-center text-sm text-muted-foreground">
-                {t.empty.replace("{q}", query.trim())}
-              </CommandEmpty>
+              // (not cmdk's Empty: that hides itself while the list has items, and the latest articles below are items)
+              <p className="px-3 pt-8 pb-4 text-center text-sm text-muted-foreground">{t.empty.replace("{q}", query.trim())}</p>
+            )}
+            {/* Nothing found is not a dead end: the three newest articles are one key away. */}
+            {searching && docs && hits.length === 0 && tagHits.length === 0 && (
+              <CommandGroup heading={t.latest}>
+                {docs.slice(0, 3).map((doc) => (
+                  <CommandItem key={doc.slug} value={`latest:${doc.slug}`} onSelect={() => go(`/${locale}/posts/${doc.slug}`)} className="gap-3 rounded-md px-2.5 py-2">
+                    <FileText className="text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate">{doc.title}</span>
+                    <EntryNo no={doc.no} className="shrink-0 text-xs text-signal" />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
             {!docs && (
-              <p className="px-3 py-8 text-center text-sm text-muted-foreground" role="status">
-                {failed ? t.failed : t.loading}
-              </p>
+              <div className="px-3 py-8 text-center text-sm text-muted-foreground" role="status">
+                <p>{failed ? t.failed : t.loading}</p>
+                {failed && <button type="button" onClick={() => { setFailed(false); setAttempt((n) => n + 1); }} className="tap mt-3 cursor-pointer rounded-md border border-input px-3 py-1.5 text-foreground hover:bg-muted" data-testid="search-retry">{t.retry}</button>}
+              </div>
             )}
 
             {searching && hits.length > 0 && (
@@ -119,7 +131,7 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
                         <Highlighted hit={hit} />
                       </p>
                     </div>
-                    <EntryNo no={hit.no} className="mt-0.5 shrink-0 text-[0.6875rem] text-signal" />
+                    <EntryNo no={hit.no} className="mt-0.5 shrink-0 text-xs text-signal" />
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -131,7 +143,7 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
                   <CommandItem key={doc.slug} value={doc.slug} onSelect={() => go(`/${locale}/posts/${doc.slug}`)} className="gap-3 rounded-md px-2.5 py-2">
                     <FileText className="text-muted-foreground" aria-hidden />
                     <span className="min-w-0 flex-1 truncate">{doc.title}</span>
-                    <EntryNo no={doc.no} className="shrink-0 text-[0.6875rem] text-signal" />
+                    <EntryNo no={doc.no} className="shrink-0 text-xs text-signal" />
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -149,7 +161,9 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
             )}
           </CommandList>
 
-          <div className="flex items-center gap-4 border-t border-border px-3.5 py-2 font-mono text-[0.6875rem] text-muted-foreground">
+          {/* How many there are now, said once per change to a screen reader; the group heading shows it to the eye. */}
+          <p className="sr-only" role="status" aria-live="polite">{searching && docs ? (hits.length === 1 ? t.resultsOne : t.results.replace("{n}", String(hits.length))) : ""}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3.5 py-2 font-mono text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <kbd className="rounded-sm border border-border px-1">↑</kbd>
               <kbd className="rounded-sm border border-border px-1">↓</kbd>
@@ -160,6 +174,10 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
                 <CornerDownLeft className="size-2.5" aria-hidden />
               </kbd>
               {t.select}
+            </span>
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <kbd className="rounded-sm border border-border px-1">/</kbd>
+              {t.open}
             </span>
             <span className="ml-auto flex items-center gap-1.5">
               <kbd className="rounded-sm border border-border px-1">esc</kbd>

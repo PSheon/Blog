@@ -277,7 +277,7 @@ export function PlaygroundLab() {
       </div>
       <label className="flex min-w-44 flex-1 items-center gap-3">
         <span className="label shrink-0">{t.hour} {String(Math.floor(hour)).padStart(2, "0")}:{String(Math.round((hour % 1) * 60)).padStart(2, "0")}</span>
-        <Slider value={[hour]} min={6.5} max={21} step={0.25} aria-label={t.hour} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
+        <Slider value={[hour]} min={6.5} max={21} step={0.25} aria-label={t.hour} valueText={`${String(Math.floor(hour)).padStart(2, "0")}:${String(Math.round((hour % 1) * 60)).padStart(2, "0")}`} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
       </label>
     </>
   );

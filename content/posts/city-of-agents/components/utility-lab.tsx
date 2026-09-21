@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useLabels } from "./labels";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { PARAMS, utility } from "./sim";
 
 /** Fig. 03: two things to do, each with a need behind it and a walk in front of it. The same function the city uses picks. */

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { CalibrationChart, type Curve, KneeChart, Legend } from "./chart";
 import { type Labels, useLabels } from "./labels";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { type Bar, DEFAULT_JOB, type JobOptions, makeJob, PARAMS, schedule } from "./sim";
 import { Timeline } from "./timeline";
 import { useCurves } from "./use-curves";

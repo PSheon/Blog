@@ -5,10 +5,11 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ChunkLoading } from "./chunk-loading";
 import type { DrawerProps } from "./mobile-drawer";
 
 const loadDrawer = () => import("./mobile-drawer");
-const MobileDrawer = dynamic(loadDrawer, { ssr: false });
+const MobileDrawer = dynamic(loadDrawer, { ssr: false, loading: () => <ChunkLoading fixed /> });
 
 /** The phone's menu button. The drawer behind it is fetched the first time it is needed. */
 export function MobileNav(props: Omit<DrawerProps, "open" | "onOpenChange">) {

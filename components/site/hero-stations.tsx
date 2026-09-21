@@ -7,11 +7,13 @@ import { CornerMarks } from "@/components/lab/corner-marks";
 import { ErrorBoundary } from "@/components/lab/error-boundary";
 import { cn } from "@/lib/utils";
 import { type StationKey, setStation, useStation } from "./hero/station-store";
+import { ChunkLoading } from "./chunk-loading";
 import { HeroInstrumentLazy } from "./hero-instrument-lazy";
 
-const Think = dynamic(() => import("./hero/think"), { ssr: false });
-const Generate = dynamic(() => import("./hero/generate"), { ssr: false });
-const Act = dynamic(() => import("./hero/act"), { ssr: false });
+const loading = () => <ChunkLoading />;
+const Think = dynamic(() => import("./hero/think"), { ssr: false, loading });
+const Generate = dynamic(() => import("./hero/generate"), { ssr: false, loading });
+const Act = dynamic(() => import("./hero/act"), { ssr: false, loading });
 
 export interface Station {
   key: StationKey;

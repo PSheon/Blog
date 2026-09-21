@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Legend } from "./city-lab";
 import { personName, useLabels } from "./labels";
 import { DepartureChart, EventStream, StatusTable, Timeline } from "./overseer-panel";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { MAX_N, MIN_N, type Mode, PARAMS } from "./sim";
 import { useCity } from "./use-city";
 

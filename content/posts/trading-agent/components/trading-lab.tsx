@@ -39,6 +39,7 @@ function Param({ label, value, unit, min, max, disabled, onChange }: {
         max={max}
         disabled={disabled}
         aria-label={label}
+        valueText={`${value}${unit ?? ""}`}
         onValueChange={(v) => onChange(Array.isArray(v) ? v[0] : v)}
       />
     </label>
