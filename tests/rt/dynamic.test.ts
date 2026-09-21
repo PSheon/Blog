@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { IDENTITY, buildDynamicBvh, compose, fromPose, parseModels, rotationY, writeModel } from "@/lib/rt";
+import { IDENTITY, assembleDynamicBvh, buildDynamicBvh, compose, fromPose, parseModels, prepareObject, rotationY, writeModel } from "@/lib/rt";
 
 const file = readFileSync("public/posts/light-playground/models.bin"), models = parseModels(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength) as ArrayBuffer);
 
@@ -43,10 +43,13 @@ describe("the vehicles", () => {
   it("are written where their pose puts them, and the tree built over them agrees with testing every triangle", () => {
     const total = models.kinds.length, out = { positions: new Float32Array(total * 9), materials: new Uint32Array(total) };
     let cursor = 0;
+    const groups = [0];
     cursor = writeModel(models, "car", 20, compose(fromPose({ x: 10, y: 2, z: -5 }, { x: 0, y: 0, z: 0, w: 1 }), rotationY(0.7)), () => null, out, cursor);
+    groups.push(cursor);
     cursor = writeModel(models, "heli", 23, fromPose({ x: -8, y: 6, z: 3 }, { x: 0, y: 0.383, z: 0, w: 0.924 }), (part) => (part.role === "rotor" ? rotationY(1.1) : null), out, cursor);
     expect(cursor).toBeGreaterThan(1500);
-    const nodeBase = 1000, triangleBase = 5000, bvh = buildDynamicBvh(out.positions, out.materials, cursor, nodeBase, triangleBase);
+    const nodeBase = 1000, triangleBase = 5000;
+    for (const bvh of [buildDynamicBvh(out.positions, out.materials, cursor, nodeBase, triangleBase), buildDynamicBvh(out.positions, out.materials, cursor, nodeBase, triangleBase, groups)]) {
     expect(bvh.nodeCount).toBeLessThanOrEqual(2 * cursor);
     const all = { ...bvh }, flat = new Float32Array(bvh.triangles);
     let hits = 0;
@@ -59,6 +62,26 @@ describe("the vehicles", () => {
     }
     expect(hits).toBeGreaterThan(100);
     expect(new Uint32Array(bvh.triangles)[3]).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  it("keeps a tree prepared at rest correct after the object has moved: refitting finds what testing every triangle finds", () => {
+    const total = models.kinds.length, rest = { positions: new Float32Array(total * 9), materials: new Uint32Array(total) }, out = { positions: new Float32Array(total * 9), materials: new Uint32Array(total) };
+    const carCount = writeModel(models, "car", 0, IDENTITY, () => null, rest, 0), prepared = prepareObject(rest.positions, carCount);
+    const heliRest = { positions: new Float32Array(total * 9), materials: new Uint32Array(total) }, heliCount = writeModel(models, "heli", 0, IDENTITY, () => null, heliRest, 0), heli = prepareObject(heliRest.positions, heliCount);
+    let cursor = writeModel(models, "car", 20, compose(fromPose({ x: 10, y: 2, z: -5 }, { x: 0.1, y: 0.3, z: 0, w: 0.948 }), rotationY(0.7)), (part) => (part.role === "wheel" ? rotationY(0.4) : null), out, 0);
+    const heliFirst = cursor; cursor = writeModel(models, "heli", 23, fromPose({ x: -8, y: 6, z: 3 }, { x: 0, y: 0.383, z: 0, w: 0.924 }), () => null, out, cursor);
+    const nodeBase = 300, triangleBase = 7000, bvh = assembleDynamicBvh([{ prepared, first: 0 }, { prepared: heli, first: heliFirst }], out.positions, out.materials, nodeBase, triangleBase), flat = new Float32Array(bvh.triangles);
+    expect(bvh.triangleCount).toBe(cursor);
+    let hits = 0;
+    for (let i = 0; i < 300; i++) {
+      const o = [40 * Math.cos(i), 12 + (i % 7), 40 * Math.sin(i)], target = i % 2 ? [10, 2.5, -5] : [-8, 6.5, 3], d = target.map((v, k) => v - o[k] + ((i * 7919) % 13) * 0.05), l = Math.hypot(...d), dir = d.map((v) => v / l);
+      let brute = Infinity;
+      for (let t = 0; t < cursor; t++) brute = Math.min(brute, moller(flat, t, o, dir));
+      expect(hit(bvh.nodes, bvh.triangles, nodeBase, triangleBase, o, dir)).toBe(brute);
+      if (brute < Infinity) hits++;
+    }
+    expect(hits).toBeGreaterThan(100);
   });
 
   it("builds a few thousand triangles in a few milliseconds", () => {

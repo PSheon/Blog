@@ -8,7 +8,7 @@ import { Stage } from "@/components/rt/stage";
 import { useTracer } from "@/components/rt/use-tracer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, buildDynamicBvh, compose, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, rotationY, sunAt, writeModel, type Mat34, type ModelName, type Models, type Vec3 } from "@/lib/rt";
+import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, assembleDynamicBvh, compose, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, prepareObject, rotationY, sunAt, writeModel, type Mat34, type ModelName, type Models, type Prepared, type Vec3 } from "@/lib/rt";
 import type { Renderer } from "@/lib/rt/gpu";
 import { createWorld, type World } from "./game/world";
 import { useLabels } from "./labels";
@@ -18,7 +18,7 @@ const MODES = ["raster", "direct", "full"] as const;
 type Mode = (typeof MODES)[number];
 const KEYS: Record<string, [number, number]> = { w: [0, 1], s: [0, -1], a: [-1, 0], d: [1, 0], arrowup: [0, 1], arrowdown: [0, -1], arrowleft: [-1, 0], arrowright: [1, 0] };
 
-interface Assets { models: Models; world: World; skinner: ReturnType<typeof createSkinner>; scratch: { positions: Float32Array; materials: Uint32Array } }
+interface Assets { models: Models; world: World; skinner: ReturnType<typeof createSkinner>; /** each object's tree, built once from its rest pose */ prepared: Record<ModelName | "person", Prepared>; scratch: { positions: Float32Array; materials: Uint32Array } }
 
 /**
  * The playground, walked through while it is path traced. The ground is one BVH, built once; the character and the
@@ -52,7 +52,10 @@ export function PlaygroundLab() {
       const world = await createWorld(ground, start, models, parked);
       if (!alive) { world.destroy(); return; }
       made = world;
-      assets.current = { models, world, skinner: createSkinner(man), scratch: { positions: new Float32Array(DYNAMIC * 9), materials: new Uint32Array(DYNAMIC) } };
+      const scratch = { positions: new Float32Array(DYNAMIC * 9), materials: new Uint32Array(DYNAMIC) }, skinner = createSkinner(man), prepared = {} as Assets["prepared"];
+      for (const name of ["car", "heli", "airplane"] as ModelName[]) prepared[name] = prepareObject(scratch.positions, writeModel(models, name, 0, [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], () => null, scratch, 0));
+      skinner.pose("idle", 0, true); prepared.person = prepareObject(scratch.positions, skinner.write([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 0, scratch, 0));
+      assets.current = { models, world, skinner, prepared, scratch };
       dirty.current = true; setReady(true);
     })().catch((error) => console.error("[playground] could not start the game", error));
     return () => { alive = false; assets.current = null; made?.destroy(); };
@@ -65,13 +68,15 @@ export function PlaygroundLab() {
     const started = performance.now(), person = a.world.person, out = a.scratch;
     let cursor = 0;
     let cars = 0;
+    const objects: { prepared: Prepared; first: number }[] = [];
     for (const v of a.world.vehicles) {
+      objects.push({ prepared: a.prepared[v.name], first: cursor });
       const base = park.vehicleMaterials[v.name], paint = v.name === "car" && cars++ > 0 ? park.carPaints + ((cars - 2) % 4) : base; // the first car keeps the red
       cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2], v.pose(), (part) => v.wheel(part), out, cursor);
     }
     const driven = a.world.driving();
-    if (!driven) { a.skinner.pose(person.clip, person.clipTime, person.loop, blend); cursor = a.skinner.write(compose([1, 0, 0, 0, 1, 0, 0, 0, 1, ...person.at], rotationY(Math.PI - person.facing)), park.characterMaterial, out, cursor); }
-    r.setDynamic(buildDynamicBvh(out.positions, out.materials, cursor, r.nodeBase, r.triangleBase));
+    if (!driven) { objects.push({ prepared: a.prepared.person, first: cursor }); a.skinner.pose(person.clip, person.clipTime, person.loop, blend); cursor = a.skinner.write(compose([1, 0, 0, 0, 1, 0, 0, 0, 1, ...person.at], rotationY(Math.PI - person.facing)), park.characterMaterial, out, cursor); }
+    r.setDynamic(assembleDynamicBvh(objects, out.positions, out.materials, r.nodeBase, r.triangleBase));
     timing.current.tree = timing.current.tree * 0.9 + (performance.now() - started) * 0.1; timing.current.triangles = cursor;
 
     const o = orbit.current, s = settings.current, light = sunAt(s.hour), at = driven ? driven.pose().slice(9) : person.at, head: Vec3 = [at[0], at[1] + (driven ? 1.1 : 0.95), at[2]];

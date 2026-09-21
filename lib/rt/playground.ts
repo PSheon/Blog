@@ -9,6 +9,7 @@ import type { Material, Scene, Vec3 } from "./scene";
 export const PLAYGROUND_URL = "/posts/light-playground/playground.bin";
 export const PLAYGROUND_CREDIT = "Sketchbook by Jan Blaha (swift502), MIT";
 
+const MAX_EDGE = 12, MAX_CUTS = 8;
 const grass: Vec3 = [0.2, 0.4, 0.11];
 /** Linear albedo per material name. Saturated on purpose: a grey playground has no colour to bleed. */
 const PALETTE: Record<string, Vec3> = {
@@ -26,14 +27,25 @@ export function parsePlayground(file: ArrayBuffer): Playground {
   const vertices = new Float32Array(file, at, header.vertices * 3); at += header.vertices * 12;
   const indices = header.indexBytes === 4 ? new Uint32Array(file, at, header.triangles * 3) : new Uint16Array(file, at, header.triangles * 3); at += Math.ceil((header.triangles * 3 * header.indexBytes) / 4) * 4;
   const material = Array.from(new Uint8Array(file, at, header.triangles));
-  const positions = new Array<number>(header.triangles * 9);
-  for (let i = 0; i < header.triangles * 3; i++) { const v = indices[i] * 3; positions[i * 3] = vertices[v]; positions[i * 3 + 1] = vertices[v + 1]; positions[i * 3 + 2] = vertices[v + 2]; }
+  // The ground is a few triangles a hundred metres long. A box around one of those contains half the playground, and a
+  // ray along the ground then visits 60 nodes where 15 would do. So long triangles are cut across their longest edge
+  // until no edge is longer than MAX_EDGE (or a triangle has been halved MAX_CUTS times): more triangles, tighter boxes.
+  const positions: number[] = [], split: number[] = [];
+  const cut = (a: Vec3, b: Vec3, c: Vec3, m: number, depth: number): void => {
+    const ab = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), bc = Math.hypot(c[0] - b[0], c[1] - b[1], c[2] - b[2]), ca = Math.hypot(a[0] - c[0], a[1] - c[1], a[2] - c[2]), longest = Math.max(ab, bc, ca);
+    if (longest <= MAX_EDGE || depth >= MAX_CUTS) { positions.push(...a, ...b, ...c); split.push(m); return; }
+    if (longest === ab) { const h: Vec3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2]; cut(a, h, c, m, depth + 1); cut(h, b, c, m, depth + 1); }
+    else if (longest === bc) { const h: Vec3 = [(b[0] + c[0]) / 2, (b[1] + c[1]) / 2, (b[2] + c[2]) / 2]; cut(a, b, h, m, depth + 1); cut(a, h, c, m, depth + 1); }
+    else { const h: Vec3 = [(c[0] + a[0]) / 2, (c[1] + a[1]) / 2, (c[2] + a[2]) / 2]; cut(a, b, h, m, depth + 1); cut(h, b, c, m, depth + 1); }
+  };
+  const corner = (i: number): Vec3 => { const v = indices[i] * 3; return [vertices[v], vertices[v + 1], vertices[v + 2]]; };
+  for (let t = 0; t < header.triangles; t++) cut(corner(t * 3), corner(t * 3 + 1), corner(t * 3 + 2), material[t], 0);
   const materials: Material[] = header.materials.map((name) => ({ albedo: PALETTE[name] ?? [0.6, 0.6, 0.6], emit: [0, 0, 0], mirror: name === "ocean" }));
   const vehicleMaterials = {} as Record<ModelName, number>;
   for (const name of Object.keys(VEHICLE_MATERIALS) as ModelName[]) { vehicleMaterials[name] = materials.length; materials.push(...VEHICLE_MATERIALS[name]); }
   const characterMaterial = materials.push({ albedo: [0.92, 0.78, 0.3], emit: [0, 0, 0] }) - 1;
   const carPaints = materials.length; materials.push(...CAR_PAINTS);
-  return { vehicleMaterials, characterMaterial, carPaints, positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
+  return { vehicleMaterials, characterMaterial, carPaints, positions, material: split, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
 }
 
 /** Where the sun is at `hour` (0–24) and how strong: direction towards it, strength 0.05…1, and the sky's level. */

@@ -144,3 +144,27 @@ smooth metal (roughness 0.02): everything 0.997–1.000. Roughness 0.3: 0.976–
 the ball 0.29–0.32, and the room around it darkens to 0.76–0.86. Brute-force integration of the same formulas gives
 0.988 / 0.824 / 0.307 for α = 0.09 / 0.36 / 1, as does lib/rt/ggx.ts. The furnace found a real bug on its first run:
 next-event estimation was still asking the (switched off) lamp, and walls read 2.06.
+
+## 2026-09-21 — the playground with a character and vehicles: where the time goes
+
+M4 Pro, Chrome metal-3, 960×540, full path tracing (8 bounces, sun by NEE), camera at the player's spawn looking over
+the car park: 5 cars, a helicopter, an aeroplane and the character = 11,275 moving triangles. Four bursts of 16
+samples each (NOT 64: 64 × 518,400 pixels × 3 rays × 60 visits overflows the u32 counters, and my first round of
+numbers here was garbage for exactly that reason). `.playwright-mcp/measure.js`, through `window.__lights`.
+
+| Static world's long triangles | ms per sample, with vehicles | node visits per ray | ms per sample, world only | node visits per ray |
+| --- | --- | --- | --- | --- |
+| as in the file (some are > 100 m) | 9.24 | 60.8 | 6.24 | 55.3 |
+| cut until no edge > 12 m | 6.84 | 36.6 | 4.22 | 31.1 |
+| cut until no edge > 6 m | 7.07 | 37.2 | 4.39 | 31.7 |
+| cut until no edge > 3 m | 7.78 | 41.9 | 4.98 | 36.5 |
+
+The slowdown I had blamed on the vehicles was mostly the ground: a box around a 100 m triangle holds half the
+playground. Cutting long triangles (lib/rt/playground.ts, MAX_EDGE = 12) takes a quarter off. Cutting finer makes the
+tree deeper and loses again.
+
+What did NOT help the moving tree (visits per ray unchanged within 0.5): splitting whole objects before triangles;
+preparing each object's tree once with the surface area heuristic and refitting it per frame. The second one is kept
+anyway because it halves the CPU cost per frame: 2.8 ms → 1.2 ms for 11,275 triangles. The vehicles still cost
+2.6 ms per sample for 5.5 more visits per ray; not understood yet (the second traversal's fixed cost per ray, and
+paths that rattle around inside a car's metal shell, are the suspects).
