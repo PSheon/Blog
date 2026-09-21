@@ -42,7 +42,7 @@ export default async function TagPage({ params }: PageProps<"/[locale]/tags/[tag
         rows={toRows(posts, locale)}
         tags={[]}
         filterable={false}
-        labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
+        labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags, more: t.home.moreTags, fewer: t.home.fewerTags }}
       />
     </div>
   );

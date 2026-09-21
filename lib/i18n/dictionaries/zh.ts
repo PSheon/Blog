@@ -60,6 +60,8 @@ const zh = {
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
     all: "全部",
+    moreTags: "更多",
+    fewerTags: "收合",
     viewAll: "查看全部文章",
     empty: "這個標籤下還沒有文章。",
   },

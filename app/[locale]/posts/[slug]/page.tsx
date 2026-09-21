@@ -9,7 +9,7 @@ import { PostFooter } from "@/components/article/post-footer";
 import { ReadingProgress } from "@/components/article/progress";
 import { ScrollableMath } from "@/components/article/scrollable-math";
 import { Toc, TocDisclosure } from "@/components/article/toc";
-import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
+import { EntryNo, InteractiveBadge, TagLink } from "@/components/site/post-meta";
 import { getAdjacentPosts, getAllPosts, getPostMeta, getRelatedPosts, getToc } from "@/lib/content/posts";
 import { formatDate, getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
 import { sharedMetadata } from "@/lib/seo";
@@ -92,7 +92,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
       >
         <aside className="hidden xl:block">
           <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-8">
-            <Toc items={toc} label={t.post.toc} />
+            <Toc items={toc} label={t.post.toc} top={t.post.backToTop} />
           </div>
         </aside>
 
@@ -141,6 +141,8 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
                 <dd className="mt-0.5">{t.post.minutes(post.readingMinutes)}</dd>
               </div>
             </dl>
+            {/* What it is about, before reading it and not only after. */}
+            <div className="mt-5 flex flex-wrap gap-1.5 font-sans">{post.tags.map((tag) => <TagLink key={tag} tag={tag} locale={locale} />)}</div>
           </header>
 
           {post.isFallback && (

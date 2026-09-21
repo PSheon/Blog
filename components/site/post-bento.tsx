@@ -1,5 +1,6 @@
 "use client";
 
+import { TagFilter } from "./tag-filter";
 import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
 import { ViewTransition, useState } from "react";
@@ -14,7 +15,7 @@ interface Props {
   locale: Locale;
   rows: IndexRow[];
   tags: string[];
-  labels: { all: string; empty: string; interactive: string; filter: string };
+  labels: { all: string; empty: string; interactive: string; filter: string; more: string; fewer: string };
   /** How many tiles at most. Six fills the desktop grid exactly (4+2 / 2 / 2·2·2); the full list lives on /posts. */
   limit?: number;
 }
@@ -37,28 +38,12 @@ function span(i: number, count: number): string {
 /** The home page's index as a bento grid: the most recent articles as tiles with their drawings, the newest one the largest. */
 export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
   const [tag, setTag] = useState<string | null>(null);
+  const counts: Record<string, number> = {}; for (const r of rows) for (const name of r.tags) counts[name] = (counts[name] ?? 0) + 1;
   const visible = (tag ? rows.filter((r) => r.tags.includes(tag)) : rows).slice(0, limit);
 
   return (
     <div>
-      {tags.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-1.5" role="group" aria-label={labels.filter}>
-          {[null, ...tags].map((name) => (
-            <button
-              key={name ?? "__all"}
-              type="button"
-              aria-pressed={tag === name}
-              onClick={() => setTag(name)}
-              className={cn(
-                "tap cursor-pointer rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
-                tag === name ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {name ?? labels.all}
-            </button>
-          ))}
-        </div>
-      )}
+      {tags.length > 0 && <TagFilter tags={tags} counts={counts} value={tag} onChange={setTag} labels={labels} />}
 
       {visible.length === 0 ? (
         <p className="border-t border-rule py-10 text-muted-foreground">{labels.empty}</p>

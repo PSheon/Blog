@@ -138,7 +138,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
                 </p>
               </div>
               {/* The stage is dark in both themes, like the article's own: yellow points vanish on white. */}
-              <div className="dark relative flex items-center border-t border-border bg-[#070918] md:border-t-0 md:border-l">
+              <div className="dark relative m-3 flex items-center overflow-hidden rounded-md border-border bg-[#070918] dark:m-0 dark:rounded-none dark:border-t md:dark:border-t-0 md:dark:border-l">
                 <div className="dot-grid absolute inset-0 opacity-60" aria-hidden />
                 <div className="relative w-full p-4">
                   {hasPreview(latest.slug) ? <PostPreview slug={latest.slug} /> : <PostCover slug={latest.slug} no={latest.no} />}
@@ -166,7 +166,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           // The newest article has its own card right above; the index starts with the one before it.
           rows={toRows(posts.filter((p) => p.slug !== latest?.slug), locale)}
           tags={getAllTags(locale).map((x) => x.tag)}
-          labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
+          labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags, more: t.home.moreTags, fewer: t.home.fewerTags }}
         />
       </section>
 

@@ -59,6 +59,8 @@ const en: Dictionary = {
     index: "Notebook index",
     indexLead: "Newest first.",
     all: "All",
+    moreTags: "more",
+    fewerTags: "fewer",
     viewAll: "View all posts",
     empty: "No posts under this tag yet.",
   },
