@@ -3,7 +3,7 @@
  * and measures them: the same arm, bench, camera, picture and network. tests/head-camera/model.test.ts loads the saved
  * weights and checks this file reproduces the script's outputs to 1e-9.
  */
-import { Mat, Tape } from "@/lib/ml";
+import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
 import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/pcb-flip-vla/components/sim";
 
 export { NO_SHIFT, type CameraShift, type Joints, type Vec3 };
@@ -74,7 +74,7 @@ export function onBench(p: XY, was: XY): XY {
   return reachable(q) ? q : was;
 }
 
-type Saved = { meta: { kind: Kind; seed: number; steps: number }; params: Record<string, { rows: number; cols: number; data: number[] }>; golden: { tip: XY; block: XY; pitch: number; out: XY }[] };
+export type Saved = { meta: { kind: Kind; seed: number; steps: number }; params: Record<string, { rows: number; cols: number; data: number[] }>; golden: { tip: XY; block: XY; pitch: number; out: XY }[] };
 
 /** The trained network, forward only. Same layers as the script: conv, pool, conv, 8 spatial-softmax keypoints, dense, dense. */
 export class Policy {
@@ -97,4 +97,103 @@ export class Policy {
   }
   /** open's answer, in metres on the bench. */
   static place(out: XY): XY { return [CENTRE[0] + out[0] * SPAN[0], CENTRE[1] + out[1] * SPAN[1]]; }
+}
+
+/** The same pinhole as renderBoxes, for a point: pixel coordinates in −1…1, y up. */
+export function project(p: Vec3, shift: CameraShift): XY {
+  const add = (a: Vec3, b: Vec3, k = 1): Vec3 => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k], dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const turn = (a: Vec3, k: Vec3, angle: number): Vec3 => add(add([a[0] * Math.cos(angle), a[1] * Math.cos(angle), a[2] * Math.cos(angle)], cross(k, a), Math.sin(angle)), k, dot(k, a) * (1 - Math.cos(angle)));
+  const up0: Vec3 = [0, 0, 1], eye = add(HEAD.eye, [shift.dx, shift.dy, shift.dz]);
+  let f = unit(add(HEAD.target, HEAD.eye, -1)); f = turn(f, up0, shift.yaw); f = turn(f, unit(cross(f, up0)), shift.pitch);
+  const right = unit(cross(f, up0)), up = cross(right, f), focal = 1 / Math.tan(((HEAD.fov / 2) * Math.PI) / 180), d = add(p, eye, -1), z = dot(d, f);
+  return [(focal * dot(d, right)) / z, (focal * dot(d, up)) / z];
+}
+
+/** Anywhere in the training area the arm can reach. */
+export function somewhere(rng: () => number): XY {
+  for (;;) { const p: XY = [AREA.x[0] + rng() * (AREA.x[1] - AREA.x[0]), AREA.y[0] + rng() * (AREA.y[1] - AREA.y[0])]; if (reachable(p)) return p; }
+}
+
+/**
+ * The recipe the reader trains in the page: keep looking, the camera shaken ±10° (and ±3 cm) for every picture, noise
+ * σ 0…0.1 and light × 0.6…1.2 for every picture, and the aux head that says where hand and block are in the picture.
+ * Draw for draw and float for float the research script's closed+shake with HC_AUX=1 HC_PHOTO=1 (run 9), which
+ * tests/head-camera/trainer.test.ts checks against weights the script saved.
+ */
+export class Trainer {
+  readonly params: Record<string, Mat> = {};
+  private readonly adam: Adam;
+  private readonly pos = new Mat(HALF, 1, Float64Array.from({ length: HALF }, (_, i) => ((i + 0.5) / HALF) * 2 - 1));
+  private readonly data: () => number;
+  step = 0;
+
+  constructor(seed: number, readonly steps = 10_000, readonly batch = 16) {
+    const rng = mulberry32(seed);
+    const he = (rows: number, fanIn: number) => { const m = new Mat(rows, fanIn), s = Math.sqrt(6 / fanIn); for (let i = 0; i < m.data.length; i++) m.data[i] = (rng() * 2 - 1) * s; return m; };
+    const P = this.params, inputs = 2 * K, HIDDEN = 32;
+    P.k1 = he(8, 27); P.b1 = new Mat(1, 8); P.k2 = he(16, 72); P.b2 = new Mat(1, 16); P.k3 = he(K, 16); P.b3 = new Mat(1, K);
+    P.w1 = he(inputs, HIDDEN); for (let i = 0; i < P.w1.data.length; i++) P.w1.data[i] *= Math.sqrt(HIDDEN / inputs); P.c1 = new Mat(1, HIDDEN);
+    P.w2 = he(HIDDEN, 2); for (let i = 0; i < P.w2.data.length; i++) P.w2.data[i] *= Math.sqrt(2 / HIDDEN); P.c2 = new Mat(1, 2);
+    P.wa = he(2 * K, 4); for (let i = 0; i < P.wa.data.length; i++) P.wa.data[i] *= Math.sqrt(4 / (2 * K)); P.ca = new Mat(1, 4);
+    this.adam = new Adam(P);
+    this.data = mulberry32(7 + seed);
+  }
+
+  private sample() {
+    const rng = this.data, deg = Math.PI / 180, block = somewhere(rng);
+    const shift: CameraShift = { yaw: (rng() * 2 - 1) * 10 * deg, pitch: (rng() * 2 - 1) * 10 * deg, dx: 0, dy: (rng() * 2 - 1) * 10 * 0.003, dz: (rng() * 2 - 1) * 10 * 0.003 };
+    const noise = rng() * 0.1, dim = 0.6 + rng() * 0.6;
+    // Half the hands are near their block: that is where the step is not just "full speed that way".
+    let tip = somewhere(rng);
+    if (rng() < 0.5) for (let k = 0; k < 20; k++) { const p: XY = [block[0] + (rng() - 0.5) * 0.12, block[1] + (rng() - 0.5) * 0.12]; if (reachable(p)) { tip = p; break; } }
+    const image = picture(view(tip, block, shift), noise, dim, rng);
+    const h = project([tip[0], tip[1], Z], shift), b = project([block[0], block[1], 0.04], shift);
+    return { image, want: towards(tip, block), where: [h[0], -h[1], b[0], -b[1]] };
+  }
+
+  /** One optimiser step on a fresh batch; the mean action loss. */
+  train(): number {
+    const P = this.params, lr = this.step + 1 < this.steps * 0.7 ? 3e-3 : 1e-3; // the script counts steps from 1
+    for (const p of Object.values(P)) p.grad.fill(0);
+    let loss = 0;
+    for (let s = 0; s < this.batch; s++) {
+      const { image, want, where } = this.sample(), t = new Tape(), x = new Mat(3, SIZE * SIZE, image);
+      const f1 = t.maxPool2(t.relu(t.conv2d(x, P.k1, P.b1, { h: SIZE, w: SIZE, k: 3, inputGrad: false })), { h: SIZE, w: SIZE });
+      const f2 = t.relu(t.conv2d(f1, P.k2, P.b2, { h: HALF, w: HALF, k: 3 }));
+      const maps = t.scale(t.conv2d(f2, P.k3, P.b3, { h: HALF, w: HALF, k: 1 }), HALF);
+      const kx = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "x" })), this.pos), ky = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "y" })), this.pos);
+      const keys = t.concatCols([t.transpose(kx), t.transpose(ky)]), h = t.relu(t.addRow(t.matmul(keys, P.w1), P.c1));
+      const seen = t.addRow(t.matmul(t.concatCols([t.transpose(kx), t.transpose(ky)]), P.wa), P.ca);
+      loss += t.mse(t.addRow(t.matmul(h, P.w2), P.c2), want, undefined, 1 / this.batch);
+      t.mse(seen, where, undefined, 1 / this.batch);
+      t.backward();
+    }
+    this.adam.step(lr);
+    this.step++;
+    return loss / this.batch;
+  }
+
+  /** The weights in the saved-checkpoint format, so Policy can run them. */
+  save(seed: number): Saved {
+    return { meta: { kind: "closed", seed, steps: this.step }, params: Object.fromEntries(Object.entries(this.params).map(([k, m]) => [k, { rows: m.rows, cols: m.cols, data: Array.from(m.data) }])), golden: [] };
+  }
+}
+
+/**
+ * Success rate of a keep-looking policy, measured as the research script measures it: from home, 40 steps, within 3 cm
+ * for 3 steps running, blocks drawn from `seed`. The camera is turned by `shift`; nothing else is disturbed.
+ */
+export function evaluate(policy: Policy, shift: CameraShift, episodes: number, seed: number): number {
+  const rng = mulberry32(seed);
+  let wins = 0;
+  for (let e = 0; e < episodes; e++) {
+    const block = somewhere(rng);
+    let tip: XY = [...HOME], held = 0;
+    for (let t = 0; t < 40 && held < HOLD; t++) {
+      tip = advance(tip, policy.run(picture(view(tip, block, shift))).out);
+      held = Math.hypot(tip[0] - block[0], tip[1] - block[1]) < TOL ? held + 1 : 0;
+    }
+    if (held >= HOLD) wins++;
+  }
+  return wins / episodes;
 }

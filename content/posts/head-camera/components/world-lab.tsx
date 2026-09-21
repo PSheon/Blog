@@ -7,7 +7,9 @@ import { useNear } from "@/components/lab/use-near";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { HOLD, HOME, K, type Kind, NO_SHIFT, Policy, SIZE, TOL, type XY, advance, bones, onBench, picture, towards, view } from "./model";
+import { useLabels } from "./labels";
 import { Param } from "./param";
+import { useMine } from "./trained";
 import type { BenchView } from "./view3d";
 
 /** A policy step every this many ms; the arm is drawn moving smoothly between steps. */
@@ -40,16 +42,17 @@ function paint(canvas: HTMLCanvasElement | null, bytes: Uint8Array) {
  * checkpoints. keep-looking re-reads the picture every step; look-once goes home, takes one picture and drives there.
  */
 export function WorldLab() {
+  const t = useLabels(), mine = useMine();
   const root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), eye = useRef<HTMLCanvasElement>(null);
   const near = useNear(root), reduced = useReducedMotion();
   const [policies, setPolicies] = useState<Record<Kind, Policy> | null>(null), [failed, setFailed] = useState(false);
-  const [kind, setKind] = useState<Kind>("closed"), [pitch, setPitch] = useState(0), [yaw, setYaw] = useState(0);
+  const [kind, setKind] = useState<Kind | "mine">("closed"), [pitch, setPitch] = useState(0), [yaw, setYaw] = useState(0);
   const [noise, setNoise] = useState(0), [light, setLight] = useState(1), [playing, setPlaying] = useState<boolean | null>(null);
   const [status, setStatus] = useState({ gap: 0, there: false, keys: [] as XY[], phase: "home" as Phase });
   const running = playing ?? !reduced;
   const world = useRef<World>({ tip: [...HOME], from: [...HOME], at: 0, block: [...START_BLOCK], held: 0, phase: "home", goal: null, seen: null, keys: [], drag: null, px: 0, py: 0 });
-  const knobs = useRef({ kind, pitch, yaw, noise, light, running });
-  useEffect(() => { knobs.current = { kind, pitch, yaw, noise, light, running }; }, [kind, pitch, yaw, noise, light, running]);
+  const knobs = useRef({ kind, pitch, yaw, noise, light, running, mine });
+  useEffect(() => { knobs.current = { kind, pitch, yaw, noise, light, running, mine }; }, [kind, pitch, yaw, noise, light, running, mine]);
 
   useEffect(() => {
     if (!near || policies) return;
@@ -67,9 +70,9 @@ export function WorldLab() {
     const io = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { rootMargin: "100px" });
     io.observe(canvas.current);
     const step = () => {
-      const w = world.current, k = knobs.current, policy = policies[k.kind], shift = { ...NO_SHIFT, pitch: k.pitch * deg, yaw: k.yaw * deg };
+      const w = world.current, k = knobs.current, policy = k.kind === "mine" ? k.mine ?? policies.closed : policies[k.kind], shift = { ...NO_SHIFT, pitch: k.pitch * deg, yaw: k.yaw * deg };
       w.from = w.tip;
-      if (k.kind === "closed") {
+      if (k.kind !== "open") {
         const bytes = view(w.tip, w.block, shift), r = policy.run(picture(bytes, k.noise, k.light));
         w.tip = advance(w.tip, r.out); w.seen = bytes; w.keys = r.keypoints;
       } else if (w.phase === "home") {
@@ -133,39 +136,40 @@ export function WorldLab() {
     <div ref={root} className="grid gap-4 text-sm">
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3 sm:gap-4">
         <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-border bg-background">
-          <canvas ref={canvas} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" role="img" aria-label="工作台的 3D 視圖：拖紅色方塊移動它，拖空白處轉視角" data-testid="headcam-bench" />
-          {!policies && <p className="absolute inset-0 grid place-items-center text-muted-foreground" role={failed ? "alert" : "status"}>{failed ? "模型載入失敗，重新整理再試一次。" : "載入模型中…"}</p>}
-          <p className="label pointer-events-none absolute bottom-2 left-3">拖方塊 · 拖空白處轉視角</p>
+          <canvas ref={canvas} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" role="img" aria-label={t.bench} data-testid="headcam-bench" />
+          {!policies && <p className="absolute inset-0 grid place-items-center text-muted-foreground" role={failed ? "alert" : "status"}>{failed ? t.failed : t.loading}</p>}
+          <p className="label pointer-events-none absolute bottom-2 left-3">{t.benchHint}</p>
         </div>
         <div className="grid content-start gap-2">
           <div className="relative aspect-square w-full overflow-hidden rounded-sm bg-[#181c2c]">
-            <canvas ref={eye} width={SIZE} height={SIZE} className="absolute inset-0 h-full w-full [image-rendering:pixelated]" role="img" aria-label="頭部相機看到的 32×32 畫面" data-testid="headcam-eye" />
+            <canvas ref={eye} width={SIZE} height={SIZE} className="absolute inset-0 h-full w-full [image-rendering:pixelated]" role="img" aria-label={t.eye} data-testid="headcam-eye" />
             <svg viewBox="-1 -1 2 2" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
               {status.keys.slice(0, K).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={0.045} fill={DOTS[i]} stroke="#000" strokeWidth={0.012} />)}
             </svg>
           </div>
-          <p className="label">{kind === "closed" ? "它現在看到的（每一步都重看）" : "它唯一看過的那一張（手臂收起來時拍的）"}</p>
-          <p className="text-muted-foreground">彩色點是網路壓出來的 8 個關鍵點。</p>
+          <p className="label">{kind === "open" ? t.eyeOnce : t.eyeNow}</p>
+          <p className="text-muted-foreground">{t.dots}</p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="策略">
-        <span className="label mr-1">策略</span>
-        <Button size="sm" variant={kind === "closed" ? "secondary" : "ghost"} aria-pressed={kind === "closed"} onClick={() => setKind("closed")} data-testid="headcam-closed">持續看</Button>
-        <Button size="sm" variant={kind === "open" ? "secondary" : "ghost"} aria-pressed={kind === "open"} onClick={() => setKind("open")} data-testid="headcam-open">看一眼</Button>
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.policy}>
+        <span className="label mr-1">{t.policy}</span>
+        <Button size="sm" variant={kind === "closed" ? "secondary" : "ghost"} aria-pressed={kind === "closed"} onClick={() => setKind("closed")} data-testid="headcam-closed">{t.closed}</Button>
+        <Button size="sm" variant={kind === "open" ? "secondary" : "ghost"} aria-pressed={kind === "open"} onClick={() => setKind("open")} data-testid="headcam-open">{t.open}</Button>
+        {mine && <Button size="sm" variant={kind === "mine" ? "secondary" : "ghost"} aria-pressed={kind === "mine"} onClick={() => setKind("mine")} data-testid="headcam-mine">{t.mine}</Button>}
         <span className="ml-auto flex gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => setPlaying(!running)}>{running ? <Pause aria-hidden /> : <Play aria-hidden />}{running ? "暫停" : "播放"}</Button>
-          <Button size="sm" variant="ghost" onClick={reset}><RotateCcw aria-hidden />重來</Button>
+          <Button size="sm" variant="outline" onClick={() => setPlaying(!running)}>{running ? <Pause aria-hidden /> : <Play aria-hidden />}{running ? t.pause : t.play}</Button>
+          <Button size="sm" variant="ghost" onClick={reset}><RotateCcw aria-hidden />{t.reset}</Button>
         </span>
       </div>
       <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-        <Readout label="手離方塊" value={(status.gap * 100).toFixed(1)} unit="cm" tone={status.there ? "signal" : "muted"} />
-        <Readout label="狀態" value={<span className="font-sans text-base" role="status" data-testid="headcam-status">{status.there ? "到了" : kind === "open" && status.phase !== "go" ? "回原位拍照" : "前往中"}</span>} tone="plain" />
+        <Readout label={t.gap} value={(status.gap * 100).toFixed(1)} unit="cm" tone={status.there ? "signal" : "muted"} />
+        <Readout label={t.status} value={<span className="font-sans text-base" role="status" data-testid="headcam-status">{status.there ? t.there : kind === "open" && status.phase !== "go" ? t.homing : t.going}</span>} tone="plain" />
       </div>
       <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-        <Param label="相機下傾" shown={`${pitch}°`} value={pitch} min={-10} max={20} step={1} onChange={setPitch} />
-        <Param label="相機左右轉" shown={`${yaw}°`} value={yaw} min={-20} max={20} step={1} onChange={setYaw} />
-        <Param label="畫面雜訊" shown={noise.toFixed(2)} value={noise} min={0} max={0.15} step={0.01} onChange={setNoise} />
-        <Param label="光線" shown={`${Math.round(light * 100)}%`} value={light} min={0.5} max={1.2} step={0.05} onChange={setLight} />
+        <Param label={t.pitch} shown={`${pitch}°`} value={pitch} min={-10} max={20} step={1} onChange={setPitch} />
+        <Param label={t.yaw} shown={`${yaw}°`} value={yaw} min={-20} max={20} step={1} onChange={setYaw} />
+        <Param label={t.noise} shown={noise.toFixed(2)} value={noise} min={0} max={0.15} step={0.01} onChange={setNoise} />
+        <Param label={t.light} shown={`${Math.round(light * 100)}%`} value={light} min={0.5} max={1.2} step={0.05} onChange={setLight} />
       </div>
     </div>
   );
