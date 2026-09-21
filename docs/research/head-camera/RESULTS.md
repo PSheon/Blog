@@ -299,6 +299,18 @@ finite differences; it is not in lib/ml). "wrong" = ended holding still on the o
 - At ≈ 300 s for 10 000 steps with 15 at once, 20 000 steps is far outside a page's budget. Language ships as a
   checkpoint in any case (option A).
 
+## The 3D prototype (2026-09-21) and one thing it showed
+
+`content/posts/head-camera/` (draft № 015): a three.js bench where the reader drags the block, turns the head camera, and
+switches between two checkpoints saved by the script (`HC_SAVE`; run 9's recipe with aux, seed 11, the best of five for
+both: 98.5 % and 75.5 % untouched). `tests/head-camera/model.test.ts` checks the page's model module against the script's
+golden outputs to 1e-9.
+
+Watching it showed something no run measured: every episode stopped at the first arrival, so **staying** was never
+scored. Measured afterwards (closed, seed 11, 100 random blocks, 40 more steps after arriving): within 3 cm for 95.9 % of
+those steps; the largest drift has a median of 2.6 cm and a 90th percentile of 3.5 cm. From one place, [0.30, −0.16],
+the forearm hides the block from the head camera and the hand wobbles 3–4 cm off: the prototype starts elsewhere.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

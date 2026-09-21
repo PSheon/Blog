@@ -1,0 +1,19 @@
+---
+title: 頭上一顆相機就夠了？自己訓練一個小的 Figure
+description: 原型頁，還不是文章。一隻手臂只靠頭上一顆 32×32 的相機找方塊；你可以把方塊拖到任何地方、把相機弄歪，看「持續看」和「看一眼」兩種策略的差別。
+date: 2026-09-21
+tags: [ai-agent, robotics, from-scratch]
+no: 15
+interactive: true
+draft: true
+---
+
+import { WorldLab } from "./components";
+
+{/* 原型頁：只有一個 3D 互動元件，給 Paul 檢查用。內文之後才寫。數字見 docs/research/head-camera/RESULTS.md。 */}
+
+這一頁目前只有一個互動元件，還不是文章。
+
+<Instrument fig="01" title="head camera / bench" size="wide" caption="把紅色方塊拖到淡紫色範圍內的任何地方（訓練時方塊只出現在這個範圍）。「持續看」每一步都重看畫面；「看一眼」先回原位拍一張照片、算出方塊在哪，然後閉著眼睛開過去，虛線框是它以為方塊在的地方。兩個模型都是預先練好的（種子 11，5 個種子裡兩者都是最好的那個）。">
+  <WorldLab />
+</Instrument>

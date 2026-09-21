@@ -247,6 +247,20 @@ function overlay(net: Net, tip: [number, number], block: [number, number], shift
 }
 
 /** shove: at step 8 the hand is knocked 6 cm in a random direction. distractor: a yellow block elsewhere on the bench. */
+/**
+ * HC_SAVE=<dir>: the trained weights as JSON ({ name: { rows, cols, data } }), plus golden outputs for four fixed scenes so
+ * a page that loads them can prove it computes what this script did.
+ */
+function save(net: Net, file: string, meta: Record<string, unknown>) {
+  const params = Object.fromEntries(Object.entries(net.params).map(([k, m]) => [k, { rows: m.rows, cols: m.cols, data: Array.from(m.data) }]));
+  const scenes: { tip: [number, number]; block: [number, number]; pitch: number }[] = [
+    { tip: HOME, block: [0.44, 0.08], pitch: 0 }, { tip: [0.34, -0.1], block: [0.44, 0.08], pitch: 0 },
+    { tip: [0.3, 0.12], block: [0.4, -0.15], pitch: 5 }, { tip: [0.42, 0.02], block: [0.46, 0.05], pitch: -8 },
+  ];
+  const golden = scenes.map((g) => ({ ...g, out: net.act(picture(g.tip, g.block, true, { ...NO_SHIFT, pitch: g.pitch * deg }), [0, 0]) }));
+  writeFileSync(file, JSON.stringify({ meta: { kind: net.kind, ...meta }, params, golden }));
+}
+
 type Condition = { name: string; shift: CameraShift; moveBlock?: boolean; shove?: boolean; distractor?: boolean; noise?: number; dim?: number };
 function evaluate(net: Net, condition: Condition, episodes: number, seed: number) {
   const rng = mulberry32(seed);
@@ -310,6 +324,7 @@ describe("head camera", () => {
         for (let step = 1; step <= STEPS; step++) net.step(Array.from({ length: BATCH }, () => sample(kind, rng, shake)), rate(step, STEPS));
         seconds += (performance.now() - t0) / 1000;
         conditions.forEach((c, i) => table[i].push(evaluate(net, c, EPISODES, 99).success * 100));
+        if (process.env.HC_SAVE) save(net, `${process.env.HC_SAVE}/${spec.replace("+", "-")}-${seed}.json`, { spec, seed, steps: STEPS, aux: AUX, photo: PHOTO, shake: SHAKE });
         console.log(`${spec} seed ${seed}: ${conditions.map((c, i) => `${c.name} ${table[i].at(-1)!.toFixed(1)}`).join(" | ")}`);
         if (kind !== "open") {
           console.log(`  what the keypoints follow (seed ${seed}):\n${whatTheyFollow(net, 300, 5).join("\n")}`);
