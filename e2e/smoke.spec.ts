@@ -658,8 +658,7 @@ for (const locale of ["zh", "en"] as const) {
 
 test("three progress bars watch a job and disagree; a fourth learns", async ({ page }) => {
   const response = await page.goto("/zh/posts/task-scheduler");
-  // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "task-scheduler is still a draft");
+  expect(response?.status()).toBe(200);
   test.setTimeout(90_000);
   const errors = watchErrors(page);
   await expect(page.locator("[data-instrument]")).toHaveCount(6);

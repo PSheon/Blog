@@ -1,3 +1,5 @@
+// Reads the file system: a client component that imports this by mistake gets a clear build error, not a bundler riddle.
+import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 import matter from "gray-matter";
@@ -91,6 +93,16 @@ export function getAllPosts(locale: Locale, opts: QueryOptions = {}): PostMeta[]
 export function getPostMeta(slug: string, locale: Locale, opts: QueryOptions = {}): PostMeta | null {
   const meta = load(opts.dir ?? POSTS_DIR, slug, locale)?.meta ?? null;
   return meta?.draft && !showDrafts(opts) ? null : meta;
+}
+
+/**
+ * The article's MDX body (front matter removed), or null. The one way to the text of a post: the same fallback to zh,
+ * the same front-matter check and the same treatment of drafts as everything else here. The search index used to read
+ * and parse the files a second time by itself.
+ */
+export function getPostSource(slug: string, locale: Locale, opts: QueryOptions = {}): string | null {
+  const loaded = load(opts.dir ?? POSTS_DIR, slug, locale);
+  return !loaded || (loaded.meta.draft && !showDrafts(opts)) ? null : loaded.source;
 }
 
 export function getToc(slug: string, locale: Locale, opts: QueryOptions = {}): TocItem[] {
