@@ -143,10 +143,64 @@ So run 3a's explanation holds, measured: with a camera that never moves the netw
 as a thing; shaking the camera is what makes it separate "my hand" from "the block", which is what steering by the gap
 needs. That is the figure for "what it learned to look at".
 
+## Run 5 — what makes training dependable (closed + shaken, seeds 11–15, 200 episodes; mean, min–max)
+
+The spike gained three switches (`HC_LR`, `HC_AUX`, `HC_BATCH`; header of `spike.test.ts.txt`). "aux" adds a straight
+line from the eight keypoints to where the hand and the block are in the picture this camera took, trained beside the
+action with weight 1 and thrown away afterwards: a small version of Figure's "visual proprioception", and it uses what
+the simulator already knows. "cosine" warms up over 5 % of the steps to 3e-3 and then falls to 1e-4. The baseline is
+runs 1–4's schedule, and its seeds 11–13 reproduce run 4 to the decimal (91.5, 92.0, 43.0). Seconds are with twelve
+models training at once; one alone is about a fifth faster (run 4: 91 s for 5 000 steps).
+
+| | steps | s a model | as trained | pitch 5° | 10° | 20° | yaw 5° | 10° | 20° | moved 3 cm | block moved |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| baseline | 5 000 | 116 | 74.9 (43–92) | 74.7 | 71.0 | 51.3 | 77.5 | 74.0 | 39.7 | 76.3 | 82.9 |
+| cosine | 5 000 | 116 | 64.3 (57–70) | 67.6 | 64.3 | 44.2 | 65.0 | 62.1 | 42.4 | 63.2 | 75.3 |
+| aux | 5 000 | 111 | 81.2 (70–96) | 83.1 | 78.4 | 53.3 | 81.8 | 76.8 | 43.4 | 86.6 | 88.4 |
+| aux + cosine | 5 000 | 113 | 73.2 (55–94) | 74.3 | 71.4 | 44.2 | 72.7 | 66.5 | 42.4 | 68.5 | 81.7 |
+| **twice as long** | 10 000 | 208 | **91.3 (73–98)** | 92.5 (86–98) | 90.4 | 61.8 | 92.2 | 90.1 | 61.9 | 92.6 | 95.1 |
+
+- **The network was under-trained, not badly initialised.** Every schedule that lowers the average learning rate
+  (cosine) is worse; twice the steps lifts the mean by 16 points and the worst seed from 43 to 73. Per-seed logs:
+  `run-5/`.
+- aux helps a little at 5 000 steps (+6 mean, worst seed 43 → 70) and costs nothing in time.
+- Seed 13 is still the weak one at 10 000 steps (73 %), and still has no keypoint that follows the block (best R² 0.45):
+  the same failure as in run 4, only later.
+
+## Run 6 — dependable training, and the three acts again at one budget (seeds 11–15, 200 episodes; mean, min–max)
+
+Two fixes for closed + shaken on top of run 5's winner, and every other policy at the same 10 000 steps so the
+comparison is fair (runs 1–4 compared them at 2 500–5 000). No aux except where it says so. Seconds as in run 5 (twelve at
+once).
+
+| | steps | s a model | as trained | pitch 5° | 10° | 20° | yaw 5° | 10° | 20° | moved 3 cm | block moved |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| open | 10 000 | 211 | 83.0 (78–92) | 3.5 | 0.6 | 0.9 | 3.5 | 0.5 | 0.1 | 5.3 | 65.7 |
+| closed | 10 000 | 215 | 96.1 (90–98) | 41.6 (6–82) | 20.5 | 6.8 | 58.3 (26–85) | 32.1 | 6.8 | 60.0 | 98.7 |
+| open, shaken | 10 000 | 210 | 75.7 (54–86) | 75.8 | 75.1 | 8.7 | 78.9 | 70.0 | 19.9 | 72.7 | 59.6 |
+| closed, shaken (run 5) | 10 000 | 208 | 91.3 (73–98) | 92.5 | 90.4 | 61.8 | 92.2 | 90.1 | 61.9 | 92.6 | 95.1 |
+| closed, shaken + aux | 10 000 | 216 | **95.0 (92–97)** | 95.2 (92–100) | 94.0 | 72.4 | 94.2 | 93.2 | 73.3 | 94.6 | 98.2 |
+| closed, shaken | 15 000 | 313 | **98.1 (96–100)** | 96.5 (92–99) | 97.3 | 73.5 | 97.0 | 95.7 | 73.4 | 99.0 | 99.0 |
+
+- **Training is dependable now, two ways.** 15 000 steps: every seed 96–99.5 % untouched and ≥ 92 % inside the shaken
+  range. 10 000 steps + aux: every seed 92.5–97 %, in two thirds of the time. The spread that made run 4 unwritable
+  (43–92) is gone.
+- **The three acts hold at an equal budget, and the sizes are now five-seed sizes.** Look once dies at 5° (83 → 3.5 %).
+  Keep looking without shaking is better but not immune (96 → 42 % at 5° of pitch, with seeds from 6 to 82). Shaking
+  makes look-once flat inside the range (≈ 75 %) and pays for it untouched (83 → 76) and when the block moves (60 %);
+  keep looking + shaking is ≥ 90 % everywhere inside the range, keeps 62–74 % at 20° where look-once has 9–20 %, and
+  follows a moving block (95–99 %).
+- **Correction to run 4's explanation.** At 15 000 steps, seeds 13 and 14 succeed (97 %, 99.5 %) with NO keypoint that
+  follows the block on its own (best R² 0.53, 0.49): the block's position is spread over several keypoints. So "a
+  keypoint that follows the block" is sufficient, not necessary. With aux every seed has one (best block R² 0.86–0.91),
+  which is what a figure of "what it looks at" needs: aux makes the picture legible, not just the training steady.
+- aux is a fairness question for the article: it has been given only to closed + shaken. Open + shaken + aux is
+  unmeasured.
+
 ## What this means for the article
 
-0. **Read run 4 first: the sizes below were one seed.** The order of the three acts holds over three seeds; the
-   headline numbers do not, and training is not yet dependable.
+0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
+   budget and dependable training. Point 2's timings are superseded: see run 6's seconds.
 1. The thesis survives in a better form than I proposed. Three acts, all measured: look once breaks at 2–5°; keep
    looking is not enough on its own (run 2, 3a); keep looking + shake is (3b). The learning-free controller (run 0) is
    the explanation, and it is worth a figure of its own: it can be drawn.
@@ -157,8 +211,10 @@ needs. That is the figure for "what it learned to look at".
 
 ## Not done, and what I do not trust yet
 
-- Runs 1–3b are one training seed per cell; run 4 has three and they disagree by up to 49 points. Make training
-  dependable, then measure again with at least five seeds.
+- Runs 1–3b are one training seed per cell and run 4 three; trust runs 5–6 (five seeds) over them.
+- Seconds in runs 5–6 were measured twelve models at a time. A reader trains one: time one model alone at 10 000 (+ aux)
+  and 15 000 steps before promising "under five minutes" (run 4 alone: 91 s per 5 000 steps, so ≈ 3 min and ≈ 4.5 min).
+- Open + shaken + aux, so the look-once side gets the same help.
 - No disturbance of the arm (a shove), no noise on the picture, no distractor objects, no second block colour. The
   "language" of a VLA is absent: one task, no instruction.
 - The hand moves in a plane. No grasp, no descent, no gripper.

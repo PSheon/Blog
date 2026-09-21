@@ -5,6 +5,9 @@
  *   HC_STEPS=5000 HC_SEEDS=11,12,13 HC_KINDS=open,closed,open+shake,closed+shake HC_OUT=/some/dir \
  *     pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept; rm -r tests/headcam
  * HC_ANALYTIC=0 skips the learning-free controllers. "+shake" trains with a different camera for every picture.
+ * Run 5 added: HC_LR=step|cosine (see rate()), HC_AUX=<weight> (a training-only head that says where the hand and the
+ * block are in the picture), HC_BATCH, and HC_TAG (appended to the keypoint pictures' names, so parallel runs can share
+ * HC_OUT). Defaults reproduce runs 1–4.
  *
  * One arm (the № 010 kinematics), one block on the bench, one camera above the arm's shoulder looking down the bench:
  * a head camera. The tip moves in a plane 9 cm above the bench; an action is a step of at most 2.5 cm in x and y.
@@ -84,6 +87,8 @@ class Net {
     P.k1 = he(8, 27); P.b1 = new Mat(1, 8); P.k2 = he(16, 72); P.b2 = new Mat(1, 16); P.k3 = he(K, 16); P.b3 = new Mat(1, K);
     P.w1 = he(inputs, HIDDEN); for (let i = 0; i < P.w1.data.length; i++) P.w1.data[i] *= Math.sqrt(HIDDEN / inputs); P.c1 = new Mat(1, HIDDEN);
     P.w2 = he(HIDDEN, 2); for (let i = 0; i < P.w2.data.length; i++) P.w2.data[i] *= Math.sqrt(2 / HIDDEN); P.c2 = new Mat(1, 2);
+    // "aux": a straight line from the keypoints to where the hand and the block are in the picture. Training only.
+    if (AUX > 0) { P.wa = he(2 * K, 4); for (let i = 0; i < P.wa.data.length; i++) P.wa.data[i] *= Math.sqrt(4 / (2 * K)); P.ca = new Mat(1, 4); }
     this.adam = new Adam(P);
     this.pos = new Mat(HALF, 1, Float64Array.from({ length: HALF }, (_, i) => ((i + 0.5) / HALF) * 2 - 1));
   }
@@ -97,13 +102,19 @@ class Net {
     const parts = this.gaps ? [t.matmul(t.transpose(kx), this.gaps), t.matmul(t.transpose(ky), this.gaps)] : [t.transpose(kx), t.transpose(ky)];
     if (this.feel) parts.push(new Mat(1, 2, Float64Array.from(feel)));
     const keys = t.concatCols(parts), h = t.relu(t.addRow(t.matmul(keys, P.w1), P.c1));
-    return { out: t.addRow(t.matmul(h, P.w2), P.c2), kx, ky };
+    const seen = AUX > 0 ? t.addRow(t.matmul(t.concatCols([t.transpose(kx), t.transpose(ky)]), P.wa), P.ca) : null;
+    return { out: t.addRow(t.matmul(h, P.w2), P.c2), kx, ky, seen };
   }
   /** One optimiser step on a batch; the mean loss. */
-  step(batch: { image: Float64Array; feel: [number, number]; want: [number, number] }[], lr: number): number {
+  step(batch: { image: Float64Array; feel: [number, number]; want: [number, number]; where: number[] }[], lr: number): number {
     for (const p of Object.values(this.params)) p.grad.fill(0);
     let loss = 0;
-    for (const s of batch) { const t = new Tape(); loss += t.mse(this.forward(t, s.image, s.feel).out, s.want, undefined, 1 / batch.length); t.backward(); }
+    for (const s of batch) {
+      const t = new Tape(), f = this.forward(t, s.image, s.feel);
+      loss += t.mse(f.out, s.want, undefined, 1 / batch.length);
+      if (f.seen) t.mse(f.seen, s.where, undefined, AUX / batch.length);
+      t.backward();
+    }
     this.adam.step(lr);
     return loss / batch.length;
   }
@@ -112,16 +123,29 @@ class Net {
   act(image: Float64Array, feel: [number, number]): [number, number] { const o = this.forward(new Tape(), image, feel).out.data; return [o[0], o[1]]; }
 }
 
-const deg = Math.PI / 180, SHAKE = Number(process.env.HC_SHAKE ?? 10);
+const deg = Math.PI / 180, SHAKE = Number(process.env.HC_SHAKE ?? 10), AUX = Number(process.env.HC_AUX ?? 0);
+const LR = process.env.HC_LR ?? "step", TAG = process.env.HC_TAG ?? "";
+/** "step": 3e-3, then 1e-3 for the last 30 % (runs 1–4). "cosine": 5 % warm-up to 3e-3, then a cosine down to 1e-4. */
+function rate(step: number, steps: number): number {
+  if (LR === "step") return step < steps * 0.7 ? 3e-3 : 1e-3;
+  const warm = steps * 0.05;
+  if (step < warm) return (3e-3 * step) / warm;
+  return 1e-4 + (3e-3 - 1e-4) * 0.5 * (1 + Math.cos((Math.PI * (step - warm)) / (steps - warm)));
+}
+/** Where the hand and the block are in the picture this camera takes, in the keypoints' frame (x right, y down). */
+function where(tip: [number, number], block: [number, number], shift: CameraShift): number[] {
+  const h = project([tip[0], tip[1], Z], shift), b = project([block[0], block[1], 0.04], shift);
+  return [h[0], -h[1], b[0], -b[1]];
+}
 /** "+shake": ±HC_SHAKE degrees (and a tenth of that in cm), a different camera for every training picture. Evaluation never uses it. */
 const shaken = (rng: Rng): CameraShift => ({ yaw: (rng() * 2 - 1) * SHAKE * deg, pitch: (rng() * 2 - 1) * SHAKE * deg, dx: 0, dy: (rng() * 2 - 1) * SHAKE * 0.003, dz: (rng() * 2 - 1) * SHAKE * 0.003 });
 function sample(kind: Kind, rng: Rng, shake: boolean) {
   const block = somewhere(rng), shift = shake ? shaken(rng) : NO_SHIFT;
-  if (kind === "open") return { image: picture(HOME, block, true, shift), feel: [0, 0] as [number, number], want: norm(block) };
+  if (kind === "open") return { image: picture(HOME, block, true, shift), feel: [0, 0] as [number, number], want: norm(block), where: where(HOME, block, shift) };
   // Half the hands are near their block: that is where the step is not just "full speed that way".
   let tip = somewhere(rng);
   if (rng() < 0.5) for (let k = 0; k < 20; k++) { const p: [number, number] = [block[0] + (rng() - 0.5) * 0.12, block[1] + (rng() - 0.5) * 0.12]; if (reachable(p)) { tip = p; break; } }
-  return { image: picture(tip, block, kind !== "blind", shift), feel: norm(tip), want: expert(tip, block) };
+  return { image: picture(tip, block, kind !== "blind", shift), feel: norm(tip), want: expert(tip, block), where: where(tip, block, shift) };
 }
 
 /** The same pinhole as renderBoxes, for a point: pixel coordinates in −1…1. */
@@ -236,11 +260,11 @@ function evaluate(net: Net, condition: Condition, episodes: number, seed: number
 
 describe("head camera", () => {
   it("measures four policies under a turned camera", () => {
-    const STEPS = Number(process.env.HC_STEPS ?? 2500), BATCH = 16, EPISODES = Number(process.env.HC_EPISODES ?? 200);
+    const STEPS = Number(process.env.HC_STEPS ?? 2500), BATCH = Number(process.env.HC_BATCH ?? 16), EPISODES = Number(process.env.HC_EPISODES ?? 200);
     // What the camera sees, for a look: a PPM with the hand near a block, and the same with the camera 5° down.
     for (const [name, shift] of [["straight", NO_SHIFT], ["pitch5", { ...NO_SHIFT, pitch: 5 * deg }]] as const) {
       const bytes = renderBoxes(scene([0.4, 0.1], [0.44, -0.12], true), HEAD, shift, 128, 2);
-      writeFileSync(`${process.env.HC_OUT ?? "."}/headcam-${name}.ppm`, Buffer.concat([Buffer.from(`P6 128 128 255\n`), Buffer.from(bytes)]));
+      if (!TAG) writeFileSync(`${process.env.HC_OUT ?? "."}/headcam-${name}.ppm`, Buffer.concat([Buffer.from(`P6 128 128 255\n`), Buffer.from(bytes)]));
     }
     const conditions: Condition[] = [
       { name: "camera as trained", shift: NO_SHIFT },
@@ -259,13 +283,13 @@ describe("head camera", () => {
       let seconds = 0;
       for (const seed of SEEDS) {
         const rng = mulberry32(7 + seed), net = new Net(kind, mulberry32(seed)), t0 = performance.now();
-        for (let step = 1; step <= STEPS; step++) net.step(Array.from({ length: BATCH }, () => sample(kind, rng, shake)), step < STEPS * 0.7 ? 3e-3 : 1e-3);
+        for (let step = 1; step <= STEPS; step++) net.step(Array.from({ length: BATCH }, () => sample(kind, rng, shake)), rate(step, STEPS));
         seconds += (performance.now() - t0) / 1000;
         conditions.forEach((c, i) => table[i].push(evaluate(net, c, EPISODES, 99).success * 100));
         console.log(`${spec} seed ${seed}: ${conditions.map((c, i) => `${c.name} ${table[i].at(-1)!.toFixed(1)}`).join(" | ")}`);
         if (kind !== "open") {
           console.log(`  what the keypoints follow (seed ${seed}):\n${whatTheyFollow(net, 300, 5).join("\n")}`);
-          if (seed === SEEDS[0]) for (const [name, shift] of [["straight", NO_SHIFT], ["pitch10", { ...NO_SHIFT, pitch: 10 * deg }]] as const) overlay(net, [0.34, -0.1], [0.44, 0.08], shift, `${out}/keypoints-${spec.replace("+", "-")}-${name}.ppm`);
+          if (seed === SEEDS[0]) for (const [name, shift] of [["straight", NO_SHIFT], ["pitch10", { ...NO_SHIFT, pitch: 10 * deg }]] as const) overlay(net, [0.34, -0.1], [0.44, 0.08], shift, `${out}/keypoints-${spec.replace("+", "-")}${TAG}-${name}.ppm`);
         }
       }
       console.log(`== ${spec}: ${STEPS} steps of ${BATCH}, ${(seconds / SEEDS.length).toFixed(0)} s a model, ${SEEDS.length} seeds; mean (min–max)`);

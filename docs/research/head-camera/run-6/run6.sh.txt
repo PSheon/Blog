@@ -1,0 +1,10 @@
+#!/bin/zsh
+# Run 6: 10k+aux, 15k, and every act at 10k. 5 configs × 5 seeds.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run6
+jobs=()
+for seed in 11 12 13 14 15; do
+  jobs+=("longaux 10000 step 1 $seed closed+shake" "long15 15000 step 0 $seed closed+shake" "open 10000 step 0 $seed open" "closed 10000 step 0 $seed closed" "openshake 10000 step 0 $seed open+shake")
+done
+printf '%s\n' "${jobs[@]}" | xargs -P 12 -L 1 zsh -c 'HC_STEPS=$1 HC_LR=$2 HC_AUX=$3 HC_SEEDS=$4 HC_TAG=-$0-$4 HC_ANALYTIC=0 HC_KINDS=$5 HC_OUT='$OUT' pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept > '$OUT'/$0-$4.log 2>&1'
+echo DONE
