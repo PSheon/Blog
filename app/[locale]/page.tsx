@@ -31,7 +31,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const latest = posts[0];
   const readouts = [
     { label: t.home.readouts.posts, value: posts.length, pad: 2 },
-    { label: t.home.readouts.interactive, value: posts.filter((p) => p.interactive).length, pad: 2 },
+    { label: t.home.readouts.figures, value: posts.reduce((n, p) => n + p.figures, 0), pad: 2 }, // (it used to count interactive articles, which is every article: the same number as the first)
     { label: t.home.readouts.operators, value: countOperators(), pad: 0 },
   ];
 
@@ -58,7 +58,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         <div className="max-lg:contents">
           {/* A title that says what is here, and a subtitle that says how: Paul asked for a technical blog's title,
               not a slogan. The see / think / generate / act words live on in the rail below. */}
-          <h1 style={{ "--i": 0 } as React.CSSProperties} className="reveal triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+          <h1 style={{ "--i": 0 } as React.CSSProperties} className="reveal triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance [&:lang(zh)]:tracking-normal [&:lang(zh)]:[word-break:keep-all]">
             {t.hero.title}
           </h1>
           <p style={{ "--i": 1 } as React.CSSProperties} className="reveal order-1 font-heading text-xl leading-snug font-medium text-foreground/90 max-lg:-mt-3 sm:text-2xl lg:mt-5">{t.hero.subtitle}</p>
@@ -121,7 +121,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             <div className="spotlight grid overflow-hidden rounded-md border border-border bg-panel transition-colors group-hover:border-foreground/25 md:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:grid-cols-[minmax(0,1fr)_30rem]">
               <div className="p-6 sm:p-8 lg:p-10">
                 <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                  <EntryNo no={latest.no} draft={latest.draft} className="text-signal" />
+                  <EntryNo no={latest.no} draft={latest.draft} locale={locale} className="text-signal" />
                   <time dateTime={latest.date} className="label">
                     {formatDate(latest.date, locale)}
                   </time>
@@ -138,7 +138,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
                 </p>
               </div>
               {/* The stage is dark in both themes, like the article's own: yellow points vanish on white. */}
-              <div className="dark relative flex items-center border-t border-border bg-[#070918] md:border-t-0 md:border-l">
+              <div className="dark relative m-3 flex items-center overflow-hidden rounded-md border-border bg-[#070918] dark:m-0 dark:rounded-none dark:border-t md:dark:border-t-0 md:dark:border-l">
                 <div className="dot-grid absolute inset-0 opacity-60" aria-hidden />
                 <div className="relative w-full p-4">
                   {hasPreview(latest.slug) ? <PostPreview slug={latest.slug} /> : <PostCover slug={latest.slug} no={latest.no} />}
@@ -166,7 +166,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
           // The newest article has its own card right above; the index starts with the one before it.
           rows={toRows(posts.filter((p) => p.slug !== latest?.slug), locale)}
           tags={getAllTags(locale).map((x) => x.tag)}
-          labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
+          labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags, more: t.home.moreTags, fewer: t.home.fewerTags }}
         />
       </section>
 

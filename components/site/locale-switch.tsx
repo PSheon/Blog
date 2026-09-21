@@ -23,9 +23,9 @@ export function LocaleSwitch({ locale, label }: { locale: Locale; label: string 
           aria-current={l === locale ? "true" : undefined}
           className={cn(
             // 24 px tall: the two links sit side by side, so neither may be smaller than a fingertip (WCAG 2.5.8).
-            "rounded-[5px] px-2 py-1.5 font-mono text-xs leading-none transition-colors",
+            "tap rounded-sm px-2 py-1.5 font-mono text-xs leading-none transition-colors",
             l === locale
-              ? "bg-accent text-foreground"
+              ? "bg-accent text-foreground ring-1 ring-foreground/45 ring-inset"
               : "text-muted-foreground hover:text-foreground",
           )}
         >

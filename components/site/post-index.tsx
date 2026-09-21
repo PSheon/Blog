@@ -1,9 +1,10 @@
 "use client";
 
+import { TagFilter } from "./tag-filter";
+import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
 import { ViewTransition, useState } from "react";
 import type { Locale } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import { PostCover } from "./post-cover";
 import { EntryNo, InteractiveBadge } from "./post-meta";
 
@@ -27,7 +28,7 @@ interface Props {
   locale: Locale;
   rows: IndexRow[];
   tags: string[];
-  labels: { all: string; empty: string; interactive: string; filter: string };
+  labels: { all: string; empty: string; interactive: string; filter: string; more: string; fewer: string };
   /** Hide the filter chips, e.g. on a single-tag page. */
   filterable?: boolean;
   /** Heading level of each entry: 3 under the home page's "Notebook index" h2, 2 where the list follows the page h1. */
@@ -38,30 +39,12 @@ interface Props {
 export function PostIndex({ locale, rows, tags, labels, filterable = true, level = 2 }: Props) {
   const Heading = `h${level}` as const;
   const [tag, setTag] = useState<string | null>(null);
+  const counts: Record<string, number> = {}; for (const r of rows) for (const name of r.tags) counts[name] = (counts[name] ?? 0) + 1;
   const visible = tag ? rows.filter((r) => r.tags.includes(tag)) : rows;
 
   return (
     <div>
-      {filterable && tags.length > 0 && (
-        <div className="mb-6 flex flex-wrap gap-1.5" role="group" aria-label={labels.filter}>
-          {[null, ...tags].map((name) => (
-            <button
-              key={name ?? "__all"}
-              type="button"
-              aria-pressed={tag === name}
-              onClick={() => setTag(name)}
-              className={cn(
-                "rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
-                tag === name
-                  ? "border-signal bg-signal/10 text-signal"
-                  : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {name ?? labels.all}
-            </button>
-          ))}
-        </div>
-      )}
+      {filterable && tags.length > 0 && <TagFilter tags={tags} counts={counts} value={tag} onChange={setTag} labels={labels} />}
 
       {visible.length === 0 ? (
         <p className="border-t border-rule py-10 text-muted-foreground">{labels.empty}</p>
@@ -73,17 +56,17 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
                 href={`/${locale}/posts/${row.slug}`}
                 className="spotlight spotlight-row group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline lg:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_9rem]"
               >
-                <EntryNo no={row.no} draft={row.draft} className="text-xs text-signal" />
+                <EntryNo no={row.no} draft={row.draft} locale={locale} className="text-xs text-signal" />
                 <time dateTime={row.date} className="label">
                   {row.dateLabel}
                 </time>
                 <div className="min-w-0">
                   <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
-                    <Heading className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
+                    <Heading lang={row.langNote ? htmlLang.zh : undefined} className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
                       {row.title}
                     </Heading>
                   </ViewTransition>
-                  <p className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
+                  <p lang={row.langNote ? htmlLang.zh : undefined} className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
                     {row.description}
                   </p>
                   <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">

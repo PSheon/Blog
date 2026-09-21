@@ -1,3 +1,5 @@
+import { ArrowUpRight } from "lucide-react";
+import { Localised } from "@/components/lab/localised";
 import type { MDXComponents } from "mdx/types";
 import Link from "next/link";
 import type { ComponentProps } from "react";
@@ -26,7 +28,14 @@ function heading(Tag: "h2" | "h3" | "h4") {
 function Anchor({ href = "", ...rest }: ComponentProps<"a">) {
   if (href.startsWith("/")) return <Link href={href} {...rest} />;
   if (href.startsWith("#")) return <a href={href} {...rest} />;
-  return <a href={href} target="_blank" rel="noreferrer" {...rest} />;
+  // Leaves the site in a new tab: say so, to the eye (the arrow) and to a screen reader.
+  return (
+    <a href={href} target="_blank" rel="noreferrer" {...rest}>
+      {rest.children}
+      <ArrowUpRight aria-hidden className="ml-px inline size-[0.8em] align-baseline opacity-70" />
+      <span className="sr-only"><Localised zh="（開新分頁）" en=" (opens in a new tab)" /></span>
+    </a>
+  );
 }
 
 const components: MDXComponents = {

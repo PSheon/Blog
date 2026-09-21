@@ -1,6 +1,7 @@
 "use client";
 
 import { type ReactNode, useId, useState } from "react";
+import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 import { cn } from "@/lib/utils";
 
 /**
@@ -9,6 +10,7 @@ import { cn } from "@/lib/utils";
  */
 export function Sidenote({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const noteWord = useLocaleLabels("註", "note");
   const id = useId();
   return (
     <>
@@ -20,7 +22,7 @@ export function Sidenote({ children }: { children: ReactNode }) {
         // The number itself is about 7×12 px. The invisible ::before (::after is the number, see globals.css) gives a finger 25×26 px without moving a glyph.
         className="sidenote-ref relative mx-0.5 rounded-sm align-super font-mono text-[0.65em] leading-none text-signal before:absolute before:-inset-x-[9px] before:-inset-y-[7px] before:content-[''] xl:pointer-events-none"
       >
-        <span className="sr-only">note </span>
+        <span className="sr-only">{noteWord} </span>
       </button>
       <span
         id={id}

@@ -5,7 +5,7 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { mulberry32 } from "@/lib/ml";
 import { useLabels } from "./labels";
-import { followInk } from "./stage3d";
+import { followInk, tone } from "./stage3d";
 import { type Cloud, type Pose3, ROOM, apply, compose3, fromEuler, icp3, inverse3, rotationAngle, sweep } from "./lidar3d/icp3";
 import { useVisible } from "./use-visible";
 
@@ -38,8 +38,8 @@ export function CloudLab() {
     camera.up.set(0, 0, 1);
     const ink = new T.Color(getComputedStyle(canvas).color);
     const old = new T.Points(new T.BufferGeometry(), new T.PointsMaterial({ color: ink, size: 0.045, transparent: true, opacity: 0.5 }));
-    const now = new T.Points(new T.BufferGeometry(), new T.PointsMaterial({ color: 0x79dafa, size: 0.07 }));
-    const estLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: 0x79dafa })), truthLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: 0xff6e96 }));
+    const now = new T.Points(new T.BufferGeometry(), new T.PointsMaterial({ color: tone(0x79dafa), size: 0.07 }));
+    const estLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: tone(0x79dafa) })), truthLine = new T.Line(new T.BufferGeometry(), new T.LineBasicMaterial({ color: tone(0xff6e96) }));
     scene.add(old, now, estLine, truthLine);
     const unfollow = followInk(T, canvas, () => [scene], ink);
 

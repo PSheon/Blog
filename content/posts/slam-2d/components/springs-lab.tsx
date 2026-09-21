@@ -9,7 +9,7 @@ import { type Edge, diagonal, graphError, optimise } from "./graph";
 import { useLabels } from "./labels";
 
 import { type Pose, between, compose } from "./se2";
-import { CYAN_HEX, VIOLET_HEX, setPoints, useStage3D } from "./stage3d";
+import { CYAN_HEX, VIOLET_HEX, setPoints, useStage3D, tone } from "./stage3d";
 import { useReplay } from "./use-replay";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
@@ -78,9 +78,9 @@ function Springs({ lap }: { lap: Lap }) {
       const T = stage.T;
       stage.walls(RING, 0.8, 0.14);
       stage.aim(10, 6.4, 15, 19);
-      const node = new T.SphereGeometry(0.16, 14, 10), plain = new T.MeshStandardMaterial({ color: CYAN_HEX }), ends = new T.MeshStandardMaterial({ color: VIOLET_HEX });
+      const node = new T.SphereGeometry(0.16, 14, 10), plain = new T.MeshStandardMaterial({ color: tone(CYAN_HEX) }), ends = new T.MeshStandardMaterial({ color: tone(VIOLET_HEX) });
       const nodes = lap.believed.map((_, i) => { const m = new T.Mesh(node, i === 0 || i === lap.believed.length - 1 ? ends : plain); stage.scene.add(m); return m; });
-      return { nodes, chain: stage.line(stage.ink, 0.6), loop: stage.line(VIOLET_HEX) };
+      return { nodes, chain: stage.line(stage.ink, 0.6), loop: stage.line(tone(VIOLET_HEX)) };
     },
     (stage, o) => {
       const at = poses.map((q) => compose(START, q));

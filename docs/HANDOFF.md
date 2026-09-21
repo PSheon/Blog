@@ -11,7 +11,7 @@ For whoever picks this up next. Read this, then the memory files under
 | --- | --- |
 | Repo | `/Users/paul_jiang/Desktop/Paul/Blog`, GitHub `PSheon/Blog` (public) |
 | Branches | `dev` is where work happens. `main` is production and moves only through a PR `dev` → `main` that Paul merges (last: PR #10, 2026-09-20) |
-| Production | <https://paul-notebook.vercel.app>, Vercel project `paul-notebook`, deploys `main` |
+| Production | <https://blog.psheon.me> (since 2026-09-21; DNS on Cloudflare, CNAME to Vercel, DNS only). Vercel project `paul-notebook`, deploys `main`. `paul-notebook.vercel.app` redirects 308 to it, path kept. Production env: `NEXT_PUBLIC_SITE_URL=https://blog.psheon.me` |
 | Dev server | `pnpm dev` on :3000 |
 | Other worktree | `/Users/paul_jiang/Desktop/Paul/Blog-city`, branch `feat/city-of-agents` (PR #9 → `dev`), owned by another session. One writer per checkout |
 | Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
@@ -21,18 +21,47 @@ Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 T
 built on `feat/sche` by another session). A
 VLA article was started as 010 and is parked on the branch `feat/vla` (pushed): the PCB-flip draft, its training
 pipeline, and the head-camera study in `docs/research/head-camera/` that would replace it. A draft shows only in
-`next dev`, with a "草稿 DRAFT" mark.
+`next dev`, with a mark in the page's language ("草稿" / "DRAFT").
 it dull.
+
+### The light series (two articles, published 2026-09-22)
+
+`light-from-noise` (№ 011, part one: what path tracing is) and `light-playground` (№ 012, part two: a playground you
+walk, drive and fly through, path traced every frame). Paul cut the plan from four articles to two because theory-first
+articles bore him; what the engine can do beyond the two articles (four sampling strategies, MIS, a white furnace)
+stays in `lib/rt` with its tests. Read before touching it:
+
+- `docs/research/light/RESULTS.md`: every number in the articles, how it was measured, and the measuring mistakes
+  (u32 counters overflow with 64-sample bursts at 960 × 540: use 16; wait for the figure's loop to be idle).
+- `lib/rt/`: scene, SAH BVH, CPU reference, the WGSL kernel (`kernel.ts`: path tracing, NEE/MIS, GGX, glass, outdoors,
+  a second tree for moving things, temporal reprojection, an à-trous filter), `gpu.ts` (the Renderer), `dynamic.ts`
+  (prepared trees refitted per frame), `playground.ts`, `models.ts`, `boxman.ts` (assets and CPU skinning).
+  The kernel is AT the default limit of 8 storage buffers per stage: one more needs `requiredLimits`.
+  `tests/rt/wgsl.test.ts` checks the shaders for WGSL reserved words, which reached the browser three times.
+- `components/rt/`: `use-tracer.ts` (worker build, frame loop, waits for Start, paces by elapsed time), `stage.tsx`.
+  In development `window.__lights[<canvas test id>]` and `window.__world` are there for measurements.
+- The game is `content/posts/light-playground/components/game/`: `character.ts` is Sketchbook's character state machine
+  ported state for state (its source, MIT, is cloned for reference at `../light-work/sketchbook-src`), `world.ts` is
+  Rapier, `car.ts`, `aircraft.ts`. All of it has tests that need no GPU (`tests/rt/`); Rapier runs in vitest.
+- Assets are packed by `scripts/light/pack-*.mjs` from `../light-work/assets/*.glb`. **`world.glb` must never be
+  committed**: it embeds Textures.com photographs. The packed files hold geometry, skeleton, clips and names only, and
+  tests check that no image is inside.
+- CI has no GPU. The light E2E tests take the "no adapter" branch; what needs a GPU was checked by hand
+  in the Playwright MCP browser, whose own tab must be in front for pointer lock (a `newContext()` window is refused).
 
 ## Waiting on Paul
 
+- The two light articles lost `draft` on his word (2026-09-22) and go out in ONE `dev` → `main` PR that he merges.
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
 - A test on a real phone. Nobody has done one.
-- A custom domain and Search Console (steps were given; `NEXT_PUBLIC_SITE_URL` and the verification env vars exist).
+- Search Console (the verification env vars exist). The custom domain is done. Open: should `psheon.me` and `www.psheon.me` redirect to `blog.` instead of serving the site too.
 - What is still open from the last audit: `docs/research/2026-09-20-project-audit.md`.
 
 ## Rules Paul has set (also in memory)
 
+- Commit messages follow Conventional Commits, `type(scope): summary`. Which type, which scope and how to word the
+  summary are in [COMMITS.md](COMMITS.md); read it before the first commit. `.githooks/commit-msg` refuses anything else
+  (`pnpm install` points git at it). PR titles take the same form.
 - Never move or push `main`. Releases are a PR `dev` → `main` that he merges. "Deploy" is not "release".
 - Never force-push `dev`. Paul and Dependabot merge into `dev` on GitHub, so `git fetch && git status -sb` before
   every commit and push; on a rejected push, `git rebase origin/dev`, and tell him.
@@ -134,7 +163,7 @@ the per-article split. Numbers, method and what is left: `docs/research/2026-09-
 
 - Windows shows Chinese serif text in PMingLiU (system font trade-off).
 - Going *back* has no page transition (React's default for history navigation).
-- No custom domain; `lib/site.ts` takes the origin from Vercel until `NEXT_PUBLIC_SITE_URL` is set.
+- Moving to `blog.psheon.me` changed every RSS guid (subscribers saw all items once more) and left localStorage and installed PWAs on the old origin. Previews still take their origin from Vercel (`lib/site.ts`).
 - Article 005: "unseen emoji" and cross-OS domain shift are stated as unmeasured guesses.
 - No CSP (what one would need is in the audit). KaTeX is not MathML: switching changes how formulas look.
 - Idea not started: live MNIST training as an upgrade to article 001 (conv backward exists).

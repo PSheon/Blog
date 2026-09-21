@@ -4,7 +4,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { DECIMATION } from "./policy";
 import { useRig } from "./rig";
 import type { Knobs, Lite3Sim } from "./sim";

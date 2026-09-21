@@ -12,8 +12,8 @@ export function NavLink({ href, children }: { href: string; children: ReactNode 
       href={href}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "rounded-md px-2.5 py-1.5 text-sm transition-colors",
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+        "tap rounded-md px-2.5 py-1.5 text-sm transition-colors",
+        active ? "text-foreground underline decoration-signal decoration-2 underline-offset-8" : "text-muted-foreground hover:text-foreground", // the underline: the two greys alone are 1.9:1 apart
       )}
     >
       {children}

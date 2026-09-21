@@ -1,7 +1,7 @@
 import type * as THREE from "three";
 import { type Pose, compose } from "./se2";
 import type { Slam } from "./slam";
-import { followInk } from "./stage3d";
+import { followInk, tone } from "./stage3d";
 import type { Segment } from "./world";
 
 type Three = typeof import("@/lib/three");
@@ -66,7 +66,7 @@ export class DriveView {
       this.real.add(wall);
     }
     const makeCar = () => {
-      const g = new T.Group(), body = new T.Mesh(new T.BoxGeometry(0.62, 0.4, 0.2), new T.MeshStandardMaterial({ color: CYAN, roughness: 0.4 }));
+      const g = new T.Group(), body = new T.Mesh(new T.BoxGeometry(0.62, 0.4, 0.2), new T.MeshStandardMaterial({ color: tone(CYAN), roughness: 0.4 }));
       body.position.z = 0.2;
       const nose = new T.Mesh(new T.ConeGeometry(0.13, 0.3, 12), new T.MeshStandardMaterial({ color: 0xffffff }));
       nose.rotation.z = -Math.PI / 2; nose.position.set(0.42, 0, 0.2);
@@ -78,10 +78,10 @@ export class DriveView {
     this.carReal = makeCar(); this.carMap = makeCar();
     this.real.add(this.carReal); this.map.add(this.carMap);
     const line = (color: number, opacity = 1) => new T.LineBasicMaterial({ color, transparent: opacity < 1, opacity });
-    this.rays = new T.LineSegments(new T.BufferGeometry(), line(CYAN, 0.22)); this.real.add(this.rays);
+    this.rays = new T.LineSegments(new T.BufferGeometry(), line(tone(CYAN), 0.22)); this.real.add(this.rays);
     this.stubs = new T.LineSegments(new T.BufferGeometry(), new T.LineBasicMaterial({ color: ink, transparent: true, opacity: 0.55 }));
-    this.slamPath = new T.Line(new T.BufferGeometry(), line(CYAN)); this.wheelPath = new T.Line(new T.BufferGeometry(), line(PINK));
-    this.links = new T.LineSegments(new T.BufferGeometry(), line(VIOLET, 0.5)); this.badLink = new T.Line(new T.BufferGeometry(), line(PINK));
+    this.slamPath = new T.Line(new T.BufferGeometry(), line(tone(CYAN))); this.wheelPath = new T.Line(new T.BufferGeometry(), line(tone(PINK)));
+    this.links = new T.LineSegments(new T.BufferGeometry(), line(tone(VIOLET), 0.5)); this.badLink = new T.Line(new T.BufferGeometry(), line(tone(PINK)));
     this.map.add(this.stubs, this.slamPath, this.wheelPath, this.links, this.badLink);
   }
 

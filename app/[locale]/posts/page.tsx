@@ -25,7 +25,7 @@ export default async function PostsPage({ params }: PageProps<"/[locale]/posts">
         locale={locale}
         rows={toRows(getAllPosts(locale), locale)}
         tags={getAllTags(locale).map((x) => x.tag)}
-        labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags }}
+        labels={{ all: t.home.all, empty: t.home.empty, interactive: t.post.interactive, filter: t.nav.tags, more: t.home.moreTags, fewer: t.home.fewerTags }}
       />
     </div>
   );

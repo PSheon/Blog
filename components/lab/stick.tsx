@@ -1,8 +1,10 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
-const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, 1], s: [0, -1], a: [-1, 0], d: [1, 0] };
+/** By physical key (`event.code`), not by the character it types: with a Zhuyin or Cangjie input method on, the W key types ㄊ, and a control that waits for "w" is dead. */
+const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0] };
 
 interface Props {
   label: string;
@@ -10,10 +12,16 @@ interface Props {
   /** x: −1 (left) … 1 (right), y: −1 (back) … 1 (forward). Called with (0, 0) on release. */
   onChange(x: number, y: number): void;
   testId?: string;
+  className?: string;
+  /** The stick sits in something rotated 90° clockwise by CSS (a landscape game on a portrait phone): read the pointer in that frame. */
+  quarterTurn?: boolean;
 }
 
-/** A thumb stick: drag it, or focus it and use the arrow keys / WASD. Springs back to the centre when let go. */
-export function Stick({ label, hintId, onChange, testId }: Props) {
+/**
+ * A thumb stick: drag it, or focus it and use the arrow keys / WASD. Springs back to the centre when let go. The site's
+ * one control for steering something by hand (the SLAM car, the playground): do not build another.
+ */
+export function Stick({ label, hintId, onChange, testId, className, quarterTurn }: Props) {
   const [at, setAt] = useState<[number, number]>([0, 0]);
   const held = useRef(new Set<string>());
   const move = (x: number, y: number) => { setAt([x, y]); onChange(x, y); };
@@ -23,12 +31,13 @@ export function Stick({ label, hintId, onChange, testId }: Props) {
     if (e.type === "pointerdown") e.currentTarget.setPointerCapture(e.pointerId);
     const box = e.currentTarget.getBoundingClientRect();
     let x = ((e.clientX - box.left) / box.width) * 2 - 1, y = 1 - ((e.clientY - box.top) / box.height) * 2;
+    if (quarterTurn) [x, y] = [-y, x]; // the stick's right is the screen's down, its up is the screen's right
     const r = Math.hypot(x, y);
     if (r > 1) { x /= r; y /= r; }
     move(x, y);
   };
   const keys = (e: KeyboardEvent<HTMLDivElement>) => {
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const key = e.code;
     if (!(key in KEYS)) return;
     e.preventDefault();
     if (e.type === "keydown") held.current.add(key); else held.current.delete(key);
@@ -44,7 +53,7 @@ export function Stick({ label, hintId, onChange, testId }: Props) {
       tabIndex={0}
       aria-label={label}
       aria-describedby={hintId}
-      className="relative size-32 shrink-0 touch-none rounded-full border border-border bg-background outline-none select-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn("relative size-32 shrink-0 touch-none rounded-full border border-border bg-background outline-none select-none focus-visible:ring-2 focus-visible:ring-ring", className)}
       onPointerDown={drag}
       onPointerMove={drag}
       onPointerUp={release}
@@ -56,7 +65,7 @@ export function Stick({ label, hintId, onChange, testId }: Props) {
     >
       <span className="absolute top-1/2 right-3 left-3 h-px bg-border" aria-hidden />
       <span className="absolute top-3 bottom-3 left-1/2 w-px bg-border" aria-hidden />
-      <span className="absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-signal shadow" style={{ left: `${50 + at[0] * 36}%`, top: `${50 - at[1] * 36}%` }} aria-hidden />
+      <span className="absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-signal ring-1 ring-background/60" style={{ left: `${50 + at[0] * 36}%`, top: `${50 - at[1] * 36}%` }} aria-hidden />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Pencil } from "lucide-react";
+import { ArrowLeft, ArrowRight, Pencil, ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { EntryNo, TagLink } from "@/components/site/post-meta";
 import type { PostMeta } from "@/lib/content/posts";
@@ -53,6 +53,10 @@ export function PostFooter({ locale, post, newer, older, related, t }: Props) {
           <Pencil className="size-3.5" aria-hidden />
           {t.edit}
         </a>
+        <a href="#top" className="tap flex min-h-6 items-center gap-1.5 text-sm text-muted-foreground hover:text-signal">
+          <ArrowUp className="size-3.5" aria-hidden />
+          {t.backToTop}
+        </a>
       </div>
 
       {(newer || older) && (
@@ -71,7 +75,7 @@ export function PostFooter({ locale, post, newer, older, related, t }: Props) {
             {related.map((p) => (
               <li key={p.slug} className="border-b border-rule">
                 <Link href={`/${locale}/posts/${p.slug}`} prefetch={false} className="group flex items-baseline gap-4 py-3">
-                  <EntryNo no={p.no} draft={p.draft} className="shrink-0 text-xs text-signal" />
+                  <EntryNo no={p.no} draft={p.draft} locale={locale} className="shrink-0 text-xs text-signal" />
                   <span className="font-heading text-base font-medium decoration-signal decoration-1 underline-offset-4 group-hover:underline">
                     {p.title}
                   </span>

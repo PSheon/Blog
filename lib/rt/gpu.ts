@@ -1,0 +1,284 @@
+/// <reference types="@webgpu/types" />
+import type { Bvh } from "./bvh";
+import { cross, sub, unit } from "./cpu";
+import { COMMIT, FILTER, KERNEL, MAX_SPOTS, MEASURE, MERGE, PARAMS_BYTES, PRESENT, REPROJECT, WORKGROUP } from "./kernel";
+import type { Material, Scene, Vec3 } from "./scene";
+
+const MATERIAL_FLOATS = 12;
+/** albedo.xyz mirror | emit.xyz roughness | metallic ior glass – : the kernel's `Material`. */
+function packMaterial(m: Material): number[] { return [...m.albedo, m.mirror ? 1 : 0, ...m.emit, m.roughness ?? 1, m.metallic ? 1 : 0, m.ior ?? 1.5, m.glass ? 1 : 0, m.lens ? 1 : 0]; }
+
+export interface Counters { rays: number; steps: number; overflow: number }
+
+/** Why there is no picture. "no-webgpu": the browser has none. "no-adapter": it has, but no GPU would answer. */
+export type Unavailable = "no-webgpu" | "no-adapter";
+
+/**
+ * The GPU half: buffers for one scene, the three pipelines of kernel.ts, and a canvas to show them on. Nothing here
+ * decides when to draw; an instrument calls `sample()` as often as its frame budget allows and `present()` once a frame.
+ */
+export class Renderer {
+  samples = 0;
+  bounces = 16;
+  /** See kernel.ts: the 2 × 2 grid of bounce limits, the node-visit heat map (and the count that maps to white), no hierarchy. */
+  quad: false | true | "strategies" = false;
+  /** 0 uniform, 1 cosine (article 1), 2 cosine + asking the lamp, 3 both weighted (MIS). Needs `scene.light` for 2 and 3. */
+  strategy = 1;
+  heat = false;
+  heatMax = 48;
+  brute = false;
+  /** Outdoors. `sun`: unit direction towards it and its strength (0 = indoors: no sky, no sun). `raster`: draw what a rasteriser would. */
+  sun: [number, number, number, number] = [0, 1, 0, 0];
+  skyLevel = 1;
+  /** Spot lamps (head lamps, a searchlight), asked directly at every bounce: where, which way, how strong (W/sr, in the sun's units), and the cone's half angle. At most MAX_SPOTS; the nearest to the camera are kept. */
+  spots: { at: Vec3; direction: Vec3; strength: number; halfAngle: number }[] = [];
+  exposure = 1;
+  raster = false;
+  /** Every ray that leaves sees white 1 and no lamp shines: a test of what materials give back. */
+  furnace = false;
+  private destroyed = false;
+
+  private constructor(
+    readonly device: GPUDevice, readonly adapterName: string, private readonly context: GPUCanvasContext, /** the size being rendered now: the canvas's own, or smaller (`setRenderSize`) */ public width: number, public height: number,
+    private readonly params: GPUBuffer, private readonly paramData: ArrayBuffer, private readonly accum: GPUBuffer, private readonly counters: GPUBuffer, private readonly tiles: GPUBuffer, private readonly tileCount: number,
+    private readonly tracePipe: GPUComputePipeline, private readonly traceBind: GPUBindGroup, private readonly measurePipe: GPUComputePipeline, private readonly measureBind: GPUBindGroup,
+    private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[], private readonly mats: GPUBuffer,
+    private readonly nodes: GPUBuffer, private readonly tris: GPUBuffer, /** where a dynamic tree starts: pass these to buildDynamicBvh */ readonly nodeBase: number, readonly triangleBase: number, readonly dynamicCapacity: number,
+    private readonly temporal: { commitPipe: GPUComputePipeline; commitBind: GPUBindGroup; reprojectPipe: GPUComputePipeline; reprojectBind: GPUBindGroup; gbuf: GPUBuffer; gprev: GPUBuffer; carried: GPUBuffer; movedFrom: GPUBuffer; bytes: number; mergePipe: GPUComputePipeline; mergeBind: GPUBindGroup; filterPipe: GPUComputePipeline; filterBinds: GPUBindGroup[] } | null,
+  ) {}
+  /** How many samples' worth a carried-over pixel may count for: higher is smoother and slower to notice that the light changed. */
+  readonly fullWidth = this.width; readonly fullHeight = this.height;
+  historyCap = 12;
+  /** Borrow from neighbouring pixels of the same surface before showing the picture (needs `temporal`). */
+  denoise = false;
+  private pendingReproject = false;
+  private dynamicRoot = 0;
+
+  /** `dynamicTriangles`: room to keep after the world's tree for a second one that is rebuilt every frame (`setDynamic`). */
+  static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number, dynamicTriangles = 0, /** keep what `advance()` needs to carry a picture across a movement (four more buffers the size of the picture) */ temporal = false): Promise<Renderer | Unavailable> {
+    if (!navigator.gpu) return "no-webgpu"; // some browsers define the property and leave it undefined
+    const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
+    if (!adapter) return "no-adapter";
+    // A million triangles are 48 MB of triangles and 20 MB of nodes: more than the 128 MiB a binding gets by default only
+    // beyond that, but ask for what the adapter has so the ceiling is the hardware's and not the default's.
+    const device = await adapter.requestDevice({ requiredLimits: { maxStorageBufferBindingSize: adapter.limits.maxStorageBufferBindingSize, maxBufferSize: adapter.limits.maxBufferSize } });
+    const context = canvas.getContext("webgpu");
+    if (!context) return "no-webgpu";
+    const format = navigator.gpu.getPreferredCanvasFormat();
+    canvas.width = width; canvas.height = height;
+    context.configure({ device, format, alphaMode: "opaque" });
+
+    const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC, owned: GPUBuffer[] = [];
+    const make = (size: number, usage: number, data?: ArrayBuffer | ArrayBufferView) => { const b = device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage }); if (data) device.queue.writeBuffer(b, 0, data as ArrayBuffer); owned.push(b); return b; };
+    const materials = new Float32Array(scene.materials.length * MATERIAL_FLOATS);
+    scene.materials.forEach((m, i) => materials.set(packMaterial(m), i * MATERIAL_FLOATS));
+    const across = Math.ceil(width / WORKGROUP), down = Math.ceil(height / WORKGROUP), tileCount = across * down;
+    const nodes = make(bvh.nodes.byteLength + dynamicTriangles * 2 * 32, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength + dynamicTriangles * 48, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials), smooth = make(Math.max(48, bvh.normals?.byteLength ?? 0), STORAGE, bvh.normals?.byteLength ? bvh.normals : undefined);
+    const accum = make(width * height * 16 * 2, STORAGE), counters = make(16, STORAGE), tiles = make(tileCount * 8, STORAGE);
+    const paramData = new ArrayBuffer(PARAMS_BYTES), params = make(PARAMS_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+
+    new Uint32Array(paramData, 0, 4).set([width, height, 0, 16]);
+    Renderer.writeCamera(paramData, scene.camera, width / height);
+    if (scene.light) new Float32Array(paramData, 128, 12).set([...scene.light.corner, scene.light.material + 1, ...scene.light.u, 0, ...scene.light.v, 0]);
+
+    // A shader that does not compile only logs a warning, and the pipeline promise then rejects with little to say. Ask
+    // each module for its messages, so a failure names the line.
+    const compile = async (code: string, name: string) => {
+      const shader = device.createShaderModule({ code, label: name }), problems = (await shader.getCompilationInfo()).messages.filter((m) => m.type === "error");
+      if (problems.length) throw new Error(`${name}: ${problems.map((m) => `line ${m.lineNum}: ${m.message}`).join("; ")}`);
+      return shader;
+    };
+    const picture = temporal ? width * height * 16 : 16, movedFrom = make(Math.max(48, temporal ? dynamicTriangles * 48 : 0), STORAGE), gbuf = make(picture, STORAGE), gnorm = make(picture, STORAGE), imageA = make(picture, STORAGE), imageB = make(picture, STORAGE), gprev = make(picture, STORAGE), history = make(picture, STORAGE), carried = make(picture, STORAGE);
+    const entries = (buffers: GPUBuffer[]) => buffers.map((buffer, binding) => ({ binding, resource: { buffer } }));
+    const [trace, measure, shader, commit, reproject, merge, filter] = await Promise.all([compile(KERNEL, "path tracing kernel"), compile(MEASURE, "error measurement"), compile(PRESENT, "present"), compile(COMMIT, "commit history"), compile(REPROJECT, "reproject history"), compile(MERGE, "merge for the filter"), compile(FILTER, "spatial filter")]);
+    const [tracePipe, measurePipe, commitPipe, reprojectPipe, mergePipe, filterPipe] = await Promise.all([trace, measure, commit, reproject, merge, filter].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
+    const presentPipe = await device.createRenderPipelineAsync({ layout: "auto", vertex: { module: shader, entryPoint: "vs" }, fragment: { module: shader, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
+    return new Renderer(device, adapter.info?.description || adapter.info?.architecture || adapter.info?.vendor || "GPU", context, width, height, params, paramData, accum, counters, tiles, tileCount,
+      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth, gbuf, gnorm]) }),
+      measurePipe, device.createBindGroup({ layout: measurePipe.getBindGroupLayout(0), entries: entries([accum, tiles, params]) }),
+      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params, carried, imageB]) }), owned, mats, nodes, tris, bvh.nodeCount, bvh.triangleCount, dynamicTriangles,
+      temporal ? { commitPipe, commitBind: device.createBindGroup({ layout: commitPipe.getBindGroupLayout(0), entries: entries([accum, carried, history, params]) }), reprojectPipe, reprojectBind: device.createBindGroup({ layout: reprojectPipe.getBindGroupLayout(0), entries: entries([gbuf, gprev, history, carried, params, tris, movedFrom]) }), gbuf, gprev, carried, movedFrom, bytes: picture,
+        mergePipe, mergeBind: device.createBindGroup({ layout: mergePipe.getBindGroupLayout(0), entries: entries([accum, carried, imageA, params]) }), filterPipe,
+        // three passes: A → B, B → A, A → B, so the result is where PRESENT looks for it
+        filterBinds: [[imageA, imageB], [imageB, imageA], [imageA, imageB]].map(([from, to]) => device.createBindGroup({ layout: filterPipe.getBindGroupLayout(0), entries: entries([from, to, gbuf, gnorm, params]) })) } : null);
+  }
+
+  private static writeCamera(paramData: ArrayBuffer, camera: Scene["camera"], aspect: number): void {
+    const { eye, target, fov } = camera, f = unit(sub(target, eye)), right = unit(cross(f, [0, 1, 0])), up = cross(right, f), half = Math.tan((fov * Math.PI) / 360);
+    new Float32Array(paramData, 16, 16).set([...eye, 0, ...f, 0, right[0] * half * aspect, right[1] * half * aspect, right[2] * half * aspect, 0, up[0] * half, up[1] * half, up[2] * half, 0]);
+  }
+  /** Change one material in place (a slider moved). What has been accumulated is of the old one: the caller resets. */
+  setMaterial(index: number, material: Material): void { this.device.queue.writeBuffer(this.mats, index * MATERIAL_FLOATS * 4, new Float32Array(packMaterial(material))); }
+
+  /** This frame's tree of moving things (built with this renderer's `nodeBase` and `triangleBase`). The picture so far is of the old one: the caller resets. */
+  setDynamic(tree: { nodes: ArrayBuffer; triangles: ArrayBuffer; triangleCount: number }): void {
+    if (tree.triangleCount > this.dynamicCapacity) throw new Error(`${tree.triangleCount} moving triangles, room for ${this.dynamicCapacity}`);
+    this.device.queue.writeBuffer(this.nodes, this.nodeBase * 32, tree.nodes); this.device.queue.writeBuffer(this.tris, this.triangleBase * 48, tree.triangles);
+    this.dynamicRoot = tree.triangleCount > 0 ? this.nodeBase : 0;
+  }
+
+  /**
+   * Render fewer pixels than the canvas has (never more: the buffers are the canvas's size) and let PRESENT stretch them,
+   * for a GPU that cannot keep up. Everything accumulated and carried is of the old grid and is dropped.
+   */
+  setRenderSize(width: number, height: number): void {
+    width = Math.max(16, Math.min(width, this.fullWidth)); height = Math.max(16, Math.min(height, this.fullHeight));
+    if (width === this.width && height === this.height) return;
+    this.width = width; this.height = height;
+    new Uint32Array(this.paramData, 0, 2).set([width, height]);
+    this.reset();
+  }
+
+  /** Look from somewhere else. What has been accumulated is of the old view: the caller resets. */
+  setCamera(camera: Scene["camera"]): void { Renderer.writeCamera(this.paramData, camera, this.width / this.height); }
+
+  private writeParams(): void {
+    new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
+    new Float32Array(this.paramData, 96, 6).set([...this.sun, this.exposure, this.skyLevel]);
+    new Uint32Array(this.paramData, 120, 2).set([this.strategy, this.furnace ? 1 : 0]);
+    const spots = this.spots.slice(0, MAX_SPOTS), lamps = new Float32Array(this.paramData, 272, MAX_SPOTS * 8);
+    spots.forEach((s, i) => lamps.set([...s.at, s.strength, ...s.direction, Math.cos(s.halfAngle)], i * 8));
+    new Uint32Array(this.paramData, 264, 1).set([spots.length]);
+    new Uint32Array(this.paramData, 176, 2).set([this.dynamicRoot, this.temporal ? 1 : 0]);
+    new Uint32Array(this.paramData, 188, 1).set([this.triangleBase]);
+    new Float32Array(this.paramData, 184, 1).set([this.historyCap]);
+    new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : this.raster ? 2 : 0, this.quad === "strategies" ? 2 : this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
+    this.device.queue.writeBuffer(this.params, 0, this.paramData);
+  }
+
+  /** Forget everything accumulated: the scene, the camera or the bounce limit changed. (With `temporal`, also what was carried over: for a change of light, not of view.) */
+  reset(): void {
+    this.samples = 0; this.pendingReproject = false;
+    const e = this.device.createCommandEncoder();
+    e.clearBuffer(this.accum); e.clearBuffer(this.counters);
+    if (this.temporal) e.clearBuffer(this.temporal.carried);
+    this.device.queue.submit([e.finish()]);
+  }
+
+  /**
+   * Something moved: instead of `reset()`, keep the picture. Call this BEFORE `setCamera` / `setDynamic`: it records
+   * what the screen shows and where the camera was, then empties the accumulation. The next `sample()` carries the
+   * old picture over to the new view (kernel.ts, REPROJECT). Without `temporal` this is `reset()`.
+   */
+  advance(): void {
+    const t = this.temporal;
+    if (!t || this.samples === 0) { this.reset(); return; }
+    this.writeParams();
+    const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+    pass.setPipeline(t.commitPipe); pass.setBindGroup(0, t.commitBind); pass.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP)); pass.end();
+    e.copyBufferToBuffer(t.gbuf, 0, t.gprev, 0, t.bytes);
+    if (this.dynamicCapacity) e.copyBufferToBuffer(this.tris, this.triangleBase * 48, t.movedFrom, 0, this.dynamicCapacity * 48); // where the moving triangles were, before setDynamic moves them
+    e.clearBuffer(this.accum); e.clearBuffer(this.counters);
+    this.device.queue.submit([e.finish()]);
+    new Float32Array(this.paramData, 192, 16).set(new Float32Array(this.paramData, 16, 16)); // where the camera was
+    this.samples = 0; this.pendingReproject = true;
+  }
+
+  /** `count` more samples for every pixel. Each is its own submit: the sample index is a uniform. */
+  sample(count = 1): void {
+    for (let i = 0; i < count; i++) {
+      this.writeParams();
+      const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+      pass.setPipeline(this.tracePipe); pass.setBindGroup(0, this.traceBind);
+      pass.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP));
+      pass.end();
+      this.device.queue.submit([e.finish()]);
+      this.samples++;
+      if (this.pendingReproject && this.temporal) { // the first sample of the frame has said what every pixel sees: fetch its past
+        this.pendingReproject = false;
+        const t = this.temporal, r = this.device.createCommandEncoder(), p = r.beginComputePass();
+        p.setPipeline(t.reprojectPipe); p.setBindGroup(0, t.reprojectBind); p.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP)); p.end();
+        this.device.queue.submit([r.finish()]);
+      }
+    }
+  }
+
+  present(): void {
+    const t = this.temporal, filtering = !!t && this.denoise && !this.heat && !this.raster;
+    if (t && filtering) { // merge, then the three passes, each with its own spacing: a uniform is read when its pass runs, so each is its own submit
+      const workgroups: [number, number] = [Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP)];
+      [0, 1, 2, 4].forEach((step, k) => {
+        new Uint32Array(this.paramData, 256, 2).set([1, step]); this.writeParams();
+        const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+        if (k === 0) { pass.setPipeline(t.mergePipe); pass.setBindGroup(0, t.mergeBind); } else { pass.setPipeline(t.filterPipe); pass.setBindGroup(0, t.filterBinds[k - 1]); }
+        pass.dispatchWorkgroups(...workgroups); pass.end(); this.device.queue.submit([e.finish()]);
+      });
+    }
+    new Uint32Array(this.paramData, 256, 2).set([filtering ? 1 : 0, 0]);
+    this.writeParams();
+    const e = this.device.createCommandEncoder(), pass = e.beginRenderPass({ colorAttachments: [{ view: this.context.getCurrentTexture().createView(), loadOp: "clear", storeOp: "store", clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
+    pass.setPipeline(this.presentPipe); pass.setBindGroup(0, this.presentBind); pass.draw(3); pass.end();
+    this.device.queue.submit([e.finish()]);
+  }
+
+  /** Resolves when the GPU has done everything submitted so far: how an instrument learns how long a sample takes. */
+  idle(): Promise<undefined> { return this.device.queue.onSubmittedWorkDone(); }
+
+  private async read(source: GPUBuffer, bytes: number): Promise<ArrayBuffer> {
+    const staging = this.device.createBuffer({ size: bytes, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }), e = this.device.createCommandEncoder();
+    e.copyBufferToBuffer(source, 0, staging, 0, bytes);
+    this.device.queue.submit([e.finish()]);
+    await staging.mapAsync(GPUMapMode.READ);
+    const copy = staging.getMappedRange().slice(0);
+    staging.unmap(); staging.destroy();
+    return copy;
+  }
+
+  /** Rays cast, BVH nodes visited and traversal stacks that overflowed, since the last reset. (u32: wraps at 4.29 billion.) */
+  async readCounters(): Promise<Counters> {
+    const [rays, steps, overflow] = new Uint32Array(await this.read(this.counters, 16));
+    return { rays, steps, overflow };
+  }
+
+  /**
+   * The picture's error right now, with no reference image. Even and odd samples have built two pictures of their own;
+   * half their difference is the error of their average. Returned relative to the picture's mean radiance: 0.1 means the
+   * typical pixel is 10 % of the average brightness away from where it will settle. Needs at least two samples.
+   */
+  async error(): Promise<number> {
+    this.writeParams();
+    const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+    pass.setPipeline(this.measurePipe); pass.setBindGroup(0, this.measureBind);
+    pass.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP));
+    pass.end();
+    this.device.queue.submit([e.finish()]);
+    const tiles = new Float32Array(await this.read(this.tiles, this.tileCount * 8));
+    let squared = 0, mean = 0;
+    for (let i = 0; i < tiles.length; i += 2) { squared += tiles[i]; mean += tiles[i + 1]; }
+    const pixels = this.width * this.height;
+    return mean > 0 ? Math.sqrt(squared / pixels) / (mean / pixels) : 0;
+  }
+
+  /** `error()` for each tile of the 2 × 2 grid, with the tile's mean radiance: four pictures of one scene should agree on the second and differ in the first. */
+  async errorByTile(): Promise<{ error: number; mean: number }[]> {
+    this.writeParams();
+    const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+    pass.setPipeline(this.measurePipe); pass.setBindGroup(0, this.measureBind);
+    pass.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP));
+    pass.end();
+    this.device.queue.submit([e.finish()]);
+    const tiles = new Float32Array(await this.read(this.tiles, this.tileCount * 8)), across = Math.ceil(this.width / WORKGROUP), down = Math.ceil(this.height / WORKGROUP);
+    const sums = [0, 1, 2, 3].map(() => ({ squared: 0, mean: 0 }));
+    for (let y = 0; y < down; y++) for (let x = 0; x < across; x++) { const q = sums[(y >= down / 2 ? 2 : 0) + (x >= across / 2 ? 1 : 0)], i = (y * across + x) * 2; q.squared += tiles[i]; q.mean += tiles[i + 1]; }
+    const pixels = (this.width * this.height) / 4;
+    return sums.map((q) => ({ error: q.mean > 0 ? Math.sqrt(q.squared / pixels) / (q.mean / pixels) : 0, mean: q.mean / pixels }));
+  }
+
+  /** One pixel's linear radiance as accumulated so far (both buffers together), or null before any sample. */
+  async readPixel(x: number, y: number): Promise<[number, number, number] | null> {
+    const pixel = y * this.width + x, half = this.width * this.height;
+    const [a, b] = await Promise.all([pixel, half + pixel].map(async (i) => { const staging = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }), e = this.device.createCommandEncoder(); e.copyBufferToBuffer(this.accum, i * 16, staging, 0, 16); this.device.queue.submit([e.finish()]); await staging.mapAsync(GPUMapMode.READ); const v = new Float32Array(staging.getMappedRange().slice(0)); staging.unmap(); staging.destroy(); return v; }));
+    const n = a[3] + b[3];
+    return n ? [(a[0] + b[0]) / n, (a[1] + b[1]) / n, (a[2] + b[2]) / n] : null;
+  }
+
+  /** Both accumulation buffers as they are (rgb sums and sample counts): for tests, which compare numbers, not screenshots. */
+  async readAccumulation(): Promise<Float32Array> { return new Float32Array(await this.read(this.accum, this.width * this.height * 32)); }
+
+  destroy(): void {
+    if (this.destroyed) return;
+    this.destroyed = true;
+    for (const b of this.owned) b.destroy();
+    this.device.destroy();
+  }
+}

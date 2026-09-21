@@ -39,9 +39,20 @@ The one exception is a stage that must stay dark in both themes (section 5).
   profile banner. Never three flat colour blocks side by side.
 - Text contrast is WCAG AA at minimum in both themes (axe checks every page in both). A new colour pair is
   measured before it ships.
-- Radius is small (`--radius: 0.375rem`): `rounded-sm` for chips and canvases, `rounded-md` for panels,
-  `rounded-full` only for pills and dots. Borders are 1 px. No drop shadows; depth comes from `panel`, borders and
-  the two glows (`.hero-glow`, `.card-glow`).
+- Radius is small (`--radius: 0.375rem`): `rounded-sm` for chips, toggle cells and canvases, `rounded-md` for panels,
+  buttons and dialogs, `rounded-full` only for pills and dots. Borders are 1 px: `--border` for a line that only
+  divides, `--input` (3:1 against every surface) for the edge of something that can be pressed or typed into.
+- No drop shadows on anything that sits in the page; depth comes from `panel`, borders and the two glows
+  (`.hero-glow`, `.card-glow`). A layer that floats over the page (the phone's drawer, the open outline, the install
+  hint) casts one, so that it reads as above the text it covers. The selected station's dot and the rail's dots
+  glow in their own colour: that is a signal, not depth.
+- Data series drawn into a canvas that follows the theme follow it too. WebGL materials take numbers, not custom
+  properties, so SLAM keeps both themes' values of `--signal`, `--signal-2` and `--signal-3` (`tone()` in its
+  `stage3d.ts`) and swaps them with the ink when the theme changes: on the light stage the bright ones were 1.5:1, the
+  light theme's are 7.3, 5.5 and 5.9:1. Colours drawn over something that is dark in both themes stay constants
+  (HydraNet's boxes over its photographs), and so does a colour that is a physical quantity (the lamp in the path figure).
+- Chinese body text runs 37 characters to the line (680 px at 18 px, measured); that is inside the 30–40 that reads
+  well set horizontally, so the measure is the same as the English one's and figures keep the column's width.
 
 ### Type
 
@@ -61,7 +72,7 @@ The one exception is a stage that must stay dark in both themes (section 5).
 
 ### Motion
 
-- Short and functional: page swap 120 ms out / 260 ms in, title morph 340 ms (native View Transitions through
+- Short and functional: page swap 180 ms out / 460 ms in (90 ms late), title morph 340 ms (native View Transitions through
   React `<ViewTransition>`; not framer-motion).
 - The page swap is keyed to the pathname (`components/site/page-swap.tsx`, enter/exit). Never hang it on
   `<ViewTransition update>`: a `next/dynamic` component replacing its placeholder is an update too, and replayed
@@ -118,6 +129,15 @@ Rules inside an instrument:
   it was right for diffusion and wrong for the others.
 - A stage whose content depends on colour (coloured point clouds) stays dark in both themes: wrap it in
   `className="dark bg-[#070918]"`.
+
+### Controls for steering something by hand
+
+One thumb stick for the whole site: `components/lab/stick.tsx` (drag it, or focus it and use the arrows / W A S D; it
+has a `quarterTurn` for an overlay rotated by CSS). Do not build another control for the same job. Every key handler
+reads `event.code`, never `event.key`: with a Zhuyin or Cangjie input method on, W types ㄊ and a control that waits
+for "w" is dead. A figure that is a game may expand to cover the window (the playground does): then the world is the
+whole screen and everything else floats over it, the keys shown are the ones for what the reader is doing right now,
+the stick and touch buttons appear only on coarse pointers, a click takes the pointer and Escape always gives it back.
 
 ### A new article also needs
 

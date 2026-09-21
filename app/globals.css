@@ -5,6 +5,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* A control smaller than a fingertip gets a 44 px area to press where the pointer is a finger, without moving a pixel of
+   layout: an invisible ::before, centred on it. (Not for an element that already uses its ::before.) */
+@utility tap {
+  @media (pointer: coarse) {
+    &:not(.absolute, .fixed, .sticky) {
+      position: relative;
+    }
+    &::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 2.75rem);
+      height: max(100%, 2.75rem);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -82,7 +101,7 @@
   --accent-foreground: #1c2033;
   --destructive: #b3261e;
   --border: #12162a38;
-  --input: #12162a52;
+  --input: #12162a7a; /* a control's own edge: 3:1 against every surface it sits on (WCAG 1.4.11). --border stays faint: it only divides. */
   --ring: #065a82;
   --signal: #065a82;
   --signal-2: #c2255c;
@@ -164,8 +183,15 @@
   mask-image: linear-gradient(90deg, transparent, #000 3.5rem, #000 calc(100% - 3.5rem), transparent);
 }
 
+/* Opacity and transform only, which a phone's compositor animates for free. A blur is repainted every frame, so it is
+   kept for screens with a pointer and room (a laptop's GPU does not notice it). */
 @keyframes blur-rise {
-  from { opacity: 0; filter: blur(6px); transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (hover: hover) and (min-width: 64rem) {
+  @keyframes blur-rise {
+    from { opacity: 0; filter: blur(6px); transform: translateY(8px); }
+  }
 }
 .reveal {
   animation: blur-rise 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -182,7 +208,6 @@
  */
 .bento-art {
   transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s;
-  will-change: transform;
 }
 .bento-cover {
   transition: background-position 0.9s cubic-bezier(0.22, 1, 0.36, 1);
@@ -196,7 +221,7 @@
   transform: translateX(-70%);
 }
 @media (hover: hover) {
-  .group:hover .bento-art { transform: scale(1.08) rotate(-1.2deg) translateY(-2px); opacity: 1; }
+  .group:hover .bento-art { transform: scale(1.08) rotate(-1.2deg) translateY(-2px); opacity: 1; will-change: transform; } /* a layer while it moves, not one per tile for ever */
   .group:hover .bento-cover { background-position: 9px 9px; }
   .group:hover .bento-cover::after { transform: translateX(70%); transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
 }
@@ -292,7 +317,7 @@ html:not(.dark) {
   --accent-foreground: #e9eaf6;
   --destructive: #ff6e96;
   --border: #9b9bc42e;
-  --input: #9b9bc447;
+  --input: #9b9bc494;
   --ring: #79dafa;
   --signal: #79dafa;
   --signal-2: #ff6e96;
@@ -485,7 +510,8 @@ html:not(.dark) {
     line-height: 1.8;
     counter-reset: sidenote;
   }
-  :lang(en) .prose-notebook {
+  /* The prose element itself, not its page: under /en a zh article that has no translation keeps the zh measure. */
+  .prose-notebook:lang(en) {
     font-size: 1.1875rem;
     line-height: 1.7;
   }
@@ -583,6 +609,14 @@ html:not(.dark) {
     color: var(--muted-foreground);
     font-style: italic;
   }
+  /* Chinese has no italic: a browser slants the glyphs by itself, and it reads as a mistake. */
+  .prose-notebook:lang(zh) blockquote {
+    font-style: normal;
+  }
+  /* Negative tracking is for Latin display type; CJK glyphs are drawn to sit in their squares. */
+  :lang(zh) :where(h1, h2, h3, h4) {
+    letter-spacing: 0;
+  }
   .prose-notebook hr {
     border: 0;
     border-top: 1px solid var(--rule);
@@ -598,6 +632,10 @@ html:not(.dark) {
   }
   .prose-notebook .table-scroll {
     overflow-x: auto;
+  }
+  /* More to the right than fits (set by ScrollableMath): the right edge fades until it has been scrolled to the end. */
+  .prose-notebook :where(.table-scroll, pre, .katex-display)[data-more] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
   }
   .prose-notebook table {
     width: 100%;
@@ -716,14 +754,29 @@ html:not(.dark) {
   from {
     opacity: 0;
     transform: translateY(28px) scale(0.985);
-    filter: blur(5px);
   }
 }
 @keyframes page-out {
   to {
     opacity: 0;
     transform: translateY(-14px) scale(0.985);
-    filter: blur(3px);
+  }
+}
+/* The blur is for screens with a pointer and room: on a phone it is a full-page repaint every frame of the swap. */
+@media (hover: hover) and (min-width: 64rem) {
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(28px) scale(0.985);
+      filter: blur(5px);
+    }
+  }
+  @keyframes page-out {
+    to {
+      opacity: 0;
+      transform: translateY(-14px) scale(0.985);
+      filter: blur(3px);
+    }
   }
 }
 ::view-transition-old(.page-swap) {

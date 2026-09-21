@@ -33,8 +33,8 @@ export function ThemeToggle({ t }: { t: Dictionary["theme"] }) {
             title={t[value]}
             onClick={() => setTheme(value)}
             className={cn(
-              "grid h-6 w-7 place-items-center rounded-[5px] transition-colors",
-              active ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+              "tap grid h-6 w-7 place-items-center rounded-sm transition-colors",
+              active ? "bg-accent text-foreground ring-1 ring-foreground/45 ring-inset" : "text-muted-foreground hover:text-foreground", // the ring: the fill alone is 1.1:1 against its neighbours
             )}
           >
             <Icon className="size-3.5" aria-hidden />

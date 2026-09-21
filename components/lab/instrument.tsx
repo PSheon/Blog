@@ -3,6 +3,7 @@ import { type FigureSize, figureSize } from "@/components/mdx/figure";
 import { cn } from "@/lib/utils";
 import { CornerMarks } from "./corner-marks";
 import { ErrorBoundary } from "./error-boundary";
+import { Localised } from "./localised";
 
 interface Props {
   /** Figure number, e.g. "03". */
@@ -46,8 +47,8 @@ export function Instrument({ fig, title, size = "inline", caption, status, class
         <div className={cn("dot-grid p-4 font-sans sm:p-5", className)}>
           <ErrorBoundary
             fallback={
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                This instrument hit an error. The rest of the article is unaffected.
+              <p role="alert" className="py-8 text-center text-sm text-muted-foreground">
+                <Localised zh="這張互動圖出錯了，文章其他部分不受影響。" en="This instrument hit an error. The rest of the article is unaffected." />
               </p>
             }
           >
@@ -57,7 +58,7 @@ export function Instrument({ fig, title, size = "inline", caption, status, class
           </ErrorBoundary>
           <noscript>
             <p className="pt-3 text-center text-sm text-muted-foreground">
-              This interactive figure needs JavaScript.
+              <Localised zh="這張互動圖需要 JavaScript。" en="This interactive figure needs JavaScript." />
             </p>
           </noscript>
         </div>

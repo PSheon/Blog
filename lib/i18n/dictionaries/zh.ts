@@ -12,7 +12,9 @@ const zh = {
     results: "{n} 個結果",
     resultsOne: "1 個結果",
     loading: "正在載入搜尋索引…",
-    failed: "搜尋索引載入失敗，請檢查網路後重新打開搜尋。",
+    failed: "搜尋索引載入失敗，請檢查網路。",
+    retry: "再試一次",
+    latest: "最新的文章",
     posts: "所有文章",
     tags: "標籤",
     navigate: "移動",
@@ -23,7 +25,8 @@ const zh = {
   locale: { label: "語言", switch: "切換語言" },
   hero: {
     eyebrow: "實驗筆記",
-    title: "從零實作機器學習模型",
+    // U+200B marks the one place the H1 may break: a balanced wrap otherwise cuts 機｜器 in half on a phone
+    title: "從零實作\u200B機器學習模型",
     subtitle: "每一篇都能在瀏覽器裡訓練、拆開、弄壞",
     // The rail under the hero: one stop per kind of article, each a real tag.
     topics: [
@@ -54,11 +57,13 @@ const zh = {
   },
   home: {
     latest: "最新文章",
-    readouts: { posts: "篇文章", interactive: "篇可以動手玩", operators: "個手寫運算子" },
+    readouts: { posts: "篇文章", figures: "張可以動手玩的圖", operators: "個手寫運算子" },
     topics: "依主題瀏覽：看見、思考、生成、行動",
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
     all: "全部",
+    moreTags: "更多",
+    fewerTags: "收合",
     viewAll: "查看全部文章",
     empty: "這個標籤下還沒有文章。",
   },
@@ -70,6 +75,8 @@ const zh = {
     updated: "更新",
     readingTime: "閱讀時間",
     mathLabel: "數學式，可左右捲動",
+    tableLabel: "表格，可左右捲動",
+    codeLabel: "程式碼，可左右捲動",
     toc: "本頁目錄",
     backToTop: "回到頂端",
     fallback: "這篇文章目前只有中文版。",

@@ -14,7 +14,8 @@ const FORWARD = 2, BACK = 1, TURN = 1.5, SIDE = 0.8;
 const WINDOW = 8, RATE = 10, SLOTS = WINDOW * RATE;
 /** Two decimals, without the "-0.00" a tiny negative number would give. */
 const fmt = (v: number) => (Math.abs(v) < 0.005 ? 0 : v).toFixed(2);
-const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], w: [0, 1], ArrowDown: [0, -1], s: [0, -1], ArrowLeft: [-1, 0], a: [-1, 0], ArrowRight: [1, 0], d: [1, 0] };
+/** Physical keys (`event.code`), so an input method that makes W type ㄊ does not take the controls away. */
+const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], KeyW: [0, 1], ArrowDown: [0, -1], KeyS: [0, -1], ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0] };
 
 /** Fig. 01: drive it. The reader's command and what the robot actually does, side by side. */
 export function RemoteLab() {
@@ -54,7 +55,7 @@ export function RemoteLab() {
     setStick([clamp(((e.clientX - box.left) / box.width) * 2 - 1), clamp(1 - ((e.clientY - box.top) / box.height) * 2)]);
   };
   const keys = (e: KeyboardEvent<HTMLDivElement>) => {
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const key = e.code;
     if (!(key in KEYS)) return;
     e.preventDefault();
     if (e.type === "keydown") held.current.add(key); else held.current.delete(key);

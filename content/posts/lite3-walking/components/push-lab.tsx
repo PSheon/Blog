@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLabels } from "./labels";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { pushRobot, useRig } from "./rig";
 import type { Knobs, Lite3Sim } from "./sim";
 import { Stage } from "./stage";

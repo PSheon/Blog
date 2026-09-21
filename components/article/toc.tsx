@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUp } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { TocItem } from "@/lib/content/toc";
 import { cn } from "@/lib/utils";
@@ -21,8 +22,11 @@ function useActiveHeading(ids: string[]): string | null {
       setActive(current ?? headings[0].id);
     };
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
+    // Once a frame at most: a scroll event fires more often than the screen redraws, and each one measured every heading.
+    let queued = 0;
+    const onScroll = () => { if (!queued) queued = requestAnimationFrame(() => { queued = 0; update(); }); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => { window.removeEventListener("scroll", onScroll); cancelAnimationFrame(queued); };
   }, [ids]);
 
   return active;
@@ -38,7 +42,7 @@ function TocList({ items, active, onNavigate, stagger }: { items: TocItem[]; act
             onClick={onNavigate}
             aria-current={active === item.id ? "location" : undefined}
             className={cn(
-              "-ml-px block border-l py-1.5 leading-snug transition-colors",
+              "tap -ml-px block border-l py-1.5 leading-snug transition-colors",
               item.depth === 3 ? "pl-7" : "pl-4",
               active === item.id
                 ? "border-signal text-foreground"
@@ -53,13 +57,14 @@ function TocList({ items, active, onNavigate, stagger }: { items: TocItem[]; act
   );
 }
 
-export function Toc({ items, label }: { items: TocItem[]; label: string }) {
+export function Toc({ items, label, top }: { items: TocItem[]; label: string; /** the words for the way back up */ top: string }) {
   const active = useActiveHeading(items.map((i) => i.id));
   if (items.length === 0) return null;
   return (
     <nav aria-label={label}>
       <p className="label mb-3">{label}</p>
       <TocList items={items} active={active} />
+      <a href="#top" className="tap mt-3 inline-flex min-h-6 items-center gap-1 font-sans text-xs text-muted-foreground hover:text-foreground"><ArrowUp className="size-3.5" aria-hidden />{top}</a>
     </nav>
   );
 }
@@ -72,12 +77,14 @@ export function Toc({ items, label }: { items: TocItem[]; label: string }) {
 export function TocDisclosure({ items, label }: { items: TocItem[]; label: string }) {
   const active = useActiveHeading(items.map((i) => i.id));
   const [open, setOpen] = useState(false);
-  const root = useRef<HTMLDivElement>(null);
+  const root = useRef<HTMLDivElement>(null), toggle = useRef<HTMLButtonElement>(null);
   const panelId = useId();
+  // Folded, the panel is inert: focus left inside it would be lost. It goes back to the button that opened the panel.
+  const close = () => { if (root.current?.contains(document.activeElement) && document.activeElement !== toggle.current) toggle.current?.focus({ preventScroll: true }); setOpen(false); };
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
     const onPointer = (e: PointerEvent) => !root.current?.contains(e.target as Node) && setOpen(false);
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
@@ -102,6 +109,7 @@ export function TocDisclosure({ items, label }: { items: TocItem[]; label: strin
         data-testid="toc-bar"
       >
         <button
+          ref={toggle}
           type="button"
           aria-expanded={open}
           aria-controls={panelId}
@@ -118,7 +126,7 @@ export function TocDisclosure({ items, label }: { items: TocItem[]; label: strin
         <div id={panelId} inert={!open} className="toc-panel grid">
           <div className="min-h-0 overflow-hidden">
             <nav aria-label={label} className="max-h-[60dvh] overflow-y-auto overscroll-contain px-4 pb-4">
-              <TocList items={items} active={active} onNavigate={() => setOpen(false)} stagger />
+              <TocList items={items} active={active} onNavigate={close} stagger />
             </nav>
           </div>
         </div>

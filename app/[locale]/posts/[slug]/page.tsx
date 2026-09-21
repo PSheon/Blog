@@ -9,7 +9,7 @@ import { PostFooter } from "@/components/article/post-footer";
 import { ReadingProgress } from "@/components/article/progress";
 import { ScrollableMath } from "@/components/article/scrollable-math";
 import { Toc, TocDisclosure } from "@/components/article/toc";
-import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
+import { EntryNo, InteractiveBadge, TagLink } from "@/components/site/post-meta";
 import { getAdjacentPosts, getAllPosts, getPostMeta, getRelatedPosts, getToc } from "@/lib/content/posts";
 import { formatDate, getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
 import { sharedMetadata } from "@/lib/seo";
@@ -83,7 +83,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
   return (
     <>
       <ReadingProgress />
-      <ScrollableMath label={t.post.mathLabel} />
+      <ScrollableMath label={t.post.mathLabel} tableLabel={t.post.tableLabel} codeLabel={t.post.codeLabel} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
@@ -92,32 +92,35 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
       >
         <aside className="hidden xl:block">
           <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-8">
-            <Toc items={toc} label={t.post.toc} />
+            <Toc items={toc} label={t.post.toc} top={t.post.backToTop} />
           </div>
         </aside>
 
         <div className="mx-auto min-w-0 max-w-[42.5rem] xl:col-span-2 xl:mx-0 xl:max-w-none">
           {post.draft && (
-            // Only ever rendered by `next dev`: a production build has no drafts. To the author, so in both languages.
+            // Only ever rendered by `next dev`: a production build has no drafts. To the author, in the page's language.
             <p role="note" data-testid="draft-banner" className="mb-6 max-w-[48rem] rounded-md border border-signal-2 bg-signal-2/10 px-4 py-3 font-sans text-sm leading-relaxed">
-              <strong className="font-semibold text-signal-2">草稿 DRAFT</strong>
+              <strong className="font-semibold text-signal-2">{locale === "en" ? "DRAFT" : "草稿"}</strong>
               <span className="mx-2 text-muted-foreground">/</span>
-              這篇只在本機的 <code className="font-mono text-xs">next dev</code> 看得到，正式站不會出現。拿掉 frontmatter 的 <code className="font-mono text-xs">draft: true</code>（中英文兩個檔）才會發布。
-              <span lang="en" className="mt-1 block text-muted-foreground">Only <code className="font-mono text-xs">next dev</code> shows this page; production builds leave it out. Remove <code className="font-mono text-xs">draft: true</code> from both language files to publish.</span>
+              {locale === "en" ? (
+                <>Only <code className="font-mono text-xs">next dev</code> shows this page; production builds leave it out. Remove <code className="font-mono text-xs">draft: true</code> from both language files to publish.</>
+              ) : (
+                <>這篇只在本機的 <code className="font-mono text-xs">next dev</code> 看得到，正式站不會出現。拿掉 frontmatter 的 <code className="font-mono text-xs">draft: true</code>（中英文兩個檔）才會發布。</>
+              )}
             </p>
           )}
           <header className="max-w-[48rem] border-b border-rule pb-8">
             <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              <EntryNo no={post.no} draft={post.draft} className="text-signal" />
+              <EntryNo no={post.no} draft={post.draft} locale={locale} className="text-signal" />
               {post.interactive && <InteractiveBadge label={t.post.interactive} />}
             </p>
             {/* Same name as the title in the post index: the browser morphs one into the other. */}
             <ViewTransition name={`post-title-${slug}`} share="title-morph" default="none">
-              <h1 className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+              <h1 lang={post.isFallback ? htmlLang[post.locale] : undefined} className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance [&:lang(zh)]:tracking-normal">
                 {post.title}
               </h1>
             </ViewTransition>
-            <p className="mt-5 font-serif text-xl leading-relaxed text-muted-foreground">{post.description}</p>
+            <p lang={post.isFallback ? htmlLang[post.locale] : undefined} className="mt-5 font-serif text-xl leading-relaxed text-muted-foreground">{post.description}</p>
             <dl className="mt-7 flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs">
               <div>
                 <dt className="text-muted-foreground">{t.post.published}</dt>
@@ -138,6 +141,8 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
                 <dd className="mt-0.5">{t.post.minutes(post.readingMinutes)}</dd>
               </div>
             </dl>
+            {/* What it is about, before reading it and not only after. */}
+            <div className="mt-5 flex flex-wrap gap-1.5 font-sans">{post.tags.map((tag) => <TagLink key={tag} tag={tag} locale={locale} />)}</div>
           </header>
 
           {post.isFallback && (

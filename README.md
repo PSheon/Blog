@@ -1,9 +1,9 @@
 # paul.notebook — machine learning models built from scratch, trained in your browser
 
 [![CI](https://github.com/PSheon/Blog/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PSheon/Blog/actions/workflows/ci.yml)
-[![Live site](https://img.shields.io/badge/live-paul--notebook.vercel.app-79dafa)](https://paul-notebook.vercel.app)
+[![Live site](https://img.shields.io/badge/live-paul--notebook.vercel.app-79dafa)](https://blog.psheon.me)
 
-**[paul-notebook.vercel.app](https://paul-notebook.vercel.app)** · [English](https://paul-notebook.vercel.app/en) · [中文](https://paul-notebook.vercel.app/zh) · [RSS](https://paul-notebook.vercel.app/en/feed.xml)
+**[blog.psheon.me](https://blog.psheon.me)** · [English](https://blog.psheon.me/en) · [中文](https://blog.psheon.me/zh) · [RSS](https://blog.psheon.me/en/feed.xml)
 
 An interactive machine-learning blog. Every article takes one model apart — a CNN, a Transformer, a
 diffusion model, neuroevolution, a quadruped's walking policy — and ships with instruments you can train,
@@ -13,22 +13,24 @@ no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 從零實作機器學習模型的互動部落格：每一篇都能在瀏覽器裡訓練、拆開、弄壞。CNN、Transformer、擴散模型、
 神經演化、機器狗走路策略，全部用 TypeScript 從零寫起，不靠任何機器學習函式庫。
 
-![paul.notebook](https://paul-notebook.vercel.app/en/opengraph-image)
+![paul.notebook](https://blog.psheon.me/en/opengraph-image)
 
 ## Articles
 
 | № | English | 中文 |
 | --- | --- | --- |
-| 010 | [A task scheduler from scratch](https://paul-notebook.vercel.app/en/posts/task-scheduler) | [從零打造一個任務排程器](https://paul-notebook.vercel.app/zh/posts/task-scheduler) |
-| 009 | [A city nobody schedules — 300 people, each minding their own needs](https://paul-notebook.vercel.app/en/posts/city-of-agents) | [沒有人排班的城市：300 個小人各忙各的](https://paul-notebook.vercel.app/zh/posts/city-of-agents) |
-| 008 | [Drawing the map while finding yourself on it — SLAM from scratch](https://paul-notebook.vercel.app/en/posts/slam-2d) | [一邊畫地圖，一邊找自己](https://paul-notebook.vercel.app/zh/posts/slam-2d) |
-| 007 | [How a cloud of noise becomes an apple: a 3-D diffusion model trained in the browser](https://paul-notebook.vercel.app/en/posts/diffusion-points) | [一團雜訊怎麼長成一顆蘋果](https://paul-notebook.vercel.app/zh/posts/diffusion-points) |
-| 006 | [A robot dog in the browser: its walking policy is four matrix multiplications (MuJoCo WASM)](https://paul-notebook.vercel.app/en/posts/lite3-walking) | [把一隻機器狗搬進瀏覽器](https://paul-notebook.vercel.app/zh/posts/lite3-walking) |
-| 005 | [One body, two heads: a multi-task HydraNet that draws boxes and masks](https://paul-notebook.vercel.app/en/posts/hydranet-fruit) | [一個身體，兩個頭：HydraNet](https://paul-notebook.vercel.app/zh/posts/hydranet-fruit) |
-| 004 | [Training a Transformer from scratch: autodiff engine, attention maps](https://paul-notebook.vercel.app/en/posts/transformer-from-scratch) | [在瀏覽器裡從零訓練一個 Transformer](https://paul-notebook.vercel.app/zh/posts/transformer-from-scratch) |
-| 003 | [A neuroevolution trading squad on 2024 AAPL prices](https://paul-notebook.vercel.app/en/posts/trading-agent) | [打造神經進化交易戰隊](https://paul-notebook.vercel.app/zh/posts/trading-agent) |
-| 002 | [Neuroevolution: 50 birds teach themselves Flappy Bird](https://paul-notebook.vercel.app/en/posts/ai-flappy-bird) | [讓 50 隻小鳥自己學會 Flappy Bird](https://paul-notebook.vercel.app/zh/posts/ai-flappy-bird) |
-| 001 | [A CNN from scratch: watching a convolutional network see](https://paul-notebook.vercel.app/en/posts/cnn-from-scratch) | [從零開始的 CNN](https://paul-notebook.vercel.app/zh/posts/cnn-from-scratch) |
+| 012 | [Putting a path tracer in a 3D playground: crash a car, gun a plane, fly a helicopter](https://blog.psheon.me/en/posts/light-playground) | [把光追放進 3D 遊樂園：體驗開車碰撞、飛機加速、直升機飛行](https://blog.psheon.me/zh/posts/light-playground) |
+| 011 | [How a picture clears from snow: a WebGPU path tracer from scratch](https://blog.psheon.me/en/posts/light-from-noise) | [一張圖怎麼從雪花變清晰：從零寫一個 WebGPU 路徑追蹤器](https://blog.psheon.me/zh/posts/light-from-noise) |
+| 010 | [A task scheduler from scratch](https://blog.psheon.me/en/posts/task-scheduler) | [從零打造一個任務排程器](https://blog.psheon.me/zh/posts/task-scheduler) |
+| 009 | [A city nobody schedules — 300 people, each minding their own needs](https://blog.psheon.me/en/posts/city-of-agents) | [沒有人排班的城市：300 個小人各忙各的](https://blog.psheon.me/zh/posts/city-of-agents) |
+| 008 | [Drawing the map while finding yourself on it — SLAM from scratch](https://blog.psheon.me/en/posts/slam-2d) | [一邊畫地圖，一邊找自己](https://blog.psheon.me/zh/posts/slam-2d) |
+| 007 | [How a cloud of noise becomes an apple: a 3-D diffusion model trained in the browser](https://blog.psheon.me/en/posts/diffusion-points) | [一團雜訊怎麼長成一顆蘋果](https://blog.psheon.me/zh/posts/diffusion-points) |
+| 006 | [A robot dog in the browser: its walking policy is four matrix multiplications (MuJoCo WASM)](https://blog.psheon.me/en/posts/lite3-walking) | [把一隻機器狗搬進瀏覽器](https://blog.psheon.me/zh/posts/lite3-walking) |
+| 005 | [One body, two heads: a multi-task HydraNet that draws boxes and masks](https://blog.psheon.me/en/posts/hydranet-fruit) | [一個身體，兩個頭：HydraNet](https://blog.psheon.me/zh/posts/hydranet-fruit) |
+| 004 | [Training a Transformer from scratch: autodiff engine, attention maps](https://blog.psheon.me/en/posts/transformer-from-scratch) | [在瀏覽器裡從零訓練一個 Transformer](https://blog.psheon.me/zh/posts/transformer-from-scratch) |
+| 003 | [A neuroevolution trading squad on 2024 AAPL prices](https://blog.psheon.me/en/posts/trading-agent) | [打造神經進化交易戰隊](https://blog.psheon.me/zh/posts/trading-agent) |
+| 002 | [Neuroevolution: 50 birds teach themselves Flappy Bird](https://blog.psheon.me/en/posts/ai-flappy-bird) | [讓 50 隻小鳥自己學會 Flappy Bird](https://blog.psheon.me/zh/posts/ai-flappy-bird) |
+| 001 | [A CNN from scratch: watching a convolutional network see](https://blog.psheon.me/en/posts/cnn-from-scratch) | [從零開始的 CNN](https://blog.psheon.me/zh/posts/cnn-from-scratch) |
 
 Built with Next.js 16 (App Router, static generation) · MDX · shadcn/ui (Base UI) · Tailwind v4 · TypeScript ·
 Three.js and MuJoCo WebAssembly where an article needs them.

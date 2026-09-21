@@ -7,7 +7,7 @@ import { KernelMark } from "./kernel-mark";
 import { LocaleSwitch } from "./locale-switch";
 import { ThemeToggle } from "./theme-toggle";
 
-const linkClass = "py-1 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline";
+const linkClass = "tap py-1 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline";
 
 /**
  * The notebook's colophon: one sentence about how it is made, the handful of places to go, and the two

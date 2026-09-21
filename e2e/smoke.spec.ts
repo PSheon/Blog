@@ -423,6 +423,9 @@ test("one visit is enough to read offline: the first page, an article reached by
   await page.goto("/en");
   await expect.poll(kept, { timeout: 30_000 }).toBe(true);
   // A client-side navigation fetches an RSC payload, not the HTML that a reload asks for. That has to be kept too.
+  // (By way of the index of all articles: the home page lists the newest six, and this one is no longer among them.)
+  await page.locator('main a[href="/en/posts"]').first().click();
+  await expect(page).toHaveURL(/\/en\/posts$/);
   await page.locator('main a[href="/en/posts/transformer-from-scratch"]').first().click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
   await expect.poll(kept, { timeout: 30_000 }).toBe(true);
@@ -585,8 +588,8 @@ test("a city of people runs in the page: the clock moves, the three heads differ
   await thumb.focus();
   await page.keyboard.press("Home");
   await expect(page.getByTestId("city-live")).toBeEnabled();
-  await page.getByTestId("city-live").click();
-  await expect(page.getByTestId("city-live")).toBeDisabled();
+  // On a slow runner the first click can land while the timeline is still re-rendering from the Home key: click until it takes.
+  await expect(async () => { const live = page.getByTestId("city-live"); if (await live.isEnabled()) await live.click(); await expect(live).toBeDisabled({ timeout: 1_000 }); }).toPass({ timeout: 15_000 });
   expect(errors).toEqual([]);
 });
 
@@ -695,5 +698,77 @@ test("three progress bars watch a job and disagree; a fourth learns", async ({ p
   const plan = await value("plan"), learned = await value("learn");
   expect(plan).toBeGreaterThan(5);
   expect(learned).toBeLessThan(plan * 0.7);
+  expect(errors).toEqual([]);
+});
+
+test("a picture clears from noise on the reader's GPU, or the figure says why it cannot", async ({ page }) => {
+  const response = await page.goto("/zh/posts/light-from-noise");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "light-from-noise is still a draft");
+  const errors = watchErrors(page);
+  const figure = page.locator('[data-instrument="light / converge"]');
+  await figure.scrollIntoViewIfNeeded();
+  const adapter = await page.evaluate(async () => ("gpu" in navigator ? Boolean(await (navigator as unknown as { gpu: { requestAdapter(): Promise<unknown> } }).gpu.requestAdapter()) : false));
+  if (!adapter) {
+    // CI has no GPU. Say so where a reader of the report will see it, and check what a reader without one is shown.
+    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the GPU path tracer did not run; checked the fallback picture, its message and the CPU paths" });
+    await expect(figure.getByTestId("light-status")).toContainText(/WebGPU/);
+    await expect(figure.getByTestId("light-canvas-fallback")).toBeVisible(); // the finished picture stands in
+    // The one-path figure is the CPU's: it has to work over the fallback picture.
+    const path = page.locator('[data-instrument="light / one path"]');
+    await path.scrollIntoViewIfNeeded();
+    await path.getByTestId("light-shoot-100").click();
+    await expect.poll(async () => Number((await path.getByTestId("light-paths").textContent())!.replace(/\D/g, ""))).toBeGreaterThan(100);
+    expect(errors).toEqual([]);
+    return;
+  }
+  const spp = async () => Number((await figure.getByTestId("light-spp").textContent())!.replace(/\D/g, "") || 0);
+  await page.waitForTimeout(600);
+  expect(await spp()).toBe(1); // one sample to look at, then it waits for the reader
+  await figure.getByTestId("light-toggle").click();
+  await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(64);
+  await figure.getByTestId("light-toggle").click(); // pause: the count stops
+  const held = await spp();
+  await page.waitForTimeout(600);
+  expect(await spp()).toBe(held);
+  expect(errors).toEqual([]);
+});
+
+test("the playground is a game: a character walks it, gets into a car, and the picture is path traced, or the figure says why it cannot", async ({ page }) => {
+  const response = await page.goto("/zh/posts/light-playground");
+  test.skip(response?.status() === 404, "light-playground is still a draft");
+  const errors = watchErrors(page);
+  const figure = page.locator('[data-instrument="playground / fly"]');
+  await figure.scrollIntoViewIfNeeded();
+  const adapter = await page.evaluate(async () => { const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu; return gpu ? Boolean(await gpu.requestAdapter()) : false; });
+  if (!adapter) {
+    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the playground was not rendered and the game did not start; only the message was checked" });
+    await expect(figure.getByTestId("light-status")).toContainText(/WebGPU/);
+    expect(errors).toEqual([]);
+    return;
+  }
+  const stage = figure.getByTestId("playground-stage"), spp = async () => Number((await figure.getByTestId("playground-spp").textContent())!.replace(/\D/g, "") || 0);
+  await figure.getByTestId("playground-enter").click(); // the game is fetched when asked for, not by scrolling past
+  await expect(stage).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(32); // standing still, it clears
+  await stage.focus();
+  await page.keyboard.down("KeyW");
+  await page.waitForTimeout(500);
+  expect(await spp()).toBeLessThan(8); // moving, every frame is a new picture
+  await page.keyboard.up("KeyW");
+  // next to a car, F walks to the door, opens it, sits down: Sketchbook's states end at the wheel
+  await figure.getByTestId("playground-go-car").click();
+  await stage.focus();
+  await page.keyboard.press("KeyF");
+  await expect(stage).toHaveAttribute("data-seat", "driving", { timeout: 15_000 });
+  await page.keyboard.press("KeyF");
+  await expect(stage).not.toHaveAttribute("data-seat", "driving", { timeout: 10_000 });
+  // expanded it covers the window and says which keys do what now; Escape closes it
+  await figure.getByTestId("playground-expand").click();
+  await expect(page.locator('[data-expanded="true"]')).toBeVisible();
+  const covers = await page.getByTestId("playground-canvas").evaluate((c) => { const r = c.getBoundingClientRect(); return r.width >= innerWidth - 1 && r.height >= innerHeight - 1; });
+  expect(covers).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-expanded="true"]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
