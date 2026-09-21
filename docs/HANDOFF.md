@@ -24,8 +24,34 @@ pipeline, and the head-camera study in `docs/research/head-camera/` that would r
 `next dev`, with a "草稿 DRAFT" mark.
 it dull.
 
+### The light series (two articles, both complete drafts on `dev`)
+
+`light-from-noise` (№ 011, part one: what path tracing is) and `light-playground` (№ 012, part two: a playground you
+walk, drive and fly through, path traced every frame). Paul cut the plan from four articles to two because theory-first
+articles bore him; what the engine can do beyond the two articles (four sampling strategies, MIS, a white furnace)
+stays in `lib/rt` with its tests. Read before touching it:
+
+- `docs/research/light/RESULTS.md`: every number in the articles, how it was measured, and the measuring mistakes
+  (u32 counters overflow with 64-sample bursts at 960 × 540: use 16; wait for the figure's loop to be idle).
+- `lib/rt/`: scene, SAH BVH, CPU reference, the WGSL kernel (`kernel.ts`: path tracing, NEE/MIS, GGX, glass, outdoors,
+  a second tree for moving things, temporal reprojection, an à-trous filter), `gpu.ts` (the Renderer), `dynamic.ts`
+  (prepared trees refitted per frame), `playground.ts`, `models.ts`, `boxman.ts` (assets and CPU skinning).
+  The kernel is AT the default limit of 8 storage buffers per stage: one more needs `requiredLimits`.
+  `tests/rt/wgsl.test.ts` checks the shaders for WGSL reserved words, which reached the browser three times.
+- `components/rt/`: `use-tracer.ts` (worker build, frame loop, waits for Start, paces by elapsed time), `stage.tsx`.
+  In development `window.__lights[<canvas test id>]` and `window.__world` are there for measurements.
+- The game is `content/posts/light-playground/components/game/`: `character.ts` is Sketchbook's character state machine
+  ported state for state (its source, MIT, is cloned for reference at `../light-work/sketchbook-src`), `world.ts` is
+  Rapier, `car.ts`, `aircraft.ts`. All of it has tests that need no GPU (`tests/rt/`); Rapier runs in vitest.
+- Assets are packed by `scripts/light/pack-*.mjs` from `../light-work/assets/*.glb`. **`world.glb` must never be
+  committed**: it embeds Textures.com photographs. The packed files hold geometry, skeleton, clips and names only, and
+  tests check that no image is inside.
+- CI has no GPU. The light E2E tests skip (draft) or take the "no adapter" branch; what needs a GPU was checked by hand
+  in the Playwright MCP browser, whose own tab must be in front for pointer lock (a `newContext()` window is refused).
+
 ## Waiting on Paul
 
+- Read and play the two light articles; on his word both lose `draft` and go out in ONE `dev` → `main` PR.
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
 - A test on a real phone. Nobody has done one.
 - Search Console (the verification env vars exist). The custom domain is done. Open: should `psheon.me` and `www.psheon.me` redirect to `blog.` instead of serving the site too.

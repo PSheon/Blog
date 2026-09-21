@@ -119,6 +119,15 @@ Rules inside an instrument:
 - A stage whose content depends on colour (coloured point clouds) stays dark in both themes: wrap it in
   `className="dark bg-[#070918]"`.
 
+### Controls for steering something by hand
+
+One thumb stick for the whole site: `components/lab/stick.tsx` (drag it, or focus it and use the arrows / W A S D; it
+has a `quarterTurn` for an overlay rotated by CSS). Do not build another control for the same job. Every key handler
+reads `event.code`, never `event.key`: with a Zhuyin or Cangjie input method on, W types ㄊ and a control that waits
+for "w" is dead. A figure that is a game may expand to cover the window (the playground does): then the world is the
+whole screen and everything else floats over it, the keys shown are the ones for what the reader is doing right now,
+the stick and touch buttons appear only on coarse pointers, a click takes the pointer and Escape always gives it back.
+
 ### A new article also needs
 
 - Its instruments exported twice: `components/labs.ts` re-exports them plainly, and `components/index.ts` (the one the
