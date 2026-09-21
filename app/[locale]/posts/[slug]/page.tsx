@@ -15,7 +15,8 @@ import { formatDate, getDictionary, htmlLang, isLocale, locales } from "@/lib/i1
 import { sharedMetadata } from "@/lib/seo";
 import { site } from "@/lib/site";
 
-export const dynamicParams = false;
+// An unknown value is rendered on demand and ends in notFound() below (see the note in app/[locale]/layout.tsx).
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   return locales.flatMap((locale) => getAllPosts(locale).map((p) => ({ locale, slug: p.slug })));

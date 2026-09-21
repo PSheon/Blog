@@ -159,19 +159,31 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
   });
 }
 
-test("a URL that matches nothing gets the site's own 404, not the framework's", async ({ page }) => {
-  const response = await page.goto("/zh/no-such-page/at-all");
-  expect(response?.status()).toBe(404);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
-  await expect(page.getByRole("banner")).toBeVisible();
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+test("a URL that matches nothing gets the site's own 404, in the language of the URL", async ({ page }) => {
+  // A page that matches no route, an article that does not exist, a tag nobody used: all three end in the same 404.
+  for (const [url, title, other, home] of [
+    ["/zh/no-such-page/at-all", "找不到這一頁", "Page not found", "/zh"],
+    ["/en/posts/pcb-flip-", "Page not found", "找不到這一頁", "/en"],
+    ["/en/tags/no-such-tag", "Page not found", "找不到這一頁", "/en"],
+  ] as const) {
+    const response = await page.goto(url);
+    expect(response?.status(), url).toBe(404);
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toHaveText(title);
+    await expect(heading).not.toContainText(other); // it used to say both at once
+    await expect(page.getByTestId("not-found").getByRole("link")).toHaveAttribute("href", home);
+    await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  }
 });
 
 test("URLs outside both locales get the site's own 404 too, styled and themed", async ({ page }) => {
   for (const url of ["/no-such-page", "/no-such/page/at-all"]) {
     const response = await page.goto(url);
     expect(response?.status()).toBe(404);
+    // Nothing in such a URL says which language the reader wants, so this one speaks both.
     await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Page not found");
     // The framework's fallback is black on white; ours carries the stylesheet and the default dark theme.
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(7, 9, 24)");
   }
@@ -643,3 +655,45 @@ for (const locale of ["zh", "en"] as const) {
     }
   });
 }
+
+test("three progress bars watch a job and disagree; a fourth learns", async ({ page }) => {
+  const response = await page.goto("/zh/posts/task-scheduler");
+  expect(response?.status()).toBe(200);
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+
+  // The step-through: rule 2 hands tasks to workers; a running task can be made to fail and is ready again at once.
+  const graph = page.getByTestId("graph-lab");
+  await graph.scrollIntoViewIfNeeded();
+  await graph.getByTestId("graph-step").click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 2");
+  const running = graph.locator('[data-testid^="node-running-"]').first();
+  await running.click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 4");
+
+  // Failures: with one attempt in five failing, the averaged jobs report failed attempts and wasted time.
+  const fail = page.getByTestId("fail-lab");
+  await fail.scrollIntoViewIfNeeded();
+  await expect(fail.getByRole("status")).toContainText("150", { timeout: 40_000 });
+  await expect.poll(async () => Number.parseFloat(await fail.locator(".tabular").nth(2).innerText()), { timeout: 40_000 }).toBeGreaterThan(5); // failed attempts per job
+  await page.getByTestId("race-start").scrollIntoViewIfNeeded();
+
+  // The opener: the bars start at zero, and once the job is over all of them say 100.
+  await expect(page.getByTestId("race-count")).toContainText("0%");
+  await page.getByTestId("race-start").click();
+  await expect(page.getByTestId("race-time")).toContainText("100%", { timeout: 40_000 });
+  for (const bar of ["count", "work", "plan"]) await expect(page.getByTestId(`race-${bar}`)).toContainText("100%");
+
+  // The averaged figures finish their 150 jobs; learning makes the forecast more honest than the plan alone.
+  const learn = page.getByTestId("learn-lab");
+  await learn.scrollIntoViewIfNeeded();
+  await expect(learn.getByRole("status")).toContainText("150", { timeout: 40_000 });
+  await page.getByTestId("learn-toggle").check();
+  // Wait for the rerun that includes the learning bar to finish, then read the two averages.
+  const value = async (bar: string) => Number.parseFloat(await learn.locator(`[data-testid="off-${bar}"][data-done="true"] .tabular`).innerText({ timeout: 40_000 }));
+  const plan = await value("plan"), learned = await value("learn");
+  expect(plan).toBeGreaterThan(5);
+  expect(learned).toBeLessThan(plan * 0.7);
+  expect(errors).toEqual([]);
+});

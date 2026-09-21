@@ -1,3 +1,4 @@
+import "server-only";
 import { ImageResponse } from "next/og";
 import { site } from "@/lib/site";
 
@@ -9,16 +10,31 @@ export const ogSize = { width: 1200, height: 630 };
  * as TrueType when the request carries no modern User-Agent.
  */
 async function subsetFont(family: string, weight: number, text: string): Promise<ArrayBuffer | null> {
-  try {
+  const once = async () => {
     const css = await fetch(
       `https://fonts.googleapis.com/css2?family=${family}:wght@${weight}&text=${encodeURIComponent(text)}`,
-    ).then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))));
+    ).then((r) => (r.ok ? r.text() : Promise.reject(new Error(`fonts.googleapis.com answered ${r.status}`))));
     const url = /src: url\((.+?)\) format\('(?:opentype|truetype)'\)/.exec(css)?.[1];
-    if (!url) return null;
-    return await fetch(url).then((r) => r.arrayBuffer());
-  } catch {
-    return null;
+    if (!url) throw new Error("no TrueType source in the stylesheet Google Fonts returned");
+    return fetch(url).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(`font file answered ${r.status}`))));
+  };
+  // One blip on the way to Google Fonts used to cost a Chinese article its share card without a word: the card fell
+  // back to the English title, the build stayed green, and nobody knew until a link was shared. So: three tries, and
+  // then say so. On a production deployment the build fails instead (the previous deployment stays up), because a
+  // wrong card on the live site is worse than a deploy that has to be run again.
+  let last: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      return await once();
+    } catch (error) {
+      last = error;
+      await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+    }
   }
+  const message = `[og] could not fetch the ${family} ${weight} subset after 3 tries: ${last instanceof Error ? last.message : String(last)}`;
+  if (process.env.VERCEL_ENV === "production") throw new Error(message);
+  console.warn(`${message}. The card falls back to Latin text.`);
+  return null;
 }
 
 interface Card {

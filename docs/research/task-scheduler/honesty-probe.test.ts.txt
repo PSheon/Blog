@@ -1,0 +1,12 @@
+// How honest four kinds of progress bar are, by setting: 200 jobs each, seeds 1–200.
+// Run: cp docs/research/task-scheduler/honesty-probe.test.ts.txt tests/scheduler/honesty-probe.test.ts
+//      pnpm exec vitest run tests/scheduler/honesty-probe.test.ts --disable-console-intercept ; rm tests/scheduler/honesty-probe.test.ts
+import { it } from "vitest";
+import { BARS, DEFAULT_JOB, makeJob, trace } from "@/content/posts/task-scheduler/components/sim";
+it("probe", () => {
+  for (const [label, o, w] of [["even, unbiased, 4w", { ...DEFAULT_JOB, skew: 0.2, bias: 0, noise: 0.05 }, 4], ["skewed, unbiased, 4w", { ...DEFAULT_JOB, bias: 0, noise: 0.05 }, 4], ["skewed, unbiased, 16w", { ...DEFAULT_JOB, bias: 0, noise: 0.05 }, 16], ["default (biased), 4w", DEFAULT_JOB, 4], ["default (biased), 16w", DEFAULT_JOB, 16]] as const) {
+    const sum = Object.fromEntries(BARS.map((b) => [b, { error: 0, above90: 0, backwards: 0 }])), N = 200, t0 = performance.now();
+    for (let s = 1; s <= N; s++) { const h = trace(makeJob(s, o), w).honesty; for (const b of BARS) { sum[b].error += h[b].error / N; sum[b].above90 += h[b].above90 / N; sum[b].backwards += h[b].backwards / N; } }
+    console.log(label.padEnd(24), BARS.map((b) => `${b}: ${sum[b].error.toFixed(1)} pts, ${(100 * sum[b].above90).toFixed(0)}% above 90, back ${sum[b].backwards.toFixed(1)}`).join(" | "), `[${((performance.now() - t0) / N).toFixed(1)} ms/run]`);
+  }
+}, 300000);
