@@ -6,9 +6,9 @@ const none: Keys = { anyDirection: false, justDirection: false, run: false, just
 
 function setup() {
   const log: string[] = [], door = { open: false };
-  const w = { grounded: true, speed: 0, impact: 0, turn: 0, vehicle: null as Surroundings["vehicle"], clipLength: (c: string) => LENGTH[c] ?? 0.5, jump: (s: number) => { log.push(`jump ${s}`); w.grounded = false; }, seated: () => log.push("seated"), released: (to: string) => log.push(`released ${to}`), cancelEntry: () => log.push("cancel") };
+  const w = { grounded: true, speed: 0, impact: 0, turn: 0, vehicle: null as Surroundings["vehicle"], clipLength: (c: string) => LENGTH[c] ?? 0.5, jump: (s: number) => { log.push(`jump ${s}`); w.grounded = false; }, seated: () => log.push("seated"), shifted: () => log.push("shifted"), released: (to: string) => log.push(`released ${to}`), cancelEntry: () => log.push("cancel") };
   const c = new Character(w as Surroundings), run = (seconds: number, keys: Partial<Keys> = {}) => { const seen = new Set<string>(); for (let i = 0; i < Math.round(seconds * 60); i++) { c.update(1 / 60, { ...none, ...keys }); seen.add(c.state); } return [...seen]; };
-  const vehicle = (airplane = false): NonNullable<Surroundings["vehicle"]> => ({ airplane, hasDoor: !airplane, get doorOpen() { return door.open; }, side: "right", exitSide: "left", doorSide: "left", speed: 0, open: () => { door.open = true; log.push("door open"); }, close: () => { door.open = false; log.push("door close"); }, noDirection: true });
+  const vehicle = (airplane = false, driverSeat = true): NonNullable<Surroundings["vehicle"]> => ({ driverSeat, shiftSide: "left", airplane, hasDoor: !airplane, get doorOpen() { return door.open; }, side: "right", exitSide: "left", doorSide: "left", speed: 0, open: () => { door.open = true; log.push("door open"); }, close: () => { door.open = false; log.push("door close"); }, noDirection: true });
   return { c, w, run, log, vehicle };
 }
 
@@ -73,6 +73,20 @@ describe("the character's states, as Sketchbook has them", () => {
     run(1 / 60, { justEnter: true }); expect([c.state, c.clip]).toEqual(["ExitingVehicle", "stand_up_left"]);
     expect(log.at(-1)).toBe("door open");
     run(0.7); expect(log.at(-1)).toBe("released CloseVehicleDoorOutside");
+  });
+
+  it("from the passenger's side: sits down there, closes that door, slides over to the wheel, and only then drives", () => {
+    const { c, w, run, log, vehicle } = setup();
+    const seat = vehicle(false, false); w.vehicle = seat;
+    c.enter("OpenVehicleDoor"); run(0.6); expect(c.state).toBe("EnteringVehicle");
+    run(0.6); expect(log).not.toContain("seated"); // in a seat, but not at the wheel
+    expect(c.state).toBe("CloseVehicleDoorInside");
+    run(0.8); expect(log.at(-1)).toBe("door close");
+    expect([c.state, c.clip]).toEqual(["SwitchingSeats", "sitting_shift_left"]);
+    run(0.3); expect(c.progress).toBeGreaterThan(0); expect(c.progress).toBeLessThan(1);
+    (seat as { driverSeat: boolean }).driverSeat = true; // what `shifted` does in the world
+    run(0.4); expect(log.slice(-2)).toEqual(["shifted", "seated"]);
+    expect([c.state, c.clip]).toEqual(["Driving", "driving"]);
   });
 
   it("climbs into the aeroplane with its own clip, and leaves it with a jump", () => {

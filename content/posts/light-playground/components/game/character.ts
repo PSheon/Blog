@@ -4,15 +4,16 @@ import type { ClipName } from "@/lib/rt";
  * The character's states, ported from Sketchbook (Jan Blaha / swift502, MIT: src/ts/characters/character_states). Same
  * states, same transitions, same numbers: the clip each state plays, how long it lasts, what the velocity and rotation
  * springs are set to, when the jump leaves the ground, how hard a landing has to be for a roll. What is not here is the
- * physics (Rapier moves the body; this only says how fast it wants to go and where it wants to face) and the passenger
- * seats (the character always drives).
+ * physics (Rapier moves the body; this only says how fast it wants to go and where it wants to face). A passenger seat is
+ * only ever a way in: reached from the passenger's side, the character sits down there and slides over to the wheel, as
+ * Sketchbook's does when it wants to drive.
  *
  * The file knows nothing of Rapier or the renderer, so that a test can walk it through its states.
  */
 export type StateName =
   | "Idle" | "IdleRotateLeft" | "IdleRotateRight" | "StartWalkForward" | "StartWalkLeft" | "StartWalkRight" | "StartWalkBackLeft" | "StartWalkBackRight" | "Walk" | "Sprint" | "EndWalk"
   | "JumpIdle" | "JumpRunning" | "Falling" | "DropIdle" | "DropRunning" | "DropRolling"
-  | "OpenVehicleDoor" | "EnteringVehicle" | "Driving" | "CloseVehicleDoorInside" | "ExitingVehicle" | "ExitingAirplane" | "CloseVehicleDoorOutside";
+  | "OpenVehicleDoor" | "EnteringVehicle" | "Sitting" | "SwitchingSeats" | "Driving" | "CloseVehicleDoorInside" | "ExitingVehicle" | "ExitingAirplane" | "CloseVehicleDoorOutside";
 
 /** What the keys say this step. `justX`: went down since the last step. */
 export interface Keys { anyDirection: boolean; justDirection: boolean; run: boolean; justRun: boolean; justJump: boolean; justEnter: boolean }
@@ -29,11 +30,13 @@ export interface Surroundings {
   turn: number;
   clipLength(clip: ClipName): number;
   /** the vehicle being entered or sat in, if any */
-  vehicle: { airplane: boolean; hasDoor: boolean; doorOpen: boolean; /** the seat, seen from the entry point */ side: Side; /** the entry point, seen from the seat */ exitSide: Side; /** the door, seen from the seat */ doorSide: Side; speed: number; open(): void; close(): void; noDirection: boolean } | null;
+  vehicle: { airplane: boolean; hasDoor: boolean; doorOpen: boolean; /** the seat, seen from the entry point */ side: Side; /** the entry point, seen from the seat */ exitSide: Side; /** the door, seen from the seat */ doorSide: Side; /** is the seat it is in (or getting into) the driver's */ driverSeat: boolean; /** the driver's seat, seen from this one */ shiftSide: Side; speed: number; open(): void; close(): void; noDirection: boolean } | null;
   /** leave the ground with this vertical speed */
   jump(speed: number): void;
   /** the character is now in the driver's seat / back on its own feet */
   seated(): void;
+  /** it has slid over: its seat is now the driver's */
+  shifted(): void;
   released(to: "Falling" | "DropRolling" | "Idle" | "CloseVehicleDoorOutside"): void;
   /** abandon the way into a vehicle */
   cancelEntry(): void;
@@ -99,6 +102,8 @@ export class Character {
       case "DropRolling": this.velocity.mass = 1; this.velocity.damping = 0.6; this.velocityTarget = 0.8; this.steers = true; this.play("drop_running_roll", 0.03); break;
       case "OpenVehicleDoor": this.canFindVehicles = false; this.velocityTarget = 0; this.velocity.position = this.velocity.velocity = 0; this.approach.position = this.approach.velocity = 0; this.approach.target = 1; this.play(v?.side === "left" ? "open_door_standing_left" : "open_door_standing_right", 0.1); break;
       case "EnteringVehicle": this.canFindVehicles = false; this.velocityTarget = 0; this.velocity.position = this.velocity.velocity = 0; this.approach.target = 1; this.play(v?.airplane ? (v.side === "left" ? "enter_airplane_left" : "enter_airplane_right") : v?.side === "left" ? "sit_down_left" : "sit_down_right", 0.1); break;
+      case "Sitting": this.canFindVehicles = false; this.play("sitting", 0.1); break;
+      case "SwitchingSeats": this.canFindVehicles = false; this.canLeaveVehicles = false; this.play(v?.shiftSide === "left" ? "sitting_shift_left" : "sitting_shift_right", 0.1); break;
       case "Driving": this.canFindVehicles = false; this.play("driving", 0.1); break;
       case "CloseVehicleDoorInside": this.canFindVehicles = false; this.canLeaveVehicles = false; this.play(v?.doorSide === "left" ? "close_door_sitting_left" : "close_door_sitting_right", 0.1); v?.open(); break;
       case "ExitingVehicle": this.canFindVehicles = false; v?.open(); this.play(v?.exitSide === "left" ? "stand_up_left" : "stand_up_right", 0.1); break;
@@ -188,18 +193,25 @@ export class Character {
         else this.progress = Math.min(1, this.approach.step());
         return;
       case "EnteringVehicle": {
-        if (this.ended(step)) { w.seated(); this.enter("Driving"); return; }
+        if (this.ended(step)) { if (w.vehicle && !w.vehicle.driverSeat) this.enter("Sitting"); else { w.seated(); this.enter("Driving"); } return; }
         this.approach.step();
         this.progress = ease(Math.min(1, Math.max(0, this.timer / (this.length - (w.vehicle?.airplane ? 0.3 : 0)))));
         return;
       }
+      case "Sitting": // a passenger seat is on the way to the wheel: close the door first if it stands open, then slide over
+        if (w.vehicle?.hasDoor && w.vehicle.doorOpen && w.vehicle.noDirection) this.enter("CloseVehicleDoorInside"); else this.enter("SwitchingSeats");
+        return;
+      case "SwitchingSeats":
+        if (this.ended(step)) { w.shifted(); w.seated(); this.enter("Driving"); }
+        else this.progress = ease(this.timer / this.length);
+        return;
       case "Driving":
         if (keys.justEnter && this.canLeaveVehicles) { this.enter(w.vehicle?.airplane ? "ExitingAirplane" : "ExitingVehicle"); return; }
         if (w.vehicle?.hasDoor && w.vehicle.doorOpen && w.vehicle.noDirection) this.enter("CloseVehicleDoorInside");
         return;
       case "CloseVehicleDoorInside":
         if (this.timer > 0.4 && !this.closed) { this.closed = true; w.vehicle?.close(); }
-        if (this.ended(step)) this.enter("Driving");
+        if (this.ended(step)) this.enter(w.vehicle && !w.vehicle.driverSeat ? "Sitting" : "Driving");
         return;
       case "ExitingVehicle":
         if (this.ended(step)) {

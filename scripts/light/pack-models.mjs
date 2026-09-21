@@ -65,7 +65,7 @@ for (const name of ["car", "heli", "airplane"]) {
   const visit = (index, parent, part) => {
     const node = gltf.nodes[index], world = mul(parent, trs(node)), data = node.extras?.data;
     if (data === "collision") { const p = accessor(gltf.meshes[node.mesh].primitives[0].attributes.POSITION); let r = 0; const half = [0, 0, 0]; for (let k = 0; k < p.count; k++) { const v = [p.get(k, 0), p.get(k, 1), p.get(k, 2)].map((x, c) => Math.abs(x * Math.hypot(world[c * 4], world[c * 4 + 1], world[c * 4 + 2]))); r = Math.max(r, Math.hypot(...v)); for (let c = 0; c < 3; c++) half[c] = Math.max(half[c], v[c]); } colliders.push(node.extras.shape === "sphere" ? { shape: "sphere", at: [world[12], world[13], world[14]].map(round), radius: round(r) } : { shape: "box", at: [world[12], world[13], world[14]].map(round), half: half.map(round), rest: world.slice(0, 12).map(round) }); return; }
-    if (data === "seat") seats.push({ name: node.name, type: node.extras.seat_type, at: [world[12], world[13], world[14]].map(round), door: node.extras.door_object ?? null, entries: (node.extras.entry_points ?? "").split(";").filter(Boolean) });
+    if (data === "seat") seats.push({ name: node.name, type: node.extras.seat_type, at: [world[12], world[13], world[14]].map(round), door: node.extras.door_object ?? null, connected: (node.extras.connected_seats ?? "").split(";").filter(Boolean), entries: (node.extras.entry_points ?? "").split(";").filter(Boolean) });
     if (/^entrance/.test(node.name)) entries[node.name] = [world[12], world[13], world[14]].map(round);
     if (data === "camera") anchors.camera = [world[12], world[13], world[14]].map(round);
     let target = part;

@@ -68,9 +68,9 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
 
   // ---- the character: what it wants (character.ts) and what happens to it (here)
   let pending = 0, vy = 0, grounded = false, impact = 0, facing = 0, facingTarget = 0, air: [number, number] = [0, 0], horizontal = 0, turn = 0, doorsMoving = false;
-  let target: { vehicle: Vehicle; entry: Vec3; since: number } | null = null; // walking to a vehicle's door
-  let inside: { vehicle: Vehicle; entry: Vec3; from: Vec3; fromYaw: number; seated: boolean } | null = null; // attached to a vehicle: from the door to the seat and back
-  const last = { jump: false, run: false, direction: false, enter: false }, doorOf = (v: Vehicle) => (v.seat.door ? v.doors.get(v.seat.door) ?? null : null);
+  let target: { vehicle: Vehicle; seat: Seat; entry: Vec3; since: number } | null = null; // walking to a vehicle's door
+  let inside: { vehicle: Vehicle; /** the seat it is in or on its way into; a passenger's only until it has slid over */ seat: Seat; entry: Vec3; from: Vec3; fromYaw: number; seated: boolean } | null = null; // attached to a vehicle: from the door to the seat and back
+  const last = { jump: false, run: false, direction: false, enter: false }, doorOf = (v: Vehicle, seat: Seat) => (seat.door ? v.doors.get(seat.door) ?? null : null);
   let stick: [number, number] = [0, 0];
 
   const surroundings: Surroundings = {
@@ -79,19 +79,20 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     get vehicle() {
       const v = inside?.vehicle ?? target?.vehicle;
       if (!v) return null;
-      const entry = inside?.entry ?? target?.entry ?? v.seat.at, door = doorOf(v), part = models.models[v.name].parts.find((p) => p.name === v.seat.door), lv = v.body.linvel();
-      return { airplane: v.name === "airplane", hasDoor: !!door, doorOpen: !!door && door.rotation > 0 && door.target === door.rotation, side: sideOf(entry, v.seat.at), exitSide: sideOf(v.seat.at, entry), doorSide: part?.rest ? sideOf(v.seat.at, [part.rest[9], part.rest[10], part.rest[11]]) : "left", speed: Math.hypot(lv.x, lv.y, lv.z), open: () => { if (door) door.target = 1; }, close: () => { if (door) door.target = 0; }, noDirection: Math.hypot(stick[0], stick[1]) < 0.05 };
+      const seat = inside?.seat ?? target?.seat ?? v.seat, entry = inside?.entry ?? target?.entry ?? seat.at, door = doorOf(v, seat), part = models.models[v.name].parts.find((p) => p.name === seat.door), lv = v.body.linvel();
+      return { airplane: v.name === "airplane", hasDoor: !!door, doorOpen: !!door && door.rotation > 0 && door.target === door.rotation, side: sideOf(entry, seat.at), exitSide: sideOf(seat.at, entry), doorSide: part?.rest ? sideOf(seat.at, [part.rest[9], part.rest[10], part.rest[11]]) : "left", driverSeat: seat === v.seat, shiftSide: sideOf(seat.at, v.seat.at), speed: Math.hypot(lv.x, lv.y, lv.z), open: () => { if (door) door.target = 1; }, close: () => { if (door) door.target = 0; }, noDirection: Math.hypot(stick[0], stick[1]) < 0.05 };
     },
     jump: (speed) => { vy = speed > 0 ? Math.max(JUMP * 0.85, speed) : JUMP; grounded = false; },
     seated: () => { if (inside) inside.seated = true; },
+    shifted: () => { if (inside) { const v = inside.vehicle; inside.seat = v.seat; inside.entry = v.seat.entries[0]?.at ?? inside.entry; } }, // from now on the driver's seat, door and way out
     released: (to) => {
       if (!inside) { character.enter("Idle"); return; }
-      const v = inside.vehicle, m = v.pose(), lv = v.body.linvel(), at = apply(m, character.state === "ExitingAirplane" ? [v.seat.at[0], v.seat.at[1] + SEAT_UP + 1, v.seat.at[2]] : [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]]);
+      const v = inside.vehicle, m = v.pose(), lv = v.body.linvel(), at = apply(m, character.state === "ExitingAirplane" ? [inside.seat.at[0], inside.seat.at[1] + SEAT_UP + 1, inside.seat.at[2]] : [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]]);
       body.setTranslation({ x: at[0], y: at[1] + HALF + RADIUS, z: at[2] }, true); capsule.setEnabled(true);
       facing = facingTarget = Math.PI - yawOf(m); vy = lv.y; air = [lv.x, lv.z]; character.velocity.position = character.velocity.velocity = 0;
       const ground = world.castRay(new R.Ray({ x: at[0], y: at[1] + 0.5, z: at[2] }, { x: 0, y: -1, z: 0 }), 1.2, true, undefined, undefined, capsule, v.body);
       const next = to === "Falling" || !ground ? "Falling" : to;
-      if (next !== "CloseVehicleDoorOutside") { target = null; inside = null; } else { target = { vehicle: v, entry: inside.entry, since: 0 }; inside = null; } // closing the door still needs to know whose door
+      if (next !== "CloseVehicleDoorOutside") { target = null; inside = null; } else { target = { vehicle: v, seat: inside.seat, entry: inside.entry, since: 0 }; inside = null; } // closing the door still needs to know whose door
       character.enter(next);
     },
     cancelEntry: () => { target = null; },
@@ -115,7 +116,12 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     // F on foot: find a vehicle (Sketchbook looks 10 m around), and its driver's nearest entry point; the character then walks there by itself
     if (keys.justEnter && !inside && character.canFindVehicles) {
       const v = nearest(10);
-      if (v) { const t = body.translation(), here: Vec3 = [t.x, t.y, t.z], m = v.pose(); let best = v.seat.entries[0]?.at ?? v.seat.at, d = Infinity; for (const e of v.seat.entries) { const w = apply(m, e.at), dist = Math.hypot(w[0] - here[0], w[2] - here[2]); if (dist < d) { d = dist; best = e.at; } } target = { vehicle: v, entry: best, since: 0 }; }
+      if (v) { // the driver's seat, or a passenger seat one can slide over from, whichever door is nearer (Sketchbook's findVehicleToEnter)
+        const t = body.translation(), m = v.pose(), seats = models.models[v.name].seats.filter((s) => s === v.seat || s.connected.includes(v.seat.name));
+        let seat = v.seat, best = v.seat.entries[0]?.at ?? v.seat.at, d = Infinity;
+        for (const s of seats) for (const e of s.entries) { const w = apply(m, e.at), dist = Math.hypot(w[0] - t.x, w[2] - t.z); if (dist < d) { d = dist; best = e.at; seat = s; } }
+        target = { vehicle: v, seat, entry: best, since: 0 };
+      }
     }
 
     // the vehicles: whoever is driven gets the stick; doors swing (5 rad/s) to where they were told
@@ -132,8 +138,8 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
       character.update(STEP, keys);
       world.step();
       if (inside) {
-        const v = inside.vehicle, s = character.state, entry: Vec3 = [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]], seat: Vec3 = [v.seat.at[0], v.seat.at[1] + SEAT_UP, v.seat.at[2]];
-        const local = s === "OpenVehicleDoor" ? lerp(inside.from, entry, character.progress) : s === "EnteringVehicle" ? lerp(entry, seat, character.progress) : s === "ExitingVehicle" ? lerp(seat, entry, character.progress) : s === "ExitingAirplane" ? lerp(seat, [seat[0], seat[1] + 1, seat[2]], character.progress) : seat;
+        const v = inside.vehicle, s = character.state, entry: Vec3 = [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]], seat: Vec3 = [inside.seat.at[0], inside.seat.at[1] + SEAT_UP, inside.seat.at[2]], wheel: Vec3 = [v.seat.at[0], v.seat.at[1] + SEAT_UP, v.seat.at[2]];
+        const local = s === "OpenVehicleDoor" ? lerp(inside.from, entry, character.progress) : s === "EnteringVehicle" ? lerp(entry, seat, character.progress) : s === "ExitingVehicle" ? lerp(seat, entry, character.progress) : s === "ExitingAirplane" ? lerp(seat, [seat[0], seat[1] + 1, seat[2]], character.progress) : s === "SwitchingSeats" ? lerp(seat, wheel, character.progress) : seat;
         const yaw = s === "OpenVehicleDoor" ? inside.fromYaw * (1 - character.progress) : 0, m = v.pose();
         now.kind = "inside"; now.local = local; now.yaw = yaw; now.vehicle = v;
         const at = apply(m, local); body.setTranslation({ x: at[0], y: at[1] + HALF + RADIUS, z: at[2] }, false);
@@ -146,11 +152,11 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     let mx = input.move[0], my = input.move[1], yaw = input.yaw;
     if (target && character.state !== "CloseVehicleDoorOutside") { // walking to the door by itself: the stick is overridden, in world terms
       const t = body.translation(), goal = apply(target.vehicle.pose(), target.entry), dx = goal[0] - t.x, dz = goal[2] - t.z, dist = Math.hypot(dx, dz);
-      target.since += STEP;
-      if ((dist < 0.2 || (dist < 1.4 && target.since > 1.2 && horizontal < 0.4) || target.since > 6) && character.canEnterVehicles && Math.abs(goal[1] - (t.y - HALF - RADIUS)) < 2) {
-        const m = target.vehicle.pose(), feet: Vec3 = [t.x, t.y - HALF - RADIUS, t.z], door = doorOf(target.vehicle);
+      target.since += STEP; // (walking into a corner of the vehicle, or too long on the way: it gets in from where it stands)
+      if ((dist < 0.2 || (dist < 1.6 && target.since > 1 && horizontal < 0.4) || target.since > 3.5) && character.canEnterVehicles && Math.abs(goal[1] - (t.y - HALF - RADIUS)) < 2) {
+        const m = target.vehicle.pose(), feet: Vec3 = [t.x, t.y - HALF - RADIUS, t.z], door = doorOf(target.vehicle, target.seat);
         let relative = Math.PI - facing - yawOf(m); relative = Math.atan2(Math.sin(relative), Math.cos(relative)); // how the model is turned, seen from the vehicle
-        inside = { vehicle: target.vehicle, entry: target.entry, from: into(m, feet), fromYaw: relative, seated: false }; target = null;
+        inside = { vehicle: target.vehicle, seat: target.seat, entry: target.entry, from: into(m, feet), fromYaw: relative, seated: false }; target = null;
         capsule.setEnabled(false); vy = 0;
         character.enter(door && door.rotation < 0.5 ? "OpenVehicleDoor" : "EnteringVehicle");
         if (!door) inside.from = [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]];
