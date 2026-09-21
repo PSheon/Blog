@@ -5,3 +5,4 @@ export * from "./playground";
 export * from "./ggx";
 export * from "./dynamic";
 export * from "./models";
+export * from "./boxman";

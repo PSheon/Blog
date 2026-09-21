@@ -18,7 +18,7 @@ const PALETTE: Record<string, Vec3> = {
   helipad: [0.9, 0.55, 0.05], arrow_down: [0.9, 0.8, 0.1], ocean: [0.01, 0.05, 0.08],
 };
 
-export interface Playground extends Scene { spawns: { type: string; at: Vec3; /** the spawn's three axes, column by column */ basis: number[] }[]; /** where each vehicle's three materials (paint, window, tyre) start in `materials` */ vehicleMaterials: Record<ModelName, number> }
+export interface Playground extends Scene { spawns: { type: string; at: Vec3; /** the spawn's three axes, column by column */ basis: number[] }[]; /** where each vehicle's three materials (paint, window, tyre) start in `materials` */ vehicleMaterials: Record<ModelName, number>; /** the character's material */ characterMaterial: number }
 
 export function parsePlayground(file: ArrayBuffer): Playground {
   const view = new DataView(file), jsonBytes = view.getUint32(0, true), header = JSON.parse(new TextDecoder().decode(new Uint8Array(file, 4, jsonBytes))) as { vertices: number; triangles: number; indexBytes: 2 | 4; materials: string[]; spawns: Playground["spawns"] };
@@ -31,7 +31,8 @@ export function parsePlayground(file: ArrayBuffer): Playground {
   const materials: Material[] = header.materials.map((name) => ({ albedo: PALETTE[name] ?? [0.6, 0.6, 0.6], emit: [0, 0, 0], mirror: name === "ocean" }));
   const vehicleMaterials = {} as Record<ModelName, number>;
   for (const name of Object.keys(VEHICLE_MATERIALS) as ModelName[]) { vehicleMaterials[name] = materials.length; materials.push(...VEHICLE_MATERIALS[name]); }
-  return { vehicleMaterials, positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
+  const characterMaterial = materials.push({ albedo: [0.92, 0.78, 0.3], emit: [0, 0, 0] }) - 1;
+  return { vehicleMaterials, characterMaterial, positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
 }
 
 /** Where the sun is at `hour` (0–24) and how strong: direction towards it, strength 0.05…1, and the sky's level. */
@@ -39,4 +40,12 @@ export function sunAt(hour: number): { sun: [number, number, number, number]; sk
   const altitude = Math.sin(((hour - 6) / 24) * 2 * Math.PI), azimuth = ((hour - 6) / 12) * Math.PI;
   const d: Vec3 = [Math.cos(azimuth) * 0.8, Math.max(altitude, 0.05), Math.sin(azimuth) * 0.5 + 0.3], l = Math.hypot(...d);
   return { sun: [d[0] / l, d[1] / l, d[2] / l, Math.max(0.05, Math.min(1, altitude * 3))], skyLevel: Math.max(0.08, Math.min(1, altitude * 2 + 0.2)) };
+}
+
+/** The same file as a mesh for a physics engine: every vertex once, three indices a triangle. */
+export function parsePlaygroundMesh(file: ArrayBuffer): { vertices: Float32Array; indices: Uint32Array; spawns: Playground["spawns"] } {
+  const view = new DataView(file), jsonBytes = view.getUint32(0, true), header = JSON.parse(new TextDecoder().decode(new Uint8Array(file, 4, jsonBytes))) as { vertices: number; triangles: number; indexBytes: 2 | 4; spawns: Playground["spawns"] };
+  const at = 4 + jsonBytes, vertices = new Float32Array(file.slice(at, at + header.vertices * 12)), start = at + header.vertices * 12;
+  const indices = header.indexBytes === 4 ? new Uint32Array(file.slice(start, start + header.triangles * 12)) : Uint32Array.from(new Uint16Array(file.slice(start, start + header.triangles * 6)));
+  return { vertices, indices, spawns: header.spawns };
 }
