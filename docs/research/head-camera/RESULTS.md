@@ -453,6 +453,21 @@ far corner (x ≥ 0.46, y −0.10…−0.06) was 14–18 of 20, all of them fail
 from −0.10 at x = 0.44 to −0.05 at x = 0.50. Over 600 random page layouts (seed 7): 600/600 untouched, 596/600 at 10° of
 pitch. The tint is gone (Paul: no need to draw the forbidden part); the dashed outline shows the allowed area.
 
+## Runs 20–21 — pick and place made dependable: 60 000 steps (closed + shaken, 48 px, seeds 11–15)
+
+Run 20, the script's own evaluation over the full AREA (shadow included), as trained: 97.5 / 97.5 / 77 / 87.5 / 80.5
+(at 20 000 steps: 93.5 / 92 / 2.5 / 31.5 / 50.5). Losses 0.09–0.16. Run 21, the same five checkpoints on the page's
+layouts (block inside the cut BLOCK_AREA), 200 episodes, seed 99; mean (min–max):
+
+| as trained | pitch 5° | pitch 10° | pitch 20° | yaw 10° | block moved | pad moved |
+| --- | --- | --- | --- | --- | --- | --- |
+| **94.8 (92–100)** | 94.3 (88–100) | 93.2 (84–100) | 43.2 (17–60) | 92.4 (86–100) | 95.4 (90–100) | 95.8 (93–100) |
+
+Every seed is above 92 % untouched and above 84 % anywhere inside the shaken range: the seeds were slow, not broken, and
+the recipe is dependable at three times the steps. Cost: about 40 minutes a model with five at once. Two things are
+owed before the article's table can use this row: the other rows re-measured on the same (cut) layouts, which run 19
+predates (run 22), and keep-looking without shaking at the same 60 000 steps (run 23).
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
