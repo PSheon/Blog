@@ -19,6 +19,8 @@ no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 
 | № | English | 中文 |
 | --- | --- | --- |
+| 012 | [Putting a path tracer in a 3D playground: crash a car, gun a plane, fly a helicopter](https://blog.psheon.me/en/posts/light-playground) | [把光追放進 3D 遊樂園：體驗開車碰撞、飛機加速、直升機飛行](https://blog.psheon.me/zh/posts/light-playground) |
+| 011 | [How a picture clears from snow: a WebGPU path tracer from scratch](https://blog.psheon.me/en/posts/light-from-noise) | [一張圖怎麼從雪花變清晰：從零寫一個 WebGPU 路徑追蹤器](https://blog.psheon.me/zh/posts/light-from-noise) |
 | 010 | [A task scheduler from scratch](https://blog.psheon.me/en/posts/task-scheduler) | [從零打造一個任務排程器](https://blog.psheon.me/zh/posts/task-scheduler) |
 | 009 | [A city nobody schedules — 300 people, each minding their own needs](https://blog.psheon.me/en/posts/city-of-agents) | [沒有人排班的城市：300 個小人各忙各的](https://blog.psheon.me/zh/posts/city-of-agents) |
 | 008 | [Drawing the map while finding yourself on it — SLAM from scratch](https://blog.psheon.me/en/posts/slam-2d) | [一邊畫地圖，一邊找自己](https://blog.psheon.me/zh/posts/slam-2d) |
