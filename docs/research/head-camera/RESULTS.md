@@ -284,6 +284,21 @@ finite differences; it is not in lib/ml). "wrong" = ended holding still on the o
 - Even with only the named block on the bench, all three stay low (29–52 %), which suggests the task with two blocks in training is
   harder to learn, not just harder to evaluate.
 
+## Run 11 — language at 20 000 steps (late and film, seeds 11–15)
+
+| | two blocks | only the named one | instruction switched | named block moved | pitch 5° | yaw 10° | noise 0.05 | light 70 % |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| late | 46.6 (21–82), wrong 3.5 | 52.8 | 57.9 | 52.0 | 47.4 | 42.9 | 48.7 | 39.2 |
+| film | **74.7 (56–85)**, wrong 0.0 | 78.9 | 82.2 | 80.0 | 72.6 | 72.8 | 78.0 | 67.9 |
+
+- Twice the steps: FiLM 47 → 75 %, late 25 → 47 %. Both still rising, so still under-trained; FiLM's lead holds (28 points)
+  and its spread narrows (16–74 → 56–85).
+- **FiLM almost never goes to the wrong block**: 0.0 % with two blocks, at most 0.4 % in any column.
+  What it fails at is reaching, not choosing.
+- Switching the instruction halfway is not harder than keeping it (82 vs 75): the policy is re-asked every step.
+- At ≈ 300 s for 10 000 steps with 15 at once, 20 000 steps is far outside a page's budget. Language ships as a
+  checkpoint in any case (option A).
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
