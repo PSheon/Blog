@@ -33,7 +33,7 @@ export function ThemeToggle({ t }: { t: Dictionary["theme"] }) {
             title={t[value]}
             onClick={() => setTheme(value)}
             className={cn(
-              "tap grid h-6 w-7 place-items-center rounded-[5px] transition-colors",
+              "tap grid h-6 w-7 place-items-center rounded-sm transition-colors",
               active ? "bg-accent text-foreground ring-1 ring-foreground/45 ring-inset" : "text-muted-foreground hover:text-foreground", // the ring: the fill alone is 1.1:1 against its neighbours
             )}
           >

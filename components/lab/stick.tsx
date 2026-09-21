@@ -65,7 +65,7 @@ export function Stick({ label, hintId, onChange, testId, className, quarterTurn 
     >
       <span className="absolute top-1/2 right-3 left-3 h-px bg-border" aria-hidden />
       <span className="absolute top-3 bottom-3 left-1/2 w-px bg-border" aria-hidden />
-      <span className="absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-signal shadow" style={{ left: `${50 + at[0] * 36}%`, top: `${50 - at[1] * 36}%` }} aria-hidden />
+      <span className="absolute size-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-signal ring-1 ring-background/60" style={{ left: `${50 + at[0] * 36}%`, top: `${50 - at[1] * 36}%` }} aria-hidden />
     </div>
   );
 }

@@ -77,7 +77,7 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
       </DialogHeader>
       <DialogContent
         showCloseButton={false}
-        className="top-[12vh] w-[calc(100vw-1.5rem)] max-w-2xl translate-y-0 gap-0 overflow-hidden rounded-xl! border-border bg-popover/95 p-0 backdrop-blur-xl sm:top-[16vh] sm:max-w-2xl"
+        className="top-[12vh] w-[calc(100vw-1.5rem)] max-w-2xl translate-y-0 gap-0 overflow-hidden rounded-md! border-border bg-popover/95 p-0 backdrop-blur-xl sm:top-[16vh] sm:max-w-2xl"
       >
         {/* We rank results ourselves (lib/search.ts); cmdk only handles keyboard navigation. */}
         <Command shouldFilter={false} loop label={t.open} className="bg-transparent">

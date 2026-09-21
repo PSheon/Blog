@@ -39,9 +39,18 @@ The one exception is a stage that must stay dark in both themes (section 5).
   profile banner. Never three flat colour blocks side by side.
 - Text contrast is WCAG AA at minimum in both themes (axe checks every page in both). A new colour pair is
   measured before it ships.
-- Radius is small (`--radius: 0.375rem`): `rounded-sm` for chips and canvases, `rounded-md` for panels,
-  `rounded-full` only for pills and dots. Borders are 1 px. No drop shadows; depth comes from `panel`, borders and
-  the two glows (`.hero-glow`, `.card-glow`).
+- Radius is small (`--radius: 0.375rem`): `rounded-sm` for chips, toggle cells and canvases, `rounded-md` for panels,
+  buttons and dialogs, `rounded-full` only for pills and dots. Borders are 1 px: `--border` for a line that only
+  divides, `--input` (3:1 against every surface) for the edge of something that can be pressed or typed into.
+- No drop shadows on anything that sits in the page; depth comes from `panel`, borders and the two glows
+  (`.hero-glow`, `.card-glow`). A layer that floats over the page (the phone's drawer, the open outline, the install
+  hint) casts one, so that it reads as above the text it covers. The selected station's dot and the rail's dots
+  glow in their own colour: that is a signal, not depth.
+- Data series drawn into a canvas (SLAM's estimate, wheels and loop; HydraNet's boxes; the path figure's lamp) are
+  constants in the code, because WebGL materials and 2-D contexts take numbers, not custom properties. They are the
+  dark theme's signal colours. Ink and ground do follow the theme (read from the canvas's computed `color`).
+- Chinese body text runs 37 characters to the line (680 px at 18 px, measured); that is inside the 30–40 that reads
+  well set horizontally, so the measure is the same as the English one's and figures keep the column's width.
 
 ### Type
 
@@ -61,7 +70,7 @@ The one exception is a stage that must stay dark in both themes (section 5).
 
 ### Motion
 
-- Short and functional: page swap 120 ms out / 260 ms in, title morph 340 ms (native View Transitions through
+- Short and functional: page swap 180 ms out / 460 ms in (90 ms late), title morph 340 ms (native View Transitions through
   React `<ViewTransition>`; not framer-motion).
 - The page swap is keyed to the pathname (`components/site/page-swap.tsx`, enter/exit). Never hang it on
   `<ViewTransition update>`: a `next/dynamic` component replacing its placeholder is an update too, and replayed
