@@ -45,7 +45,7 @@ export function PickLab() {
   const t = useLabels();
   const root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), eye = useRef<HTMLCanvasElement>(null);
   const near = useNear(root), reduced = useReducedMotion();
-  const [policies, setPolicies] = useState<Record<Driver, PickPolicy> | null>(null), [failed, setFailed] = useState(false);
+  const [policies, setPolicies] = useState<Record<Driver, PickPolicy> | null>(null), [failed, setFailed] = useState(false), [no3d, setNo3d] = useState(false);
   const [driver, setDriver] = useState<Driver>("shaken"), [pitch, setPitch] = useState(0), [yaw, setYaw] = useState(0);
   const [noise, setNoise] = useState(0), [light, setLight] = useState(1), [playing, setPlaying] = useState<boolean | null>(null), [touched, setTouched] = useState(false);
   const [status, setStatus] = useState({ what: "fetch" as "fetch" | "carry" | "placed" | "home", placed: 0, keys: [] as XY[] });
@@ -56,7 +56,14 @@ export function PickLab() {
 
   useEffect(() => {
     if (!near || policies) return;
-    Promise.all(DRIVERS.map((d) => fetch(`/posts/head-camera/pick-${d}.json`).then((r) => { if (!r.ok) throw new Error(d); return r.json(); })))
+    // One hiccup should not leave the figure dead: each checkpoint is tried three times, a second apart.
+    const load = async (d: Driver) => {
+      for (let attempt = 0; ; attempt++) {
+        try { const r = await fetch(`/posts/head-camera/pick-${d}.json`); if (!r.ok) throw new Error(`${d}: ${r.status}`); return await r.json(); }
+        catch (error) { if (attempt === 2) throw error; await new Promise((ok) => setTimeout(ok, 1000)); }
+      }
+    };
+    Promise.all(DRIVERS.map(load))
       .then((saved) => setPolicies(Object.fromEntries(DRIVERS.map((d, i) => [d, new PickPolicy(saved[i])])) as Record<Driver, PickPolicy>))
       .catch(() => setFailed(true));
   }, [near, policies]);
@@ -68,7 +75,9 @@ export function PickLab() {
   useEffect(() => {
     if (!policies || !canvas.current) return;
     let bench: BenchView | null = null, frame = 0, alive = true, visible = true, last = performance.now();
-    const io = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; }, { rootMargin: "100px" });
+    // Read the LAST entry: when the page is busy a batch can hold "out of view" and then "in view" for the same canvas,
+    // and taking the first left the figure paused in plain sight (it showed up as one stalled run in forty).
+    const io = new IntersectionObserver((entries) => { visible = entries[entries.length - 1].isIntersecting; }, { rootMargin: "100px" });
     io.observe(canvas.current);
 
     const step = () => {
@@ -101,9 +110,11 @@ export function PickLab() {
     const tick = (now: number) => {
       if (!alive) return;
       frame = requestAnimationFrame(tick);
-      if (!bench || !visible) return;
+      if (!visible) return;
       const w = world.current, k = knobs.current, s = w.s;
+      // The model runs whether or not the 3D view exists: without WebGL the camera's picture and the status still work.
       if (k.running && now - last >= STEP_MS) { last = now; w.at = now; step(); }
+      if (!bench) return;
       const f = k.running ? Math.min(1, (now - w.at) / STEP_MS) : 1, hand: Vec3 = [w.from[0] + (s.hand[0] - w.from[0]) * f, w.from[1] + (s.hand[1] - w.from[1]) * f, w.from[2] + (s.hand[2] - w.from[2]) * f];
       w.jaws += ((s.closed ? 1 : 0) - w.jaws) * 0.3;
       const open = k.driver === "open" && w.phase === "work" && w.belief;
@@ -114,7 +125,7 @@ export function PickLab() {
         held: w.drag === "block" || w.drag === "pad" ? w.drag : null, look: { yaw: k.yaw * deg, pitch: k.pitch * deg }, time: now,
       });
     };
-    import("./view3d").then(({ BenchView }) => BenchView.create(canvas.current!, "pick")).then((b) => { if (alive) { bench = b; step(); } else b.dispose(); });
+    import("./view3d").then(({ BenchView }) => BenchView.create(canvas.current!, "pick")).then((b) => { if (alive) bench = b; else b.dispose(); }).catch(() => { if (alive) setNo3d(true); });
     frame = requestAnimationFrame(tick);
 
     const c = canvas.current, ndc = (e: PointerEvent): XY => { const r = c.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1]; };
@@ -168,6 +179,7 @@ export function PickLab() {
       <div className="relative aspect-[4/5] w-full overflow-hidden rounded-md border border-border bg-background sm:aspect-[16/10]">
         <canvas ref={canvas} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" role="img" aria-label={t.pickBench} data-testid="headcam-pick" />
         {!policies && <p className="absolute inset-0 grid place-items-center text-muted-foreground" role={failed ? "alert" : "status"}>{failed ? t.failed : t.loading}</p>}
+        {no3d && <p className="absolute inset-0 grid place-items-center px-8 text-center text-muted-foreground" role="alert">{t.no3d}</p>}
         <div className={`absolute top-3 left-3 flex max-w-[60%] flex-wrap gap-0.5 p-0.5 ${panel}`} role="group" aria-label={t.policy}>
           {DRIVERS.map((d) => (
             <button key={d} type="button" aria-pressed={driver === d} onClick={() => setDriver(d)} data-testid={`headcam-pick-${d}`}

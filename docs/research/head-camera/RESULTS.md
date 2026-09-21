@@ -477,6 +477,20 @@ uses these three rows and run 21's 60 000-step row, and says the budgets differ.
 seed 11 (60 000 steps): on 200 page layouts 100 % untouched, 99.5 % at 10° of pitch, 100 / 100 / 97 % at 80 / 70 / 50 % light,
 96.5 % and 44.5 % at noise 0.05 and 0.15.
 
+## Runs 23–24 — keep-looking WITHOUT shaking at the same 60 000 steps: an equal-budget comparison
+
+Run 23 (full AREA, 200 episodes), as trained per seed: 99.5 / 96.5 / 71.5 / 96 / 100; at 10° of pitch 0–1.5 % in every
+seed. Run 24, the same checkpoints on the page's layouts, mean (min–max):
+
+| | as trained | pitch 5° | pitch 10° | yaw 10° | block moved | pad moved |
+| --- | --- | --- | --- | --- | --- | --- |
+| closed, 60 000 | 95.5 (81–100) | 28.2 (0–52) | 0.7 | 9.0 (0–34) | 94.2 | 95.8 |
+| closed + shaken, 60 000 (run 21) | 94.8 (92–100) | 94.3 | 93.2 | 92.4 | 95.4 | 95.8 |
+
+Equal budgets, equal skill with the camera untouched, and 1 % against 93 % at 10°. The article's table now uses this row,
+and `pick-fixed.json` is run 23's seed 11 (on 200 page layouts: 99.5 % untouched, 51 % at 5°, 1 % at 10°; 79 / 34 / 0 % at
+80 / 70 / 50 % light; 0 % at noise 0.05). Look-once stays at 10 000 steps: it sees one picture an episode.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

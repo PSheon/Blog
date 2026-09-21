@@ -13,11 +13,15 @@ test.beforeEach(async ({ request }) => {
 });
 
 test("fig. 01: the arm picks the block up and puts it on the pad, and again with the camera tilted 10°", async ({ page }) => {
-  test.slow(); // two whole episodes of a 48 px network, one step every 150 ms
+  // Two whole episodes of a 48 px network, one step every 150 ms; with the whole suite running and WebGL in software an
+  // episode that takes 6 s alone has taken over 40.
+  test.setTimeout(240_000);
   await page.goto(ZH);
   const bench = page.getByTestId("headcam-pick");
   await bench.scrollIntoViewIfNeeded();
-  await expect(page.getByTestId("headcam-pick-status")).toHaveText("放好了", { timeout: 40_000 });
+  // If the checkpoints or the 3D view failed to load, say so instead of timing out on the status.
+  await expect(bench.locator("xpath=..").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByTestId("headcam-pick-status")).toHaveText("放好了", { timeout: 90_000 });
   await expect(page.getByTestId("headcam-pick-count")).toHaveText("放好 1 次");
   // The picture-in-picture is the network's input: it has been painted, not left blank.
   const painted = await page.getByTestId("headcam-pick-eye").evaluate((c: HTMLCanvasElement) => new Set(c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data).size);
@@ -25,7 +29,7 @@ test("fig. 01: the arm picks the block up and puts it on the pad, and again with
   await page.getByRole("slider", { name: "下傾" }).first().focus();
   for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight");
   await page.getByTestId("headcam-pick-shuffle").click();
-  await expect(page.getByTestId("headcam-pick-count")).toHaveText("放好 2 次", { timeout: 40_000 });
+  await expect(page.getByTestId("headcam-pick-count")).toHaveText("放好 2 次", { timeout: 90_000 });
 });
 
 test("fig. 01: with the camera tilted 10° the never-shaken model does not place the block", async ({ page }) => {

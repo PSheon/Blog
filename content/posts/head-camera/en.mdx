@@ -50,7 +50,7 @@ What the rest of this article asks is: will a network that learns from demonstra
 
 A script is the teacher: it knows where the block and the pad are, and at every step says which way to move, whether to go down, and whether to grip. The network sees only the 48 × 48 picture at every step, plus the hand's height and whether the gripper is open, and learns to say the same.<Sidenote>It is deliberately not told where its hand is over the bench. If it were, it could find its way back to working out absolute positions, the road that breaks when the camera moves. Helix does read wrist pose; at its scale the data can settle this. This little network cannot.</Sidenote> In training the camera never moves.
 
-The result is not visual servoing. The “keep looking” in fig. 01 was trained this way: with the camera untouched it places nearly every block, at 5° of tilt three in ten, and **at 10° none**.
+The result is not visual servoing. The “keep looking” in fig. 01 was trained this way: with the camera untouched it places nearly every block, at 5° of tilt half of them, and **at 10° one in a hundred**.
 
 In training the camera never moved, so "where the block is in the picture" and "how far the hand is from the block" always changed together, and either one explains everything the teacher ever said. The network has no reason to prefer the second; once the camera tilts, the first, which it leaned on, is wrong.
 
@@ -64,12 +64,12 @@ Four ways of doing it, each the mean of five random seeds:
 | --- | --- | --- | --- | --- | --- |
 | Look once | 66% | 0% | 0% | 18% | 12% |
 | Look once + shaken | 51% | 53% | 46% | 16% | 11% |
-| Keep looking | 74% | 0% | 1% | 73% | 74% |
+| Keep looking | 96% | 1% | 9% | 94% | 96% |
 | Keep looking + shaken | 95% | 93% | 92% | 95% | 96% |
 
-Read across: the two rows that never saw a shaken camera go to zero the moment it tilts; the two that did barely notice. Read down: when something is moved halfway through, “look once” cannot follow and “keep looking” does not care, because it was looking again at every step anyway.
+Read across: the two rows that never saw a shaken camera go to almost nothing the moment it tilts; the two that did barely notice. Read down: when something is moved halfway through, “look once” cannot follow and “keep looking” does not care, because it was looking again at every step anyway.
 
-The last row took 60,000 training steps, and all five seeds are above 92%. That number was hard won: at 20,000 steps the five seeds were 100, 97, 59, 37 and 2.5. The method was the same; some seeds simply learn slowly, and three times the steps brought every one of them in.<Sidenote>The rows had different budgets: look once 10,000 steps, keep looking 20,000 (its five seeds run from 16% to 100%, the same thing again), keep looking + shaken 60,000. Going to zero under a tilt, for the two rows that were never shaken, has nothing to do with how long they trained.</Sidenote>
+The last two rows both trained for 60,000 steps and are equally good with the camera untouched (96% and 95%); they differ only once it tilts. In the last row all five seeds are above 92%, and that number was hard won: at 20,000 steps the five seeds were 100, 97, 59, 37 and 2.5. The method was the same; some seeds simply learn slowly, and three times the steps brought every one of them in.<Sidenote>The two “look once” rows trained for only 10,000 steps: it sees one picture an episode, and more training does not give it a second look.</Sidenote>
 
 ## Why picking up is harder than touching
 
@@ -116,10 +116,10 @@ The three models of fig. 01, given light and noise they never saw in training (2
 | | normal | light 80% | light 70% | light 50% | noise 0.05 | noise 0.15 |
 | --- | --- | --- | --- | --- | --- | --- |
 | Look once | 71% | 72% | 58% | 11% | 15% | 0% |
-| Keep looking | 100% | 90% | 0% | 0% | 0% | 0% |
+| Keep looking | 99.5% | 79% | 34% | 0% | 0% | 0% |
 | + shaken, noise, light | 100% | 100% | 100% | 97% | 96.5% | 44.5% |
 
-The middle row goes from 100% to 0% when the light drops by three tenths, or with a little noise. In its training no pixel's value ever changed, so it was free to lean on exact colours. It is the lesson of the fixed camera again: **what training never varies, the network will come to depend on.** So the second extra thing in the recipe is noise (up to 0.1) and brightness (60% to 120%) at random on every training picture. Inside that range the last row hardly notices; noise of 0.15, outside it, still breaks it.
+The middle row is down to a third when the light drops by three tenths, and to 0% with a little noise. In its training no pixel's value ever changed, so it was free to lean on exact colours. It is the lesson of the fixed camera again: **what training never varies, the network will come to depend on.** So the second extra thing in the recipe is noise (up to 0.1) and brightness (60% to 120%) at random on every training picture. Inside that range the last row hardly notices; noise of 0.15, outside it, still breaks it.
 
 ## What is really different from Figure
 

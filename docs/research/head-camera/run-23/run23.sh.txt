@@ -1,0 +1,9 @@
+#!/bin/zsh
+# Run 23: keep-looking with the camera never shaken, at the same 60 000 steps as run 20, five seeds, weights saved.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run23
+for s in 11 12 13 14 15; do
+  HP_SAVE=$OUT HP_TEACHER=0 HP_SIZE=48 HP_EPISODES=200 HP_KINDS=closed HP_SHAKE=0 HP_STEPS=60000 HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/closed-shake0-60k-$s.log 2>&1 &
+done
+wait
+echo DONE
