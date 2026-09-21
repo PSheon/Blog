@@ -1,10 +1,11 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
-import { Stage, Transport } from "./stage";
+import { Stage } from "./stage";
 import { useTracer } from "./use-tracer";
 
 const SIZES = [1_000, 10_000, 100_000, 1_000_000] as const;
@@ -21,12 +22,13 @@ const BURST = 64;
 export function BvhLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const [triangles, setTriangles] = useState<number>(SIZES[0]), [brute, setBrute] = useState(false), [seen, setSeen] = useState<{ perRay: number; mrays: number; build: number; count: number; depth: number } | null>(null), [progress, setProgress] = useState(0);
-  const burst = useRef({ gpuMs: 0, done: false });
+  // `wanted` is what the switch says right now; `configure` may run before React has rendered the new state.
+  const burst = useRef({ gpuMs: 0, done: false }), wanted = useRef(false);
   const off = brute && triangles <= BRUTE_LIMIT;
   const tracer = useTracer(root, canvas, {
     triangles, size: 256, maxSamples: BURST, autostart: true, budgetMs: off ? 30 : 10,
     // White is 48 node visits with the hierarchy; without it the scale is the triangle count, or everything would be white.
-    configure: (r) => { r.heat = true; r.brute = off; r.heatMax = off ? triangles : 48; },
+    configure: (r) => { const bruteNow = wanted.current && triangles <= BRUTE_LIMIT; r.heat = true; r.brute = bruteNow; r.heatMax = bruteNow ? triangles : 48; },
     // A fixed burst, measured exactly: every ray and every visit of the 64 samples, over the GPU time they took.
     afterFrame: async (r, built, batch) => {
       const k = burst.current;
@@ -63,12 +65,13 @@ export function BvhLab() {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4">
-        <Transport status={tracer.status} live={tracer.live} onToggle={tracer.toggle} onRestart={() => { again(); tracer.restart(); }} t={t} />
+        {/* A burst of 64 samples is a measurement, not something to pause: the one control is to take it again. */}
+        <Button size="sm" disabled={!tracer.live} onClick={() => { again(); tracer.restart(); }} data-testid="light-bvh-again"><RotateCcw className="size-4" aria-hidden />{t.measureAgain}</Button>
         <div className="flex items-center gap-2" role="group" aria-label={t.triangles}>
           <span className="label">{t.triangles}</span>
           {SIZES.map((n) => <Button key={n} size="sm" variant={triangles === n ? "default" : "outline"} disabled={tracer.unavailable} onClick={() => { again(); setTriangles(n); tracer.rebuild(); }} data-testid={`light-bvh-tris-${n}`}>{compact(n)}</Button>)}
         </div>
-        <Button size="sm" variant={off ? "default" : "outline"} aria-pressed={off} disabled={!tracer.live || triangles > BRUTE_LIMIT} onClick={() => { again(); setBrute((b) => !b); queueMicrotask(tracer.restart); }} data-testid="light-bvh-off">{t.bvhOff}</Button>
+        <Button size="sm" variant={off ? "default" : "outline"} aria-pressed={off} disabled={!tracer.live || triangles > BRUTE_LIMIT} onClick={() => { again(); wanted.current = !wanted.current; setBrute(wanted.current); tracer.restart(); }} data-testid="light-bvh-off">{t.bvhOff}</Button>
       </div>
       {triangles > BRUTE_LIMIT && <p className="text-muted-foreground">{t.bruteLimit}</p>}
     </div>

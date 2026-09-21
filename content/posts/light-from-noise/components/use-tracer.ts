@@ -106,6 +106,6 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
   /** Start the picture over with the current settings. */
   const restart = useCallback(() => restartRef.current?.(), []);
   /** A different scene (or another try at getting a GPU): back to "building", and the effect above does the rest. */
-  const rebuild = useCallback(() => { setStatus("building"); setBuilt(null); setEpoch((e) => e + 1); }, []);
+  const rebuild = useCallback(() => { wantRunning.current = true; /* the reader pressed something: the new scene runs */ setStatus("building"); setBuilt(null); setEpoch((e) => e + 1); }, []);
   return { status, built, renderer, toggle, restart, rebuild, live: status === "running" || status === "paused", unavailable: status === "no-webgpu" || status === "no-adapter" || status === "failed" };
 }
