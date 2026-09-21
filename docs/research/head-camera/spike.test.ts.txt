@@ -1,0 +1,230 @@
+/**
+ * Head-camera spike: is "keep looking at your own hand" really immune to a knocked camera, and how long does it train?
+ *
+ *   mkdir -p tests/headcam && cp docs/research/head-camera/spike.test.ts.txt tests/headcam/spike.test.ts
+ *   HC_STEPS=2500 pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept; rm -r tests/headcam
+ *
+ * One arm (the № 010 kinematics), one block on the bench, one camera above the arm's shoulder looking down the bench:
+ * a head camera. The tip moves in a plane 9 cm above the bench; an action is a step of at most 2.5 cm in x and y.
+ * Success: within 3 cm of the block for three steps in a row, inside 40 steps.
+ *
+ * Four policies, the same small network (conv, conv, 8 spatial-softmax keypoints, two dense layers), trained with lib/ml
+ * exactly as a page would train them, so the seconds below are the reader's seconds:
+ *   open    sees one picture with the arm parked, says where the block is (bench coordinates); a script drives there
+ *   closed  sees every picture, arm included, says which way to move
+ *   blind   the arm is not drawn; it is told where its hand is (proprioception) and says which way to move
+ *   both    sees the arm and is told where its hand is
+ * Nobody ever trains with the camera moved. Then the camera is turned.
+ */
+import { writeFileSync } from "node:fs";
+import { describe, it } from "vitest";
+import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
+import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/pcb-flip-vla/components/sim";
+
+const SIZE = 32, HALF = SIZE / 2, K = 8, HIDDEN = 32;
+// A humanoid's arm hangs from a shoulder beside its head, not under it: the camera is 22 cm to the arm's left. Seen from
+// straight above the base (the first run), the forearm hid the hand.
+const HEAD = { eye: [-0.12, 0.22, 0.62] as Vec3, target: [0.36, 0, 0.02] as Vec3, fov: 58 };
+const Z = 0.055, MAX_STEP = 0.025, TOL = 0.03, MAX_STEPS = 40, HOLD = 3;
+const AREA = { x: [0.22, 0.5], y: [-0.22, 0.22] } as const, CENTRE = [0.36, 0], SPAN = [0.14, 0.22];
+/** "pairs": as "closed", but the dense layers are shown only the gaps between keypoints, never where a keypoint is. */
+type Kind = "open" | "closed" | "blind" | "both" | "pairs";
+type Rng = () => number;
+
+const unit = (a: Vec3): Vec3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const flat = (c: Vec3, h: Vec3, top: [number, number, number]): Box => ({ c, u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], h, top });
+
+function scene(tip: [number, number], block: [number, number], arm: boolean): Box[] {
+  const boxes: Box[] = [flat([0.34, 0, -0.01], [0.4, 0.36, 0.01], [196, 198, 208]), flat([block[0], block[1], 0.02], [0.02, 0.02, 0.02], [214, 60, 60])];
+  if (!arm) return boxes;
+  const q = solveIK([tip[0], tip[1], Z], 0) as Joints, [shoulder, elbow, wrist, end] = skeleton(q), up: Vec3 = [0, 0, 1];
+  const link = (from: Vec3, to: Vec3, thick: number, top: [number, number, number]) => {
+    const u = unit([to[0] - from[0], to[1] - from[1], to[2] - from[2]]), v = unit(cross(up, u)), n = cross(u, v);
+    boxes.push({ c: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2], u, v, n, h: [Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) / 2, thick, thick], top });
+  };
+  boxes.push(flat([0, 0, shoulder[2] / 2], [0.035, 0.035, shoulder[2] / 2], [52, 56, 70]));
+  link(shoulder, elbow, 0.016, [240, 140, 40]); link(elbow, wrist, 0.014, [240, 140, 40]);
+  link(wrist, end, 0.014, [240, 140, 40]);
+  boxes.push(flat([end[0], end[1], end[2]], [0.022, 0.022, 0.014], [60, 200, 230])); // the hand: a colour nothing else has
+  return boxes;
+}
+
+/** Channel-first, 0…1: what conv2d wants. */
+function picture(tip: [number, number], block: [number, number], arm: boolean, shift: CameraShift): Float64Array {
+  const bytes = renderBoxes(scene(tip, block, arm), HEAD, shift, SIZE, 2), n = SIZE * SIZE, out = new Float64Array(3 * n);
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) out[c * n + i] = bytes[i * 3 + c] / 255;
+  return out;
+}
+
+const reachable = (p: [number, number]) => solveIK([p[0], p[1], Z], 0) !== null;
+const somewhere = (rng: Rng): [number, number] => { for (;;) { const p: [number, number] = [AREA.x[0] + rng() * (AREA.x[1] - AREA.x[0]), AREA.y[0] + rng() * (AREA.y[1] - AREA.y[0])]; if (reachable(p)) return p; } };
+const HOME: [number, number] = (() => { const t = tipOf(PARAMS.home as unknown as Joints); return [t[0], t[1]]; })();
+const norm = (p: [number, number]): [number, number] => [(p[0] - CENTRE[0]) / SPAN[0], (p[1] - CENTRE[1]) / SPAN[1]];
+const clip = (v: number) => Math.max(-1, Math.min(1, v));
+const expert = (tip: [number, number], block: [number, number]): [number, number] => [clip((block[0] - tip[0]) / MAX_STEP), clip((block[1] - tip[1]) / MAX_STEP)];
+
+class Net {
+  readonly params: Record<string, Mat> = {};
+  private readonly adam: Adam;
+  private readonly pos: Mat;
+  private readonly feel: boolean;
+  private readonly gaps: Mat | null = null;
+  constructor(readonly kind: Kind, rng: Rng) {
+    const he = (rows: number, fanIn: number) => { const m = new Mat(rows, fanIn), s = Math.sqrt(6 / fanIn); for (let i = 0; i < m.data.length; i++) m.data[i] = (rng() * 2 - 1) * s; return m; };
+    this.feel = kind === "blind" || kind === "both";
+    const pairs = (K * (K - 1)) / 2;
+    if (kind === "pairs") { // [1, K] · gaps = every keypoint minus every later one
+      this.gaps = new Mat(K, pairs);
+      for (let i = 0, col = 0; i < K; i++) for (let j = i + 1; j < K; j++, col++) { this.gaps.data[i * pairs + col] = 1; this.gaps.data[j * pairs + col] = -1; }
+    }
+    const P = this.params, inputs = kind === "pairs" ? 2 * pairs : 2 * K + (this.feel ? 2 : 0);
+    P.k1 = he(8, 27); P.b1 = new Mat(1, 8); P.k2 = he(16, 72); P.b2 = new Mat(1, 16); P.k3 = he(K, 16); P.b3 = new Mat(1, K);
+    P.w1 = he(inputs, HIDDEN); for (let i = 0; i < P.w1.data.length; i++) P.w1.data[i] *= Math.sqrt(HIDDEN / inputs); P.c1 = new Mat(1, HIDDEN);
+    P.w2 = he(HIDDEN, 2); for (let i = 0; i < P.w2.data.length; i++) P.w2.data[i] *= Math.sqrt(2 / HIDDEN); P.c2 = new Mat(1, 2);
+    this.adam = new Adam(P);
+    this.pos = new Mat(HALF, 1, Float64Array.from({ length: HALF }, (_, i) => ((i + 0.5) / HALF) * 2 - 1));
+  }
+  parameters(): number { return Object.values(this.params).reduce((n, p) => n + p.data.length, 0); }
+  forward(t: Tape, image: Float64Array, feel: [number, number]) {
+    const P = this.params, x = new Mat(3, SIZE * SIZE, image);
+    const f1 = t.maxPool2(t.relu(t.conv2d(x, P.k1, P.b1, { h: SIZE, w: SIZE, k: 3, inputGrad: false })), { h: SIZE, w: SIZE });
+    const f2 = t.relu(t.conv2d(f1, P.k2, P.b2, { h: HALF, w: HALF, k: 3 }));
+    const maps = t.scale(t.conv2d(f2, P.k3, P.b3, { h: HALF, w: HALF, k: 1 }), HALF); // marginal() averages: give the softmax something to bite on
+    const kx = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "x" })), this.pos), ky = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "y" })), this.pos);
+    const parts = this.gaps ? [t.matmul(t.transpose(kx), this.gaps), t.matmul(t.transpose(ky), this.gaps)] : [t.transpose(kx), t.transpose(ky)];
+    if (this.feel) parts.push(new Mat(1, 2, Float64Array.from(feel)));
+    const keys = t.concatCols(parts), h = t.relu(t.addRow(t.matmul(keys, P.w1), P.c1));
+    return { out: t.addRow(t.matmul(h, P.w2), P.c2), kx, ky };
+  }
+  /** One optimiser step on a batch; the mean loss. */
+  step(batch: { image: Float64Array; feel: [number, number]; want: [number, number] }[], lr: number): number {
+    for (const p of Object.values(this.params)) p.grad.fill(0);
+    let loss = 0;
+    for (const s of batch) { const t = new Tape(); loss += t.mse(this.forward(t, s.image, s.feel).out, s.want, undefined, 1 / batch.length); t.backward(); }
+    this.adam.step(lr);
+    return loss / batch.length;
+  }
+  act(image: Float64Array, feel: [number, number]): [number, number] { const o = this.forward(new Tape(), image, feel).out.data; return [o[0], o[1]]; }
+}
+
+const deg = Math.PI / 180, SHAKE = Number(process.env.HC_SHAKE ?? 0);
+/** HC_SHAKE degrees (and a tenth of that in cm): a different camera for every training picture. Evaluation never uses it. */
+const shaken = (rng: Rng): CameraShift => (SHAKE ? { yaw: (rng() * 2 - 1) * SHAKE * deg, pitch: (rng() * 2 - 1) * SHAKE * deg, dx: 0, dy: (rng() * 2 - 1) * SHAKE * 0.003, dz: (rng() * 2 - 1) * SHAKE * 0.003 } : NO_SHIFT);
+function sample(kind: Kind, rng: Rng) {
+  const block = somewhere(rng), shift = shaken(rng);
+  if (kind === "open") return { image: picture(HOME, block, true, shift), feel: [0, 0] as [number, number], want: norm(block) };
+  // Half the hands are near their block: that is where the step is not just "full speed that way".
+  let tip = somewhere(rng);
+  if (rng() < 0.5) for (let k = 0; k < 20; k++) { const p: [number, number] = [block[0] + (rng() - 0.5) * 0.12, block[1] + (rng() - 0.5) * 0.12]; if (reachable(p)) { tip = p; break; } }
+  return { image: picture(tip, block, kind !== "blind", shift), feel: norm(tip), want: expert(tip, block) };
+}
+
+/** The same pinhole as renderBoxes, for a point: pixel coordinates in −1…1. */
+function project(p: Vec3, shift: CameraShift): [number, number] {
+  const add = (a: Vec3, b: Vec3, k = 1): Vec3 => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k], dot = (a: Vec3, b: Vec3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const turn = (a: Vec3, k: Vec3, angle: number): Vec3 => add(add([a[0] * Math.cos(angle), a[1] * Math.cos(angle), a[2] * Math.cos(angle)], cross(k, a), Math.sin(angle)), k, dot(k, a) * (1 - Math.cos(angle)));
+  const up0: Vec3 = [0, 0, 1], eye = add(HEAD.eye, [shift.dx, shift.dy, shift.dz]);
+  let f = unit(add(HEAD.target, HEAD.eye, -1)); f = turn(f, up0, shift.yaw); f = turn(f, unit(cross(f, up0)), shift.pitch);
+  const right = unit(cross(f, up0)), up = cross(right, f), focal = 1 / Math.tan(((HEAD.fov / 2) * Math.PI) / 180), d = add(p, eye, -1), z = dot(d, f);
+  return [(focal * dot(d, right)) / z, (focal * dot(d, up)) / z];
+}
+/** Where on the plane z = h the calibrated (unturned) camera would place a pixel: what "look once" computes. */
+function backProject(pixel: [number, number], h: number): [number, number] {
+  let guess: [number, number] = [0.36, 0];
+  for (let k = 0; k < 20; k++) { // Newton on the 2 × 2 problem
+    const at = project([guess[0], guess[1], h], NO_SHIFT), e = 1e-4, ax = project([guess[0] + e, guess[1], h], NO_SHIFT), ay = project([guess[0], guess[1] + e, h], NO_SHIFT);
+    const j = [(ax[0] - at[0]) / e, (ay[0] - at[0]) / e, (ax[1] - at[1]) / e, (ay[1] - at[1]) / e], det = j[0] * j[3] - j[1] * j[2], rx = pixel[0] - at[0], ry = pixel[1] - at[1];
+    guess = [guess[0] + (j[3] * rx - j[1] * ry) / det, guess[1] + (-j[2] * rx + j[0] * ry) / det];
+  }
+  return guess;
+}
+/**
+ * No learning, true pixels. "look" back-projects the block once through the camera it believes it has, and drives there
+ * by its joints. "servo" never computes a position: each step it turns the pixel gap between hand and block into a
+ * move, through the Jacobian of the camera it believes it has. Both believe the camera is where it was.
+ */
+function analytic(kind: "look" | "servo", condition: Condition, episodes: number, seed: number) {
+  const rng = mulberry32(seed);
+  let wins = 0, miss = 0;
+  for (let e = 0; e < episodes; e++) {
+    let block = somewhere(rng), tip: [number, number] = [...HOME], held = 0, won = false;
+    const goal = backProject(project([block[0], block[1], Z], condition.shift), Z);
+    for (let t = 0; t < MAX_STEPS && !won; t++) {
+      if (condition.moveBlock && t === 8) block = somewhere(rng);
+      let a: [number, number];
+      if (kind === "look") a = expert(tip, goal);
+      else {
+        const hand = project([tip[0], tip[1], Z], condition.shift), want = project([block[0], block[1], Z], condition.shift), h = 1e-4;
+        const at = project([tip[0], tip[1], Z], NO_SHIFT), ax = project([tip[0] + h, tip[1], Z], NO_SHIFT), ay = project([tip[0], tip[1] + h, Z], NO_SHIFT);
+        const j = [(ax[0] - at[0]) / h, (ay[0] - at[0]) / h, (ax[1] - at[1]) / h, (ay[1] - at[1]) / h], det = j[0] * j[3] - j[1] * j[2], rx = want[0] - hand[0], ry = want[1] - hand[1];
+        a = [clip((j[3] * rx - j[1] * ry) / det / MAX_STEP), clip((-j[2] * rx + j[0] * ry) / det / MAX_STEP)];
+      }
+      const next: [number, number] = [tip[0] + a[0] * MAX_STEP, tip[1] + a[1] * MAX_STEP];
+      if (reachable(next)) tip = next;
+      held = Math.hypot(tip[0] - block[0], tip[1] - block[1]) < TOL ? held + 1 : 0; won = held >= HOLD;
+    }
+    if (won) wins++;
+    miss += Math.hypot(tip[0] - block[0], tip[1] - block[1]);
+  }
+  return { success: wins / episodes, miss: miss / episodes };
+}
+
+type Condition = { name: string; shift: CameraShift; moveBlock?: boolean };
+function evaluate(net: Net, condition: Condition, episodes: number, seed: number) {
+  const rng = mulberry32(seed);
+  let wins = 0, steps = 0, miss = 0;
+  for (let e = 0; e < episodes; e++) {
+    let block = somewhere(rng), tip: [number, number] = [...HOME], held = 0, won = false, t = 0;
+    const goal = net.kind === "open" ? net.act(picture(HOME, block, true, condition.shift), [0, 0]) : null;
+    for (; t < MAX_STEPS && !won; t++) {
+      if (condition.moveBlock && t === 8) block = somewhere(rng);
+      let a: [number, number];
+      if (goal) { const g: [number, number] = [CENTRE[0] + goal[0] * SPAN[0], CENTRE[1] + goal[1] * SPAN[1]]; a = expert(tip, g); } // drives to where it said, by its own joints
+      else a = net.act(picture(tip, block, net.kind !== "blind", condition.shift), norm(tip));
+      const next: [number, number] = [tip[0] + clip(a[0]) * MAX_STEP, tip[1] + clip(a[1]) * MAX_STEP];
+      if (reachable(next)) tip = next;
+      held = Math.hypot(tip[0] - block[0], tip[1] - block[1]) < TOL ? held + 1 : 0;
+      won = held >= HOLD;
+    }
+    if (won) { wins++; steps += t; }
+    miss += Math.hypot(tip[0] - block[0], tip[1] - block[1]);
+  }
+  return { success: wins / episodes, steps: wins ? steps / wins : 0, miss: miss / episodes };
+}
+
+describe("head camera", () => {
+  it("measures four policies under a turned camera", () => {
+    const STEPS = Number(process.env.HC_STEPS ?? 2500), BATCH = 16, EPISODES = Number(process.env.HC_EPISODES ?? 200);
+    // What the camera sees, for a look: a PPM with the hand near a block, and the same with the camera 5° down.
+    for (const [name, shift] of [["straight", NO_SHIFT], ["pitch5", { ...NO_SHIFT, pitch: 5 * deg }]] as const) {
+      const bytes = renderBoxes(scene([0.4, 0.1], [0.44, -0.12], true), HEAD, shift, 128, 2);
+      writeFileSync(`${process.env.HC_OUT ?? "."}/headcam-${name}.ppm`, Buffer.concat([Buffer.from(`P6 128 128 255\n`), Buffer.from(bytes)]));
+    }
+    const conditions: Condition[] = [
+      { name: "camera as trained", shift: NO_SHIFT },
+      ...[2, 5, 10, 20].map((d) => ({ name: `pitch ${d}°`, shift: { ...NO_SHIFT, pitch: d * deg } })),
+      ...[2, 5, 10, 20].map((d) => ({ name: `yaw ${d}°`, shift: { ...NO_SHIFT, yaw: d * deg } })),
+      { name: "moved 3 cm sideways", shift: { ...NO_SHIFT, dy: 0.03 } },
+      { name: "block moved at step 8", shift: NO_SHIFT, moveBlock: true },
+    ];
+    console.log(`training camera shaken by ±${SHAKE}°`);
+    for (const kind of (process.env.HC_ANALYTIC === "0" ? [] : ["look", "servo"]) as ("look" | "servo")[]) {
+      console.log(`analytic ${kind} (true pixels, no learning):`);
+      for (const c of conditions) { const r = analytic(kind, c, EPISODES, 99); console.log(`  ${c.name}: ${(r.success * 100).toFixed(1)}% (ends ${(r.miss * 100).toFixed(1)} cm away on average)`); }
+    }
+    for (const kind of (process.env.HC_KINDS ?? "open,closed,blind,both,pairs").split(",") as Kind[]) {
+      const rng = mulberry32(7), net = new Net(kind, mulberry32(11));
+      const t0 = performance.now();
+      let loss = 0, render = 0;
+      for (let step = 1; step <= STEPS; step++) {
+        const r0 = performance.now(), batch = Array.from({ length: BATCH }, () => sample(kind, rng)); render += performance.now() - r0;
+        loss = 0.95 * loss + 0.05 * net.step(batch, step < STEPS * 0.7 ? 3e-3 : 1e-3);
+        if (step % 500 === 0) console.log(`${kind} step ${step}: loss ${loss.toFixed(4)}, ${((performance.now() - t0) / 1000).toFixed(0)} s (${(render / 1000).toFixed(0)} s of it drawing pictures)`);
+      }
+      const seconds = (performance.now() - t0) / 1000;
+      console.log(`${kind}: ${net.parameters()} parameters, ${STEPS} steps of ${BATCH} in ${seconds.toFixed(0)} s = ${((STEPS * BATCH) / seconds).toFixed(0)} samples/s`);
+      for (const c of conditions) { const r = evaluate(net, c, EPISODES, 99); console.log(`  ${c.name}: ${(r.success * 100).toFixed(1)}% (${r.steps.toFixed(0)} steps when it works; ends ${(r.miss * 100).toFixed(1)} cm away on average)`); }
+    }
+  }, 7_200_000);
+});
