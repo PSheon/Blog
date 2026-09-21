@@ -7,6 +7,14 @@ import type { Segment } from "./world";
 
 type Three = typeof import("@/lib/three");
 export const CYAN_HEX = 0x79dafa, PINK_HEX = 0xff6e96, VIOLET_HEX = 0xb9a5ff;
+/**
+ * The three series colours are the site's --signal, --signal-2 and --signal-3. WebGL materials take numbers, not custom
+ * properties, so both themes' values are here: the names above are the dark theme's (bright, for a dark stage), and
+ * `tone` gives the one for the theme the page is in now. On the light theme the bright ones were 1.5:1 against the stage.
+ */
+const SERIES: [number, number][] = [[0x79dafa, 0x065a82], [0xff6e96, 0xc2255c], [0xb9a5ff, 0x6347d9]]; // [dark theme, light theme]
+const lightNow = () => !document.documentElement.classList.contains("dark");
+export function tone(hex: number): number { const pair = SERIES.find((p) => p.includes(hex)); return pair ? pair[lightNow() ? 1 : 0] : hex; }
 
 /**
  * Keep a scene in the page's ink colour when the theme changes. The grid, the walls and the map lines take their
@@ -16,6 +24,8 @@ export const CYAN_HEX = 0x79dafa, PINK_HEX = 0xff6e96, VIOLET_HEX = 0xb9a5ff;
  */
 export function followInk(T: Three, canvas: HTMLCanvasElement, scenes: () => THREE.Scene[], ink: THREE.Color, after?: () => void): () => void {
   canvas.dataset.ink = ink.getHexString(); // what the scene is drawn in, so a test can tell without reading pixels
+  // The series colours change with the theme too: whatever wears one theme's gets the other's.
+  const retone = () => { for (const scene of scenes()) scene.traverse((node) => { for (const material of [(node as THREE.Mesh).material].flat()) { const colour = (material as THREE.MeshStandardMaterial | undefined)?.color; if (colour) { const hex = colour.getHex(), now = tone(hex); if (now !== hex) colour.setHex(now); } } }); };
   const observer = new MutationObserver(() => {
     const next = new T.Color(getComputedStyle(canvas).color);
     if (next.equals(ink)) return;
@@ -30,6 +40,7 @@ export function followInk(T: Three, canvas: HTMLCanvasElement, scenes: () => THR
         if (colour?.equals(ink)) colour.copy(next);
       }
     });
+    retone();
     ink.copy(next);
     canvas.dataset.ink = ink.getHexString();
     after?.();

@@ -9,7 +9,7 @@ import { useLabels } from "./labels";
 
 import { Param } from "@/components/lab/param";
 import { type Pose, between, wrap } from "./se2";
-import { CYAN_HEX, PINK_HEX, type Stage3D, setPoints, stubs, useStage3D } from "./stage3d";
+import { CYAN_HEX, PINK_HEX, type Stage3D, setPoints, stubs, useStage3D, tone } from "./stage3d";
 import { useVisible } from "./use-visible";
 import { RING, scan } from "./world";
 
@@ -58,7 +58,7 @@ export function AlignLab() {
       const T = stage.T;
       stage.aim(0, 0.6, 9, 15);
       const marker = (color: number | import("three").Color) => { const m = new T.Mesh(new T.CylinderGeometry(0.16, 0.16, 0.1, 20), new T.MeshStandardMaterial({ color })); m.rotation.x = Math.PI / 2; stage.scene.add(m); return m; };
-      return { target: stage.line(stage.ink, 0.9, true), source: stage.line(CYAN_HEX, 1, true), here: marker(stage.ink), there: marker(CYAN_HEX), unsure: stage.line(PINK_HEX) };
+      return { target: stage.line(stage.ink, 0.9, true), source: stage.line(tone(CYAN_HEX), 1, true), here: marker(stage.ink), there: marker(tone(CYAN_HEX)), unsure: stage.line(tone(PINK_HEX)) };
     },
     (stage, o) => {
       setPoints(stage.T, o.target, stubs(scans.target, { x: 0, y: 0, theta: 0 }, 0.7));

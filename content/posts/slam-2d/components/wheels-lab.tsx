@@ -10,7 +10,7 @@ import { useLabels } from "./labels";
 import { PINK } from "./paint";
 import { Param } from "@/components/lab/param";
 import { type Pose, compose } from "./se2";
-import { CYAN_HEX, PINK_HEX, place, setPoints, useStage3D } from "./stage3d";
+import { CYAN_HEX, PINK_HEX, place, setPoints, useStage3D, tone } from "./stage3d";
 import { useReplay } from "./use-replay";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
@@ -50,7 +50,7 @@ function Wheels({ laps, drift, setDrift }: { laps: Laps; drift: number; setDrift
     (stage) => {
       stage.walls(RING, 0.8, 0.22);
       stage.aim(10, 6.4, 15, 19);
-      return { truth: stage.line(stage.ink), wheels: stage.line(PINK_HEX), carTruth: stage.car(CYAN_HEX), carWheels: stage.car(PINK_HEX) };
+      return { truth: stage.line(stage.ink), wheels: stage.line(tone(PINK_HEX)), carTruth: stage.car(tone(CYAN_HEX)), carWheels: stage.car(tone(PINK_HEX)) };
     },
     (stage, o) => {
       shown.current = Math.min(end, shown.current + 6);

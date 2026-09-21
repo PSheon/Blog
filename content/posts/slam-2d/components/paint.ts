@@ -1,7 +1,8 @@
 import { type Pose, compose, transformPoints } from "./se2";
 import type { Segment } from "./world";
 
-export const CYAN = "#79dafa", VIOLET = "#b9a5ff", PINK = "#ff6e96";
+/** For things in the page (legend swatches, the glow): the site's own signal colours, which follow the theme by themselves. */
+export const CYAN = "var(--signal)", VIOLET = "var(--signal-3)", PINK = "var(--signal-2)";
 
 /** World metres → canvas pixels for a canvas that shows the 20 × 14 m ring with a margin. */
 export interface View { w: number; h: number; scale: number; ox: number; oy: number }

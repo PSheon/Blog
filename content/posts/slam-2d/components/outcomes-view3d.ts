@@ -1,7 +1,7 @@
 import type * as THREE from "three";
 import { type Outcome, START } from "./outcomes";
 import { compose } from "./se2";
-import { CYAN_HEX, PINK_HEX, VIOLET_HEX, followInk, setPoints, stubs } from "./stage3d";
+import { CYAN_HEX, PINK_HEX, VIOLET_HEX, followInk, setPoints, stubs, tone } from "./stage3d";
 
 type Three = typeof import("@/lib/three");
 
@@ -40,10 +40,10 @@ export class OutcomesView {
     const at = o.keyframes.map((k) => compose(START, k.pose)), map: number[] = [];
     o.keyframes.forEach((k, j) => { if (j % 2 === 0) stubs(k.points, at[j], 0.7, map); });
     line(ink, map, 0.55, true);
-    line(PINK_HEX, o.wheels.flatMap((p) => { const q = compose(START, p); return [q.x, q.y, 0.03]; }));
-    line(CYAN_HEX, at.flatMap((q) => [q.x, q.y, 0.06]));
-    line(VIOLET_HEX, o.loops.filter(([a, b]) => !(o.wrong && a === o.wrong.from && b === o.wrong.to)).flatMap(([a, b]) => [at[a].x, at[a].y, 0.08, at[b].x, at[b].y, 0.08]), 0.5, true);
-    if (o.wrong) line(PINK_HEX, [at[o.wrong.from].x, at[o.wrong.from].y, 0.1, at[o.wrong.to].x, at[o.wrong.to].y, 0.1]);
+    line(tone(PINK_HEX), o.wheels.flatMap((p) => { const q = compose(START, p); return [q.x, q.y, 0.03]; }));
+    line(tone(CYAN_HEX), at.flatMap((q) => [q.x, q.y, 0.06]));
+    line(tone(VIOLET_HEX), o.loops.filter(([a, b]) => !(o.wrong && a === o.wrong.from && b === o.wrong.to)).flatMap(([a, b]) => [at[a].x, at[a].y, 0.08, at[b].x, at[b].y, 0.08]), 0.5, true);
+    if (o.wrong) line(tone(PINK_HEX), [at[o.wrong.from].x, at[o.wrong.from].y, 0.1, at[o.wrong.to].x, at[o.wrong.to].y, 0.1]);
     this.scenes[i] = scene;
     this.render();
   }

@@ -46,9 +46,11 @@ The one exception is a stage that must stay dark in both themes (section 5).
   (`.hero-glow`, `.card-glow`). A layer that floats over the page (the phone's drawer, the open outline, the install
   hint) casts one, so that it reads as above the text it covers. The selected station's dot and the rail's dots
   glow in their own colour: that is a signal, not depth.
-- Data series drawn into a canvas (SLAM's estimate, wheels and loop; HydraNet's boxes; the path figure's lamp) are
-  constants in the code, because WebGL materials and 2-D contexts take numbers, not custom properties. They are the
-  dark theme's signal colours. Ink and ground do follow the theme (read from the canvas's computed `color`).
+- Data series drawn into a canvas that follows the theme follow it too. WebGL materials take numbers, not custom
+  properties, so SLAM keeps both themes' values of `--signal`, `--signal-2` and `--signal-3` (`tone()` in its
+  `stage3d.ts`) and swaps them with the ink when the theme changes: on the light stage the bright ones were 1.5:1, the
+  light theme's are 7.3, 5.5 and 5.9:1. Colours drawn over something that is dark in both themes stay constants
+  (HydraNet's boxes over its photographs), and so does a colour that is a physical quantity (the lamp in the path figure).
 - Chinese body text runs 37 characters to the line (680 px at 18 px, measured); that is inside the 30–40 that reads
   well set horizontally, so the measure is the same as the English one's and figures keep the column's width.
 

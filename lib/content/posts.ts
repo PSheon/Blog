@@ -17,6 +17,8 @@ export interface PostMeta extends Frontmatter {
   locale: Locale;
   availableLocales: Locale[];
   isFallback: boolean;
+  /** how many interactive figures (`<Instrument>`) the article has, counted from its source */
+  figures: number;
   readingMinutes: number;
 }
 
@@ -65,6 +67,7 @@ function loadUncached(dir: string, slug: string, locale: Locale): Loaded | null 
       availableLocales,
       isFallback: served !== locale,
       readingMinutes: readingMinutes(content),
+      figures: (content.match(/<Instrument\b/g) ?? []).length,
     },
   };
 }

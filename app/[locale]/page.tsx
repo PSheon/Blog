@@ -31,7 +31,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
   const latest = posts[0];
   const readouts = [
     { label: t.home.readouts.posts, value: posts.length, pad: 2 },
-    { label: t.home.readouts.interactive, value: posts.filter((p) => p.interactive).length, pad: 2 },
+    { label: t.home.readouts.figures, value: posts.reduce((n, p) => n + p.figures, 0), pad: 2 }, // (it used to count interactive articles, which is every article: the same number as the first)
     { label: t.home.readouts.operators, value: countOperators(), pad: 0 },
   ];
 

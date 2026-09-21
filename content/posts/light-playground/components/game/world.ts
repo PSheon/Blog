@@ -91,6 +91,11 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     released: (to) => {
       if (!inside) { character.enter("Idle"); return; }
       const v = inside.vehicle, m = v.pose(), lv = v.body.linvel(), at = apply(m, character.state === "ExitingAirplane" ? [inside.seat.at[0], inside.seat.at[1] + SEAT_UP + 1, inside.seat.at[2]] : [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]]);
+      // The way out is a point in the vehicle's frame, and a vehicle sits lower on its springs than where it was modelled: the
+      // point can be under the ground. A capsule that starts inside the ground mesh cannot be moved out of it by the character
+      // controller (it crept up a centimetre at a time, or not at all). So the feet go on whatever is under that point.
+      const under = world.castRay(new R.Ray({ x: at[0], y: at[1] + 1, z: at[2] }, { x: 0, y: -1, z: 0 }), 1.6, true, undefined, undefined, capsule, v.body);
+      if (under && character.state !== "ExitingAirplane") at[1] = Math.max(at[1], at[1] + 1 - under.timeOfImpact + 0.02);
       body.setTranslation({ x: at[0], y: at[1] + HALF + RADIUS, z: at[2] }, true); capsule.setEnabled(true);
       facing = facingTarget = Math.PI - yawOf(m); vy = lv.y; air = [lv.x, lv.z]; character.velocity.position = character.velocity.velocity = 0;
       const ground = world.castRay(new R.Ray({ x: at[0], y: at[1] + 0.5, z: at[2] }, { x: 0, y: -1, z: 0 }), 1.2, true, undefined, undefined, capsule, v.body);
