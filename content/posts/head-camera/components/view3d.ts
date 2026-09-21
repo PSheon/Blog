@@ -102,9 +102,15 @@ export class BenchView {
     this.joints = [0.026, 0.021, 0.018].map((r) => { const m = shadowy(new T.Mesh(new T.SphereGeometry(r, 20, 14), steel)); scene.add(m); return m; });
     this.hand = new T.Group();
     const cyan = mat(0x3cc8e6, 0.35);
-    const palm = shadowy(new T.Mesh(new T.BoxGeometry(0.044, 0.044, 0.018), cyan));
-    const fingers = [-1, 1].map((side) => { const f = shadowy(new T.Mesh(new T.BoxGeometry(0.01, 0.008, 0.026), cyan)); f.position.set(0, side * 0.018, -0.02); return f; });
-    this.hand.add(palm, ...fingers);
+    // The job is to reach, not to grasp, so the hand is a touch pad, not a gripper: a cyan puck whose underside (z − 1.3 cm)
+    // stays 2 mm clear of the block's top, with a steel collar where the wrist meets it. Nothing hangs below it.
+    const pad = shadowy(new T.Mesh(new T.CylinderGeometry(0.024, 0.024, 0.016, 28), cyan));
+    pad.rotation.x = Math.PI / 2;
+    pad.position.z = -0.005;
+    const collar = shadowy(new T.Mesh(new T.CylinderGeometry(0.015, 0.019, 0.012, 24), steel));
+    collar.rotation.x = Math.PI / 2;
+    collar.position.z = 0.009;
+    this.hand.add(pad, collar);
     scene.add(this.hand);
 
     this.blockMaterial = mat(0xd63c3c, 0.45);
@@ -199,7 +205,7 @@ export class BenchView {
     }
     if (bones) {
       const [shoulder, elbow, wrist, tip] = bones;
-      ([[shoulder, elbow], [elbow, wrist], [wrist, tip]] as [Vec3, Vec3][]).forEach(([a, b], i) => {
+      ([[shoulder, elbow], [elbow, wrist], [wrist, [tip[0], tip[1], tip[2] + 0.012] as Vec3]] as [Vec3, Vec3][]).forEach(([a, b], i) => {
         const m = this.links[i], d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), len = d.length();
         m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
         m.scale.set(1, len, 1);
