@@ -17,6 +17,9 @@ describe("the job and its schedule", () => {
     for (const workers of [1, 4, 16]) {
       const job = makeJob(9, DEFAULT_JOB), run = schedule(job.tasks, workers, job.tasks.map((t) => t.duration));
       for (const t of job.tasks) { expect(run.finish[t.id] - run.start[t.id]).toBeCloseTo(t.duration, 9); for (const d of t.deps) expect(run.start[t.id]).toBeGreaterThanOrEqual(run.finish[d] - 1e-9); }
+      // A worker does one thing at a time: no two tasks on the same worker overlap.
+      for (const a of job.tasks) for (const b of job.tasks) if (a.id < b.id && run.worker[a.id] === run.worker[b.id]) expect(run.finish[a.id] <= run.start[b.id] + 1e-9 || run.finish[b.id] <= run.start[a.id] + 1e-9).toBe(true);
+      expect(Math.max(...run.worker)).toBeLessThan(workers);
       const moments = [...run.start].sort((a, b) => a - b);
       for (const at of moments) expect(job.tasks.filter((t) => run.start[t.id] <= at && run.finish[t.id] > at).length).toBeLessThanOrEqual(workers);
     }
