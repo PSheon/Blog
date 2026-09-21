@@ -222,6 +222,25 @@ So the two models that carry the story, trained one after the other in the page,
   14–21 points inside the range, 59 at 20° of pitch, 37 when the block moves. The comparison is fair with aux on both
   sides. Per-seed logs: `run-7/`.
 
+## Run 8 — disturbances training never showed (aux recipes, 10 000 steps, seeds 11–15, 200 episodes)
+
+`HC_MORE=1` adds six conditions to the evaluation. Shove: at step 8 the hand is knocked 6 cm in a random direction. Second
+block: a yellow block of the same size elsewhere on the bench (≥ 8 cm from the red one). Noise: Gaussian, per channel, on
+0…1 pixels. Light: every pixel × 0.7. The first eleven columns reproduce runs 6–7 to the decimal.
+
+| | as trained | shoved 6 cm | second block | noise 0.05 | noise 0.15 | light 70 % | light 70 % + pitch 5° |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| open, shaken + aux | 79.4 (71–85) | 77.4 | 68.2 (39–82) | 26.0 (12–62) | 3.7 | 45.8 (20–82) | 49.5 |
+| closed, shaken + aux | 95.0 (92–97) | **95.8 (95–96)** | 77.5 (58–96) | **50.7 (34–87)** | **8.6** | **64.5 (41–90)** | 62.9 |
+
+- **A shove costs nothing** (95.8 %). It is the same fact as the moving block: a policy that looks every step does not
+  care how the gap came about. (Look-once does not care either, for the opposite reason: it drives by its joints.)
+- **Noise and light break both.** 0.05 of noise halves keep-looking; 30 % less light takes a third. Nothing in training
+  ever varied the pixels' values, only the camera's pose, so the network is free to lean on exact colours. It is run 2's
+  lesson again, one level down: **what training never varies, the network is allowed to depend on.**
+- A second block of another colour costs 18 points and splits the seeds (58–96). Which block is meant is exactly what
+  an instruction would say: the natural door to the "L" of VLA.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
@@ -229,8 +248,9 @@ So the two models that carry the story, trained one after the other in the page,
 1. The thesis survives in a better form than I proposed. Three acts, all measured: look once breaks at 2–5°; keep
    looking is not enough on its own (run 2, 3a); keep looking + shake is (3b). The learning-free controller (run 0) is
    the explanation, and it is worth a figure of its own: it can be drawn.
-2. Training in the page is real: 85 s per model on one JavaScript thread, no WebGPU. Four models ≈ 6 minutes; the two that
-   carry the story (open, closed-shaken) ≈ 3.
+2. Training in the page is real, for one model. **Decided with Paul 2026-09-21 (option A):** the reader trains only
+   closed + shaken + aux (10 000 steps, 174 s in node, run 7); every other policy ships as a checkpoint trained with the
+   same recipe, and the page says so.
 3. Figure's "visual proprioception" and "head orientation in the action space" are both natural sections: the first is
    run 1's failure (it could not see its hand), the second is the next experiment.
 

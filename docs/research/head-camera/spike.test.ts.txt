@@ -40,8 +40,11 @@ const unit = (a: Vec3): Vec3 => { const l = Math.hypot(...a) || 1; return [a[0] 
 const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const flat = (c: Vec3, h: Vec3, top: [number, number, number]): Box => ({ c, u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], h, top });
 
-function scene(tip: [number, number], block: [number, number], arm: boolean): Box[] {
+/** What the evaluation can do to a picture that training never did (run 8). */
+type Look = { distractor?: [number, number]; noise?: number; dim?: number; rng?: Rng };
+function scene(tip: [number, number], block: [number, number], arm: boolean, distractor?: [number, number]): Box[] {
   const boxes: Box[] = [flat([0.34, 0, -0.01], [0.4, 0.36, 0.01], [196, 198, 208]), flat([block[0], block[1], 0.02], [0.02, 0.02, 0.02], [214, 60, 60])];
+  if (distractor) boxes.push(flat([distractor[0], distractor[1], 0.02], [0.02, 0.02, 0.02], [220, 200, 60])); // a second block, yellow
   if (!arm) return boxes;
   const q = solveIK([tip[0], tip[1], Z], 0) as Joints, [shoulder, elbow, wrist, end] = skeleton(q), up: Vec3 = [0, 0, 1];
   const link = (from: Vec3, to: Vec3, thick: number, top: [number, number, number]) => {
@@ -56,9 +59,14 @@ function scene(tip: [number, number], block: [number, number], arm: boolean): Bo
 }
 
 /** Channel-first, 0…1: what conv2d wants. */
-function picture(tip: [number, number], block: [number, number], arm: boolean, shift: CameraShift): Float64Array {
-  const bytes = renderBoxes(scene(tip, block, arm), HEAD, shift, SIZE, 2), n = SIZE * SIZE, out = new Float64Array(3 * n);
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) out[c * n + i] = bytes[i * 3 + c] / 255;
+function picture(tip: [number, number], block: [number, number], arm: boolean, shift: CameraShift, look: Look = {}): Float64Array {
+  const bytes = renderBoxes(scene(tip, block, arm, look.distractor), HEAD, shift, SIZE, 2), n = SIZE * SIZE, out = new Float64Array(3 * n);
+  const gauss = () => { const r = look.rng!; return Math.sqrt(-2 * Math.log(1 - r())) * Math.cos(2 * Math.PI * r()); };
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) {
+    let v = (bytes[i * 3 + c] / 255) * (look.dim ?? 1);
+    if (look.noise) v += look.noise * gauss();
+    out[c * n + i] = Math.max(0, Math.min(1, v));
+  }
   return out;
 }
 
@@ -235,18 +243,23 @@ function overlay(net: Net, tip: [number, number], block: [number, number], shift
   writeFileSync(file, Buffer.concat([Buffer.from(`P6 ${big} ${big} 255\n`), Buffer.from(bytes)]));
 }
 
-type Condition = { name: string; shift: CameraShift; moveBlock?: boolean };
+/** shove: at step 8 the hand is knocked 6 cm in a random direction. distractor: a yellow block elsewhere on the bench. */
+type Condition = { name: string; shift: CameraShift; moveBlock?: boolean; shove?: boolean; distractor?: boolean; noise?: number; dim?: number };
 function evaluate(net: Net, condition: Condition, episodes: number, seed: number) {
   const rng = mulberry32(seed);
   let wins = 0, steps = 0, miss = 0;
   for (let e = 0; e < episodes; e++) {
     let block = somewhere(rng), tip: [number, number] = [...HOME], held = 0, won = false, t = 0;
-    const goal = net.kind === "open" ? net.act(picture(HOME, block, true, condition.shift), [0, 0]) : null;
+    let other: [number, number] | undefined;
+    if (condition.distractor) for (;;) { other = somewhere(rng); if (Math.hypot(other[0] - block[0], other[1] - block[1]) > 0.08) break; }
+    const look: Look = { distractor: other, noise: condition.noise, dim: condition.dim, rng };
+    const goal = net.kind === "open" ? net.act(picture(HOME, block, true, condition.shift, look), [0, 0]) : null;
     for (; t < MAX_STEPS && !won; t++) {
       if (condition.moveBlock && t === 8) block = somewhere(rng);
+      if (condition.shove && t === 8) for (let k = 0; k < 20; k++) { const a = rng() * 2 * Math.PI, p: [number, number] = [tip[0] + 0.06 * Math.cos(a), tip[1] + 0.06 * Math.sin(a)]; if (reachable(p)) { tip = p; held = 0; break; } }
       let a: [number, number];
       if (goal) { const g: [number, number] = [CENTRE[0] + goal[0] * SPAN[0], CENTRE[1] + goal[1] * SPAN[1]]; a = expert(tip, g); } // drives to where it said, by its own joints
-      else a = net.act(picture(tip, block, net.kind !== "blind", condition.shift), norm(tip));
+      else a = net.act(picture(tip, block, net.kind !== "blind", condition.shift, look), norm(tip));
       const next: [number, number] = [tip[0] + clip(a[0]) * MAX_STEP, tip[1] + clip(a[1]) * MAX_STEP];
       if (reachable(next)) tip = next;
       held = Math.hypot(tip[0] - block[0], tip[1] - block[1]) < TOL ? held + 1 : 0;
@@ -272,6 +285,14 @@ describe("head camera", () => {
       ...[2, 5, 10, 20].map((d) => ({ name: `yaw ${d}°`, shift: { ...NO_SHIFT, yaw: d * deg } })),
       { name: "moved 3 cm sideways", shift: { ...NO_SHIFT, dy: 0.03 } },
       { name: "block moved at step 8", shift: NO_SHIFT, moveBlock: true },
+      ...(process.env.HC_MORE === "1" ? [
+        { name: "shoved 6 cm at step 8", shift: NO_SHIFT, shove: true },
+        { name: "second block (yellow)", shift: NO_SHIFT, distractor: true },
+        { name: "pixel noise 0.05", shift: NO_SHIFT, noise: 0.05 },
+        { name: "pixel noise 0.15", shift: NO_SHIFT, noise: 0.15 },
+        { name: "light at 70 %", shift: NO_SHIFT, dim: 0.7 },
+        { name: "light at 70 %, pitch 5°", shift: { ...NO_SHIFT, pitch: 5 * deg }, dim: 0.7 },
+      ] : []),
     ];
     for (const kind of (process.env.HC_ANALYTIC === "0" ? [] : ["look", "servo"]) as ("look" | "servo")[]) {
       console.log(`analytic ${kind} (true pixels, no learning):`);
