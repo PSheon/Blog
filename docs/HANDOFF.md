@@ -17,8 +17,11 @@ For whoever picks this up next. Read this, then the memory files under
 | Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
 
 Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
-007 point-cloud diffusion, 008 2D SLAM, 009 city of agents. In progress elsewhere: 010 a PCB-flipping VLA (branch
-`feat/pcb-flip-vla`; a draft shows only in `next dev`). A fly-connectome article was written and dropped: real wiring never beat shuffled wiring, and Paul found
+007 point-cloud diffusion, 008 2D SLAM, 009 city of agents. In progress: **010 a task scheduler from scratch**
+(`content/posts/task-scheduler`, a draft; built on `feat/sche` by another session and folded into dev on 2026-09-21). A
+VLA article was started as 010 and is parked on the branch `feat/vla` (pushed): the PCB-flip draft, its training
+pipeline, and the head-camera study in `docs/research/head-camera/` that would replace it. A draft shows only in
+`next dev`, with a "草稿 DRAFT" mark.
 it dull.
 
 ## Waiting on Paul
@@ -68,8 +71,11 @@ it dull.
 - A service worker hides requests from `page.route`: `test.use({ serviceWorkers: "block" })` where a test routes.
 - Instruments hydrate a moment after the page. The E2E fixture in `smoke.spec.ts` waits for `[data-lab]`; a test
   with its own `page` must do the same before clicking.
-- A 404 under `/zh` or `/en` is server-rendered as an empty shell and drawn by the client, because the root layout
-  lives under `[locale]` (audit, item 6). The `NoFallbackError` lines in the server log are the same thing.
+- A 404 is server-rendered as an empty shell and drawn by the client, because the root layout lives under `[locale]`
+  (audit, item 6). Do not "fix" it with `dynamicParams = false`: that makes Next throw `Internal: NoFallbackError` for
+  an unknown URL (a full-screen runtime error in `next dev`). Unknown locales, slugs and tags are rendered on demand
+  and the PAGE calls `notFound()`; the layout never throws (it falls back to the default language), or `/nope` gets
+  the framework's bare 404. The 404 speaks the URL's language (`components/site/not-found-body.tsx`).
 - A yielding loop: MessageChannel, not nested `setTimeout(0)` (clamped to 4 ms). A time budget only works if one
   unit of work is much smaller than the budget.
 - Inside an `Instrument`, titles are `<p>`, not headings (axe `heading-order`).
