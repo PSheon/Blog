@@ -1,8 +1,8 @@
 ---
 title: A task scheduler from scratch
-description: Sixty tasks that wait for one another, four workers, 152 lines of TypeScript. The scheduler itself is four rules, failed tasks and all; the hard part is answering "how long is left". Watch three progress bars mislead you, then use the scheduler to forecast itself, and let it learn from the tasks that have finished.
+description: Sixty tasks that wait for one another, four workers, 215 lines of TypeScript. The scheduler itself is four rules, failed tasks and all; the hard part is answering "how long is left". Watch three progress bars mislead you, then use the scheduler to forecast itself, and let it learn from the tasks that have finished.
 seoTitle: "A task scheduler from scratch"
-seoDescription: "Sixty dependent tasks, four workers, 152 lines of TypeScript. The scheduler is four rules; the hard part is 'how long is left'. Three bars mislead; one learns."
+seoDescription: "Sixty dependent tasks, four workers, 215 lines of TypeScript. The scheduler is four rules; the hard part is 'how long is left'. Three bars mislead; one learns."
 date: 2026-09-21
 tags: [ai-agent, from-scratch]
 no: 11
@@ -10,7 +10,7 @@ interactive: true
 draft: true
 ---
 
-import { FailLab, LearnLab, RaceLab, SkewLab, WorkersLab } from "./components";
+import { FailLab, GraphLab, LearnLab, RaceLab, SkewLab, WorkersLab } from "./components";
 import { PARAMS } from "./components/sim/params";
 
 Below, a task scheduler at work. {PARAMS.tasks} tasks, some of which cannot start until others are done, handed to {PARAMS.workers} workers at once. Press Start.
@@ -23,7 +23,7 @@ There is nothing to fault in the scheduling: no worker idles while there is some
 
 This article does two things. It writes that scheduler from scratch, which takes four rules, including what happens when a task fails. Then it answers the question every scheduler gets asked: **how long is left?** The second is much harder than the first, and the best answer turns out to be calling the scheduler again.
 
-The scheduler and the four progress bars that follow are 152 lines of TypeScript with no library, and every chart below is worked out by your browser as you read. It is a size you can read to the end: tasks fail and are scheduled again, but there are no priorities and nobody competes with you for machines. What else is missing is listed, item by item, at the end.
+The scheduler and the four progress bars that follow are 215 lines of TypeScript with no library, and every chart below is worked out by your browser as you read. It is a size you can read to the end: tasks fail and are scheduled again, but there are no priorities and nobody competes with you for machines. What else is missing is listed, item by item, at the end.
 
 ## A scheduler is four rules
 
@@ -34,34 +34,45 @@ A job is a graph: every task remembers which tasks it is waiting for. The schedu
 3. **Jump to the moment the next attempt ends**, and give that worker back.
 4. **If that attempt failed, the task is not done**: it goes back among the tasks that can start and waits for the next free worker; whatever depends on it keeps waiting. Then back to rule 1.
 
-No clock ticks. Time only moves when an attempt ends, which is why a job that takes over two hours is scheduled in about 8 microseconds (measured on my machine). The core is this loop:
+No clock ticks. Time only moves when an attempt ends, which is why a job that takes over two hours is scheduled in about 8 microseconds (measured on my machine). The core is two functions and a loop (`Scheduler` in `sim/job.ts`; only the book-keeping lines are left out here):
 
 ```ts
-while (left > 0) {
-  for (const t of tasks) {                                   // rules 1 and 2
-    if (!freeWorkers.length) break;
-    const ready = !finished[t.id] && !busy[t.id] && t.deps.every((d) => finished[d]);
-    if (ready) begin(t.id, now);                             // note the start, take a worker
+assign() {                                                     // rules 1 and 2
+  for (const t of this.tasks) {
+    if (!this.freeWorkers.length) break;
+    const ready = !this.finished[t.id] && !this.busy[t.id] && t.deps.every((d) => this.finished[d]);
+    if (ready) this.begin(t.id, this.now);                     // note the start, take a worker
   }
-  const id = earliestToEnd(running);                         // rule 3
-  now = ends[id]; busy[id] = 0; freeWorkers.push(worker[id]);
-  const wentThrough = tried[id] === attempts[id].length - 1;
-  if (wentThrough) { finished[id] = 1; left--; }
-  else tried[id]++;                                          // rule 4: not done, so next round it is ready again
 }
+
+advance() {                                                    // rules 3 and 4
+  const id = earliest(this.running, this.ends);
+  const ok = this.tried[id] === this.attempts[id].length - 1;
+  this.now = this.ends[id]; this.busy[id] = 0; this.freeWorkers.push(this.worker[id]);
+  if (ok) { this.finished[id] = 1; this.left--; }
+  else this.tried[id]++;                                       // not finished, so rule 1 finds it again
+}
+
+while (s.left > 0) { s.assign(); s.advance(); }                // the whole scheduler
 ```
 
 Rule 4 is one line because a failed task needs no special retry queue: it is simply not marked as finished, so rule 1 sees it again on the next round.
 
-Note that `attempts` — how long every attempt at every task takes — comes from outside. Pass what really happens and you get the real timeline. Pass "I think every task goes through first time and takes this long" and you get a forecast. That will matter below.
+Below is the same scheduler on a job small enough to see whole: 14 tasks, 3 workers. An arrow runs from a task to the task that waits for it. Keep pressing Next step and watch rules 2 and 3 take turns; then start over and **click a task while it is running** to make it fail on the spot, and watch rule 4 put it back.
 
-<Sidenote>The real function has a little more: it can carry on from a job that is half done, leaving finished tasks alone and keeping the start of the current attempt of those under way. Forecasting needs that. The whole thing is `schedule` in `sim/job.ts`.</Sidenote>
+<Instrument fig="02" title="scheduler / step" caption="A dashed circle can start, a thick cyan one is running (the label says which worker has it), a filled one is done; a violet ring marks the tasks the last step touched. A running task can be clicked, or reached with the keyboard and pressed with Enter: it fails where it stands, is not marked as done, and so can start again at once. The timeline underneath is what has been scheduled so far.">
+  <GraphLab />
+</Instrument>
+
+One last thing: `attempts` — how long every attempt at every task takes — comes from outside. Pass what really happens and you get the real timeline. Pass "I think every task goes through first time and takes this long" and you get a forecast. That will matter below.
+
+<Sidenote>The real function has a little more: it can carry on from a job that is half done, leaving finished tasks alone and keeping the start of the current attempt of those under way. Forecasting needs that.</Sidenote>
 
 ## When a task fails
 
-Below is the opening job again: the same tasks in the same order, except that every attempt now has a chance of dying part-way. An empty pink outline is an attempt that failed; look to its right and the same task turns up again.
+That was you breaking tasks by hand. Now let them break by themselves: below is the opening job again, the same tasks in the same order, except that every attempt has a chance of dying part-way. An empty pink outline is an attempt that failed; look to its right and the same task turns up again.
 
-<Instrument fig="02" title="scheduler / failures" caption="The slider is the chance that an attempt fails (a task fails at most three times, and a failed attempt dies somewhere between 20% and 100% of the way through). Above, the timeline of job 77; the read-outs and the chart below are the average of 150 jobs with estimates that are right, so every error you see comes from failures. The chart plots how many points each bar is off by: lower is more honest.">
+<Instrument fig="03" title="scheduler / failures" caption="The slider is the chance that an attempt fails (a task fails at most three times, and a failed attempt dies somewhere between 20% and 100% of the way through). Above, the timeline of job 77; the read-outs and the chart below are the average of 150 jobs with estimates that are right, so every error you see comes from failures. The chart plots how many points each bar is off by: lower is more honest.">
   <FailLab />
 </Instrument>
 
@@ -87,7 +98,7 @@ The first two are what a program has. The third is what it is asked for. A progr
 
 How well that works depends on how unequal the tasks are. The next chart is not one job but the average of 150; every time you move the slider your browser runs them again in the background.
 
-<Instrument fig="03" title="scheduler / sizes" caption="The slider is how unequal the task sizes are. The higher a curve bulges, the further the bar runs ahead of the clock; the thin pink dotted line is 90%. The estimates here are almost exactly right, so nothing you see is caused by bad estimates.">
+<Instrument fig="04" title="scheduler / sizes" caption="The slider is how unequal the task sizes are. The higher a curve bulges, the further the bar runs ahead of the clock; the thin pink dotted line is 90%. The estimates here are almost exactly right, so nothing you see is caused by bad estimates.">
   <SkewLab />
 </Instrument>
 
@@ -99,13 +110,13 @@ It does not reach the diagonal either, and this time the estimates are not to bl
 
 Work done is not time passed, because the number of busy workers keeps changing. At the start many tasks can run at once, all four workers are busy and the work drains fast; at the tail one or two tasks are waiting on earlier results, the other workers idle, and the clock keeps running.
 
-<Instrument fig="04" title="scheduler / workers" caption="The slider is the number of workers. The third line (cyan) ignores how much has been done: it takes the tasks that are left, schedules them as planned on this many workers, and asks how long that will take. The estimates are right here too.">
+<Instrument fig="05" title="scheduler / workers" caption="The slider is the number of workers. The upper chart is how long the job takes on average (100 jobs), with the longest chain of dependencies as the violet dashed line; below it, how honest the three bars are with that many workers. The third line (cyan) ignores how much has been done: it takes the tasks that are left, schedules them as planned on this many workers, and asks how long that will take. The estimates are right here too.">
   <WorkersLab />
 </Instrument>
 
 Drag the slider from 1 to 32. Two things happen together.
 
-First, the job gets faster and then stops getting faster. On average: 122 minutes with one worker, 63 with two, 38 with four, 31.4 with eight, and 31.0 from there on however many you add. Those 31 minutes are the longest chain of tasks waiting on each other; more hands can only wait with it.
+First, the job gets faster and then meets a horizontal line and stops (the upper chart). On average: 122 minutes with one worker, 63 with two, 38 with four, 31.4 with eight, and 31.0 from there on however many you add. Those 31 minutes are the longest chain of tasks waiting on each other; more hands can only wait with it.
 
 Second, the counting bar gets less honest: 10 points off with 4 workers, 17 with 16, a third of the run spent above 90%. More hands make the head of the job go faster; the tail is as long as ever.
 
@@ -117,7 +128,7 @@ It has one blind spot, the failures from before: when it forecasts, it assumes e
 
 The bar that forecasts from the plan has one more assumption: that the estimates are right. Real estimates are wrong, and wrong in a regular way: uploads, say, always take twice what you thought.
 
-<Instrument fig="05" title="scheduler / learn" caption="The slider is how wrong the estimates are: every task of one kind is wrong in the same direction by the same factor. Some jobs come out over-estimated and some under, which would cancel in an average, so this chart plots how many points the bar is off by, either way: lower is more honest. Turn the switch on and the bar looks at how long finished tasks really took and corrects the estimates of the tasks of that kind still to come.">
+<Instrument fig="06" title="scheduler / learn" caption="The slider is how wrong the estimates are: every task of one kind is wrong in the same direction by the same factor. Some jobs come out over-estimated and some under, which would cancel in an average, so this chart plots how many points the bar is off by, either way: lower is more honest. Turn the switch on and the bar looks at how long finished tasks really took and corrects the estimates of the tasks of that kind still to come.">
   <LearnLab />
 </Instrument>
 
@@ -131,19 +142,21 @@ It has a price too: **it goes backwards.** When a task outruns its estimate, the
 
 ## What differs from the real thing, and how the numbers were measured
 
-**The task sizes are a distribution I chose** (log-normal) at a spread I chose. I have not checked it against a public workload; your build or your CI may be more unequal, or less. That is what the slider in figure 03 is for.
+**The task sizes are a distribution I chose** (log-normal) at a spread I chose. I have not checked it against a public workload; your build or your CI may be more unequal, or less. That is what the slider in figure 04 is for.
 
 **The scheduling rule is the plainest there is**: whichever task is ready goes first, and a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails, and no job needs four workers to start together. Those are exactly what real schedulers of the Kubernetes or Airflow kind have to deal with. Clusters that train large models more than most: OpenAI wrote in 2021 that their jobs have to be scheduled as a whole gang or not at all. What to do downstream when a task is cancelled, and who should go first, are other articles too.
 
 **The unit is a whole job of tasks that wait for each other, not a single request.** How one request queues, gets routed, and how long to wait before retrying it, Sam Rose has covered in three fine interactive essays (see the sources); this article does not repeat them.
 
+**A worker here is only a number.** It could be a machine, a process, or one of the people in the city of [entry 9](/en/posts/city-of-agents): those three hundred each decide for themselves what to do next; here a scheduler decides for them. Both run into the same thing: work that waits on other work, and nobody knowing how long is left.
+
 **Real systems often do not even know how many tasks there are**: the work grows as it goes. All four bars here assume the list is complete from the start.
 
-Where the numbers come from: figures 02 to 05 and their read-outs are your browser's average of 150 jobs. What I say I measured was run offline on 200 jobs (seeds 1 to 200); the script and the full table are in this project's `docs/research/task-scheduler/`. The opening job is number 77.
+Where the numbers come from: figures 03 to 06 and their read-outs are your browser's average of 150 jobs. What I say I measured was run offline on 200 jobs (seeds 1 to 200); the script and the full table are in this project's `docs/research/task-scheduler/`. The opening job is number 77.
 
 ## Sources
 
 - Scheduling on a real cluster (gangs scheduled together, nodes allotted by team): OpenAI, *Scaling Kubernetes to 7,500 nodes*, 2021.
 - Queueing, retrying and routing single requests: Sam Rose, *Queueing* and *Retries* (encore.dev/blog), *Load Balancing* (samwho.dev).
-- How people perceive progress bars: Harrison, Amento, Kuznetsov, Bell, *Rethinking the Progress Bar*, UIST 2007.
-- The longest chain of dependencies sets the floor: Kelley, Walker, *Critical-Path Planning and Scheduling*, 1959.
+- How people perceive progress bars: Harrison, Amento, Kuznetsov, Bell, *Rethinking the Progress Bar*, UIST 2007, pp. 115–118.
+- The longest chain of dependencies sets the floor: Kelley, Walker, *Critical-Path Planning and Scheduling*, Eastern Joint Computer Conference, 1959, pp. 160–173.

@@ -1,6 +1,8 @@
 import type { Job, Schedule } from "./sim";
 
-const KIND = ["fill-chart-1", "fill-chart-2", "fill-chart-3", "fill-chart-5"], LANE = 12, WIDTH = 600;
+/** Pink is kept for what went wrong (failed attempts, the bar that lies): the four kinds of task use the other series colours. */
+export const KIND = ["fill-chart-1", "fill-chart-3", "fill-chart-5", "fill-chart-4"];
+const LANE = 12, WIDTH = 600;
 
 /**
  * What the scheduler did: a row per worker, a block per attempt at a task, coloured by the kind of task. An attempt that
@@ -10,7 +12,8 @@ const KIND = ["fill-chart-1", "fill-chart-2", "fill-chart-3", "fill-chart-5"], L
 export function Timeline({ job, run, workers, at, label }: { job: Job; run: Schedule; workers: number; at?: number; label: string }) {
   const now = at ?? 1, height = workers * LANE + 4;
   return (
-    <svg viewBox={`0 0 ${WIDTH} ${height}`} className="w-full" role="img" aria-label={label}>
+    // Stretched sideways only: a row stays 14 px tall however narrow the screen, or a phone shows four 6 px rows.
+    <svg viewBox={`0 0 ${WIDTH} ${height}`} preserveAspectRatio="none" className="w-full" style={{ height: workers * 14 + 4 }} role="img" aria-label={label}>
       {run.attempts.map((a, i) => {
         // Rounded: node and the browser disagree in the last digits of exp and log, and a hydrated attribute has to match.
         const x = ((a.from / run.total) * WIDTH).toFixed(2), w = Math.max(1, ((a.to - a.from) / run.total) * WIDTH - 0.8).toFixed(2), y = a.worker * LANE + 2, begun = a.from / run.total <= now, over = a.to / run.total <= now;

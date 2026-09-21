@@ -44,7 +44,7 @@ export function RaceLab() {
           {SHOWN.map((bar) => (
             <div key={bar} className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-x-3 gap-y-0.5" data-testid={`race-${bar}`}>
               <span className="label col-span-2">{t.bars[bar]}</span>
-              <div className="h-2.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={t.bars[bar]} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value(bar) * 100)}><div className={`h-full ${FILL[bar]}`} style={{ width: `${value(bar) * 100}%` }} /></div>
+              <div className="h-2.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={t.bars[bar]} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value(bar) * 20) * 5}><div className={`h-full ${FILL[bar]}`} style={{ width: `${value(bar) * 100}%` }} /></div>
               <span className="text-right font-mono tabular">{Math.round(value(bar) * 100)}%</span>
             </div>
           ))}

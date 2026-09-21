@@ -49,3 +49,25 @@ export function Legend({ curves }: { curves: Curve[] }) {
     </ul>
   );
 }
+
+/** How long the job takes against how many workers it gets: it falls, then meets the floor the longest chain sets. `at` marks the reader's choice. */
+export function KneeChart({ points, floor, at, label, axis }: { points: [workers: number, minutes: number][]; floor: number; at: number; label: string; axis: { x: string; y: string; floor: string } }) {
+  const top = Math.max(1, ...points.map((p) => p[1])) * 1.05, last = points.length ? points[points.length - 1][0] : 32;
+  // Workers on a log scale: the interesting part is between 1 and 8.
+  const x = (w: number) => L + (Math.log2(w) / Math.log2(last)) * (W - L - R), y = (m: number) => H - B - (m / top) * (H - B - T), here = points.find((p) => p[0] === at);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full text-muted-foreground" role="img" aria-label={label}>
+      {[0, 0.25, 0.5, 0.75, 1].map((v) => (
+        <g key={v}><line x1={x(1)} x2={x(last)} y1={y(v * top)} y2={y(v * top)} className="stroke-border" strokeWidth={0.5} /><text x={L - 5} y={y(v * top) + 3} textAnchor="end" className="fill-current font-mono text-[8px]">{Math.round(v * top)}</text></g>
+      ))}
+      {[1, 2, 4, 8, 16, 32].filter((w) => w <= last).map((w) => <text key={w} x={x(w)} y={H - B + 11} textAnchor="middle" className="fill-current font-mono text-[8px]">{w}</text>)}
+      <line x1={x(1)} x2={x(last)} y1={y(floor)} y2={y(floor)} className="stroke-signal-3" strokeDasharray="4 3" strokeWidth={1} />
+      <text x={x(1) + 3} y={y(floor) + 11} className="fill-current font-mono text-[8px]">{axis.floor}</text>
+      <polyline fill="none" className="stroke-signal" strokeWidth={1.8} strokeLinejoin="round" points={points.map(([w, m]) => `${x(w).toFixed(1)},${y(m).toFixed(1)}`).join(" ")} />
+      {points.map(([w, m]) => <circle key={w} cx={x(w)} cy={y(m)} r={w === at ? 4 : 1.8} className={w === at ? "fill-foreground" : "fill-signal"} />)}
+      {here && <text x={x(here[0]) + 7} y={y(here[1]) - 6} className="fill-foreground font-mono text-[9px]">{here[1].toFixed(1)}</text>}
+      <text x={x(Math.sqrt(last))} y={H - 2} textAnchor="middle" className="fill-current font-mono text-[8px]">{axis.x} →</text>
+      <text x={9} y={y(top / 2)} textAnchor="middle" className="fill-current font-mono text-[8px]" transform={`rotate(-90 9 ${y(top / 2)})`}>{axis.y} →</text>
+    </svg>
+  );
+}

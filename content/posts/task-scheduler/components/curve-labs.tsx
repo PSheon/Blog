@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
-import { CalibrationChart, type Curve, Legend } from "./chart";
+import { CalibrationChart, type Curve, KneeChart, Legend } from "./chart";
 import { type Labels, useLabels } from "./labels";
 import { Param } from "./param";
 import { type Bar, DEFAULT_JOB, type JobOptions, makeJob, PARAMS, schedule } from "./sim";
@@ -45,13 +45,32 @@ export function SkewLab() {
   );
 }
 
-/** Fig. 03: how many workers. One knob; the plan bar joins the other two. */
+const WORKER_STOPS = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
+
+/** Mean job length for each number of workers, and the mean of the longest chain: 100 jobs, a few milliseconds, worked out once the figure exists in the browser (node and the browser round exp and log differently, so not while rendering on the server). */
+function useKnee(): { points: [number, number][]; floor: number } | null {
+  const [knee, setKnee] = useState<{ points: [number, number][]; floor: number } | null>(null);
+  useEffect(() => {
+    // Off the first paint: it is only a few milliseconds, but nothing on screen needs it yet.
+    const timer = window.setTimeout(() => {
+    const jobs = Array.from({ length: 100 }, (_, k) => makeJob(k + 1, GOOD));
+    let floor = 0;
+    for (const job of jobs) { const chain = new Float64Array(job.tasks.length); for (const x of job.tasks) chain[x.id] = x.duration + Math.max(0, ...x.deps.map((d) => chain[d])); floor += Math.max(...chain) / jobs.length; }
+    setKnee({ floor, points: WORKER_STOPS.map((w) => [w, jobs.reduce((sum, job) => sum + schedule(job.tasks, w, job.tasks.map((x) => x.attempts)).total, 0) / jobs.length]) });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
+  return knee;
+}
+
+/** Fig. 04: how many workers. One knob; the picture is the knee, and the bars' honesty sits beside it. */
 export function WorkersLab() {
-  const t = useLabels(), [workers, setWorkers] = useState(16);
+  const t = useLabels(), [stop, setStop] = useState(WORKER_STOPS.indexOf(16)), workers = WORKER_STOPS[stop], knee = useKnee();
   return (
     <div className="grid gap-4 text-sm" data-testid="workers-lab">
-      <Param label={t.workers} value={workers} min={1} max={32} step={1} onChange={setWorkers} />
-      <Panel t={t} options={GOOD} workers={workers} bars={["count", "work", "plan"]} headline="count" total />
+      <Param label={t.workers} value={stop} shown={String(workers)} min={0} max={WORKER_STOPS.length - 1} step={1} onChange={setStop} />
+      <div className="mx-auto w-full max-w-md"><KneeChart points={knee?.points ?? []} floor={knee?.floor ?? 0} at={workers} label={t.kneeChart} axis={{ x: t.workers, y: t.kneeAxis, floor: t.floor }} /></div>
+      <Panel t={t} options={GOOD} workers={workers} bars={["count", "work", "plan"]} headline="count" />
     </div>
   );
 }
