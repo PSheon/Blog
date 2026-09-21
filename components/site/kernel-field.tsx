@@ -1,5 +1,6 @@
 "use client";
 
+import { runWhenSeen } from "@/components/lab/run-when-seen";
 import { useEffect, useRef } from "react";
 
 const CELL = 7, GAP = 4, PITCH = CELL + GAP;
@@ -14,8 +15,8 @@ export function KernelField({ className }: { className?: string }) {
   useEffect(() => {
     const canvas = ref.current, ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let raf = 0, visible = false, cols = 0, rows = 0, levels = new Float32Array(0), last = 0, colour = "#79dafa";
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let raf = 0, cols = 0, rows = 0, levels = new Float32Array(0), last = 0, colour = "#79dafa";
 
     const resize = () => {
       const ratio = Math.min(2, window.devicePixelRatio || 1), w = canvas.clientWidth, h = canvas.clientHeight;
@@ -36,18 +37,20 @@ export function KernelField({ className }: { className?: string }) {
     };
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      if (!visible || now - last < 90) return; // about 11 frames a second is plenty for a flicker
+      if (now - last < 90) return; // about 11 frames a second is plenty for a flicker
       last = now;
       for (let k = 0; k < levels.length / 14; k++) levels[Math.floor(Math.random() * levels.length)] = Math.random() ** 3;
       draw();
     };
 
-    const seen = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
     const sized = new ResizeObserver(resize), themed = new MutationObserver(resize);
-    seen.observe(canvas); sized.observe(canvas);
+    sized.observe(canvas);
     themed.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-    if (!still) raf = requestAnimationFrame(loop);
-    return () => { cancelAnimationFrame(raf); seen.disconnect(); sized.disconnect(); themed.disconnect(); };
+    // No frames at all while the footer is off screen, the tab is behind, or motion is unwanted (asked again whenever that changes).
+    let unwatch = () => {};
+    const watch = () => { unwatch(); unwatch = calm.matches ? () => {} : runWhenSeen(canvas, () => { raf = requestAnimationFrame(loop); }, () => cancelAnimationFrame(raf)); };
+    watch(); calm.addEventListener("change", watch);
+    return () => { unwatch(); calm.removeEventListener("change", watch); sized.disconnect(); themed.disconnect(); };
   }, []);
 
   return <canvas ref={ref} aria-hidden className={className} />;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { runWhenSeen } from "@/components/lab/run-when-seen";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { draw, readPalette } from "@/content/posts/ai-flappy-bird/components/render";
 import { FlappyWorld, WORLD } from "@/content/posts/ai-flappy-bird/components/world";
@@ -34,8 +35,8 @@ export default function HeroAct({ t }: { t: { generation: string; alive: string;
       if (n++ % 6 === 0) setSeen({ generation: world.generation, alive: world.alive, best: Math.max(world.best, world.passed) });
     };
     if (still) { draw(ctx, world, palette, (el.width = Math.round(el.clientWidth)) / WORLD.width); return; }
-    frame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frame);
+    // Off screen or in a background tab the flock waits; `last` is forgotten so the pause is not paid back as ticks.
+    return runWhenSeen(el, () => { last = 0; frame = requestAnimationFrame(loop); }, () => cancelAnimationFrame(frame));
   }, [still]);
 
   return (

@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HeatCanvas } from "@/components/lab/heat-canvas";
+import { runWhenSeen } from "@/components/lab/run-when-seen";
+import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Trainer } from "@/content/posts/transformer-from-scratch/components/task";
 import { mulberry32 } from "@/lib/ml";
 
@@ -38,9 +40,13 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
   const [view, setView] = useState<View>({ steps: 0, output: [], map: null, done: false });
   const [run, setRun] = useState(0);
 
+  const root = useRef<HTMLDivElement>(null), calm = useReducedMotion();
+
   useEffect(() => {
+    const el = root.current;
+    if (!el) return;
     const trainer = new Trainer("reverse", mulberry32(7 + run));
-    let frame = 0, streak = 0;
+    let frame = 0, streak = 0, finished = false;
     const loop = () => {
       const deadline = performance.now() + 10;
       do trainer.step(); while (performance.now() < deadline);
@@ -49,18 +55,19 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
       // Getting the answer right comes early; the clean anti-diagonal on the map, which is the point of the picture,
       // takes a few hundred steps more. Then stop spending the reader's battery.
       const done = (trainer.steps >= 700 && streak > 30 && trainer.accuracy(12) === 1) || trainer.steps > 4000;
-      setView({ steps: trainer.steps, output: g.output, map: lookup(g.attention[0] ?? [], g.tokens.length), done });
-      if (!done) frame = requestAnimationFrame(loop);
+      // With reduced motion the map does not flicker its way there: it trains out of sight and the finished picture appears once.
+      if (!calm || done) setView({ steps: trainer.steps, output: g.output, map: lookup(g.attention[0] ?? [], g.tokens.length), done });
+      if (done) finished = true; else frame = requestAnimationFrame(loop);
     };
-    frame = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(frame);
-  }, [run]);
+    // It trains only while it can be seen and the tab is in front (DESIGN §2).
+    return runWhenSeen(el, () => { if (!finished) frame = requestAnimationFrame(loop); }, () => cancelAnimationFrame(frame));
+  }, [run, calm]);
 
   // Six boxes share whatever width the column has (it is narrow on a phone and on a small laptop alike), up to 1.75rem each.
   const box = "grid aspect-square w-full place-items-center rounded-sm border bg-background text-[clamp(0.75rem,4.2cqw,1.25rem)] leading-none";
   const row = "grid max-w-[12.5rem] grid-cols-6 gap-1";
   return (
-    <div className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
+    <div ref={root} className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
       <div className="mx-auto w-full max-w-[15rem]">
         {/* Input digits along the top, the answer down the side: a trained model lights the anti-diagonal. */}
         <div className="grid grid-cols-[1rem_1fr] gap-1 font-mono text-[0.7rem] text-muted-foreground">
