@@ -204,11 +204,13 @@ function evaluate(net: Net | "teacher", condition: Condition, episodes: number, 
   let wins = 0, grasped = 0, steps = 0;
   for (let e = 0; e < episodes; e++) {
     const [block, pad] = apart(rng), s: State = { hand: [...HOME], closed: false, holding: false, block, pad };
-    let belief: State | null = null, done = false, t = 0, everHeld = false;
+    let belief: State | null = null, done = false, t = 0, everHeld = false, padMoved = false;
     if (net !== "teacher" && net.kind === "open") { const o = net.run(picture(view(s, condition.shift)), []); belief = { ...s, block: unnorm(o), pad: unnorm(o.slice(2)) }; }
     for (; t < MAX_STEPS && !done; t++) {
       if (condition.moveBlock && t === 3 && !s.holding) { const [b] = apart(rng); if (Math.hypot(b[0] - s.pad[0], b[1] - s.pad[1]) > 0.12) s.block = b; }
-      if (condition.movePad && s.holding && !belief?.holding) { const [, p] = apart(rng); if (Math.hypot(p[0] - s.hand[0], p[1] - s.hand[1]) > 0.08) s.pad = p; condition = { ...condition, movePad: false }; }
+      // Once per episode, the step after the grasp. (Until run 17 this cleared the flag on `condition` itself, so only the
+      // first episode ever moved its pad and the column repeated "as trained": those numbers are void.)
+      if (condition.movePad && s.holding && !padMoved) { padMoved = true; const [, p] = apart(rng); if (Math.hypot(p[0] - s.hand[0], p[1] - s.hand[1]) > 0.08) s.pad = p; }
       if (condition.shove && t === 12) { const a = rng() * 2 * Math.PI, h: Vec3 = [s.hand[0] + 0.05 * Math.cos(a), s.hand[1] + 0.05 * Math.sin(a), s.hand[2]]; if (reach(...h)) { s.hand = h; if (s.holding) s.block = [h[0], h[1]]; } }
       let a: number[];
       if (net === "teacher") a = teacher(s);
@@ -221,6 +223,25 @@ function evaluate(net: Net | "teacher", condition: Condition, episodes: number, 
     if (everHeld) grasped++;
   }
   return { success: wins / episodes, grasped: grasped / episodes, steps: wins ? steps / wins : 0 };
+}
+
+/**
+ * HP_SAVE=<dir>: the weights as JSON plus golden outputs on six fixed states (fetching, low over the block, carrying, over
+ * the pad, closed on nothing, camera tilted), so the page's port (components/pick.ts) can prove it computes the same.
+ */
+function save(net: Net, file: string, meta: Record<string, unknown>) {
+  const params = Object.fromEntries(Object.entries(net.params).map(([k, m]) => [k, { rows: m.rows, cols: m.cols, data: Array.from(m.data) }]));
+  const block: XY = [0.3, -0.12], pad: XY = [0.46, 0.14];
+  const states: { s: State; pitch: number }[] = [
+    { s: { hand: [...HOME], closed: false, holding: false, block, pad }, pitch: 0 },
+    { s: { hand: [0.31, -0.11, 0.04], closed: false, holding: false, block, pad }, pitch: 0 },
+    { s: { hand: [0.38, 0.02, HIGH], closed: true, holding: true, block: [0.38, 0.02], pad }, pitch: 0 },
+    { s: { hand: [0.455, 0.135, 0.04], closed: true, holding: true, block: [0.455, 0.135], pad }, pitch: 0 },
+    { s: { hand: [0.4, 0.0, 0.05], closed: true, holding: false, block, pad }, pitch: 0 },
+    { s: { hand: [0.34, -0.05, 0.08], closed: false, holding: false, block, pad }, pitch: 7 },
+  ];
+  const golden = states.map(({ s: st, pitch }) => ({ state: st, pitch, out: net.run(picture(view(st, { ...NO_SHIFT, pitch: pitch * deg })), net.kind === "closed" ? feelOf(st) : []) }));
+  writeFileSync(file, JSON.stringify({ meta: { kind: net.kind, size: SIZE, ...meta }, params, golden }));
 }
 
 /** Per output: mean squared error on fresh training-like states, and how often the x–y direction is right. */
@@ -275,6 +296,7 @@ describe("pick and place", () => {
         }
         const cells = conditions.map((c) => { const r = evaluate(net, c, EPISODES, 99); return `${c.name} ${(r.success * 100).toFixed(1)} (grasped ${(r.grasped * 100).toFixed(0)})`; });
         console.log(`${kind}${SHAKE ? "+shake" : ""} seed ${seed}: ${cells.join(" | ")}`);
+        if (process.env.HP_SAVE) save(net, `${process.env.HP_SAVE}/${kind}${SHAKE ? "-shake" : ""}-${SIZE}-${seed}.json`, { seed, steps: STEPS, shake: SHAKE, asTrained: evaluate(net, conditions[0], EPISODES, 99).success });
         console.log(`== ${kind}${SHAKE ? "+shake" : ""}: ${STEPS} steps, ${seconds.toFixed(0)} s, size ${SIZE}`);
       }
     }

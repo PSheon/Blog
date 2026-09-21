@@ -42,6 +42,7 @@ export {
   PointsMaterial,
   Quaternion,
   Raycaster,
+  RingGeometry,
   RepeatWrapping,
   Scene,
   SphereGeometry,

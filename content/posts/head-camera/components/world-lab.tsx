@@ -94,7 +94,7 @@ export function WorldLab() {
       const w = world.current, k = knobs.current;
       if (k.running && now - last >= STEP_MS) { last = now; w.at = now; step(); }
       const f = k.running ? Math.min(1, (now - w.at) / STEP_MS) : 1, shown: XY = [w.from[0] + (w.tip[0] - w.from[0]) * f, w.from[1] + (w.tip[1] - w.from[1]) * f];
-      bench.render(bones(shown), w.block, k.kind === "open" && w.phase === "go" ? w.goal : null, { yaw: k.yaw * deg, pitch: k.pitch * deg });
+      bench.render({ bones: bones(shown), block: [w.block[0], w.block[1], 0.02], ghostBlock: k.kind === "open" && w.phase === "go" ? w.goal : null, held: w.drag === "block" ? "block" : null, look: { yaw: k.yaw * deg, pitch: k.pitch * deg }, time: now });
     };
     import("./view3d").then(({ BenchView }) => BenchView.create(canvas.current!)).then((b) => { if (alive) { bench = b; step(); } else b.dispose(); });
     frame = requestAnimationFrame(tick);
@@ -104,13 +104,13 @@ export function WorldLab() {
       if (!bench) return;
       const w = world.current, [x, y] = ndc(e);
       w.drag = bench.grabs(x, y) ? "block" : "orbit"; w.px = e.clientX; w.py = e.clientY;
-      bench.highlight(w.drag === "block"); setTouched(true);
+      bench.hover(w.drag === "block" ? "block" : null); bench.stopHinting(); setTouched(true);
       c.setPointerCapture(e.pointerId);
     };
     const move = (e: PointerEvent) => {
       const w = world.current;
       if (!bench) return;
-      if (!w.drag) { const [x, y] = ndc(e), over = bench.grabs(x, y); bench.highlight(over); c.style.cursor = over ? "grab" : ""; return; }
+      if (!w.drag) { const [x, y] = ndc(e), over = bench.grabs(x, y); bench.hover(over); c.style.cursor = over ? "grab" : ""; return; }
       if (w.drag === "orbit") { bench.orbit(e.clientX - w.px, e.clientY - w.py); w.px = e.clientX; w.py = e.clientY; return; }
       const [x, y] = ndc(e), p = bench.benchAt(x, y);
       if (p) w.block = onBench(p, w.block);
@@ -119,7 +119,7 @@ export function WorldLab() {
       const w = world.current;
       if (w.drag === "block" && knobs.current.kind === "open") { w.phase = "home"; w.goal = null; } // look-once looks again only when the block is put down
       w.drag = null;
-      bench?.highlight(false);
+      bench?.hover(null);
     };
     // The site switches theme by a class on <html>: repaint the fog to match.
     const themes = new MutationObserver(() => bench?.retheme());

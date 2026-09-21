@@ -2,6 +2,14 @@ import type { Vec3 } from "./model";
 import { AREA, HEAD } from "./model";
 
 type Three = typeof import("@/lib/three");
+export type Mode = "reach" | "pick";
+export type Target = "block" | "pad";
+/** One drawn moment. `block` is its centre (it rides in the hand when held); `jaws` runs 0 (open) to 1 (closed). */
+export interface Frame {
+  bones: Vec3[] | null; block: Vec3; pad?: [number, number] | null; jaws?: number;
+  ghostBlock?: [number, number] | null; ghostPad?: [number, number] | null;
+  held?: Target | null; look: { yaw: number; pitch: number }; time: number;
+}
 
 const sub = (a: Vec3, b: Vec3): Vec3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const unit = (a: Vec3): Vec3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
@@ -44,6 +52,14 @@ function tokens(el: Element) {
 export class BenchView {
   private readonly block: import("three").Mesh;
   private readonly blockMaterial: import("three").MeshStandardMaterial;
+  private pad: import("three").Mesh | null = null;
+  private padMaterial: import("three").MeshStandardMaterial | null = null;
+  private jaws: import("three").Mesh[] = [];
+  private ghostPad: import("three").LineSegments | null = null;
+  /** The "you can drag this" marker: a ring on the bench and an arrow bobbing above, one pair per draggable thing. */
+  private readonly markers = new Map<Target, { ring: import("three").Mesh; arrow: import("three").Mesh }>();
+  private hovered: Target | null = null;
+  private hinting = true;
   private readonly links: import("three").Mesh[];
   private readonly joints: import("three").Mesh[];
   private readonly hand: import("three").Group;
@@ -55,9 +71,10 @@ export class BenchView {
   private azimuth = -2.2;
   private elevation = 0.6;
   private distance = 1.9;
-  private hot = false;
+  private readonly mode: Mode;
 
-  private constructor(private readonly three: Three, private readonly renderer: import("three").WebGLRenderer, private readonly scene: import("three").Scene, private readonly camera: import("three").PerspectiveCamera) {
+  private constructor(private readonly three: Three, private readonly renderer: import("three").WebGLRenderer, private readonly scene: import("three").Scene, private readonly camera: import("three").PerspectiveCamera, mode: Mode) {
+    this.mode = mode;
     const T = three, colours = tokens(renderer.domElement);
     const mat = (color: number, rough = 0.6) => new T.MeshStandardMaterial({ color, roughness: rough, metalness: 0.08 });
     const shadowy = <M extends import("three").Mesh>(m: M, cast = true) => { m.castShadow = cast; m.receiveShadow = true; return m; };
@@ -102,15 +119,28 @@ export class BenchView {
     this.joints = [0.026, 0.021, 0.018].map((r) => { const m = shadowy(new T.Mesh(new T.SphereGeometry(r, 20, 14), steel)); scene.add(m); return m; });
     this.hand = new T.Group();
     const cyan = mat(0x3cc8e6, 0.35);
-    // The job is to reach, not to grasp, so the hand is a touch pad, not a gripper: a cyan puck whose underside (z − 1.3 cm)
-    // stays 2 mm clear of the block's top, with a steel collar where the wrist meets it. Nothing hangs below it.
-    const pad = shadowy(new T.Mesh(new T.CylinderGeometry(0.024, 0.024, 0.016, 28), cyan));
-    pad.rotation.x = Math.PI / 2;
-    pad.position.z = -0.005;
-    const collar = shadowy(new T.Mesh(new T.CylinderGeometry(0.015, 0.019, 0.012, 24), steel));
-    collar.rotation.x = Math.PI / 2;
-    collar.position.z = 0.009;
-    this.hand.add(pad, collar);
+    if (mode === "reach") {
+      // The job is to reach, not to grasp, so the hand is a touch pad: a cyan puck whose underside stays 2 mm clear of the
+      // block's top, with a steel collar where the wrist meets it. Nothing hangs below it.
+      const puck = shadowy(new T.Mesh(new T.CylinderGeometry(0.024, 0.024, 0.016, 28), cyan));
+      puck.rotation.x = Math.PI / 2;
+      puck.position.z = -0.005;
+      const collar = shadowy(new T.Mesh(new T.CylinderGeometry(0.015, 0.019, 0.012, 24), steel));
+      collar.rotation.x = Math.PI / 2;
+      collar.position.z = 0.009;
+      this.hand.add(puck, collar);
+    } else {
+      // A gripper that grips: a palm above two jaws that straddle the block along y, as the head camera's rasteriser
+      // draws them (axis-aligned, so they never cut a corner of the block). render() slides the jaws.
+      const palm = shadowy(new T.Mesh(new T.BoxGeometry(0.044, 0.064, 0.014), cyan));
+      palm.position.z = 0.03;
+      const collar = shadowy(new T.Mesh(new T.CylinderGeometry(0.014, 0.017, 0.012, 24), steel));
+      collar.rotation.x = Math.PI / 2;
+      collar.position.z = 0.043;
+      this.jaws = [-1, 1].map(() => shadowy(new T.Mesh(new T.BoxGeometry(0.026, 0.007, 0.046), cyan)));
+      this.jaws.forEach((j) => (j.position.z = 0.002));
+      this.hand.add(palm, collar, ...this.jaws);
+    }
     scene.add(this.hand);
 
     this.blockMaterial = mat(0xd63c3c, 0.45);
@@ -123,6 +153,23 @@ export class BenchView {
     this.ghost.computeLineDistances();
     this.ghost.visible = false;
     scene.add(this.ghost);
+    if (mode === "pick") {
+      this.padMaterial = mat(0x46be5a, 0.7);
+      this.pad = shadowy(new T.Mesh(new T.BoxGeometry(0.07, 0.07, 0.003), this.padMaterial), false);
+      scene.add(this.pad);
+      const h = 0.037, square = [[-h, -h], [h, -h], [h, h], [-h, h]];
+      this.ghostPad = new T.LineSegments(new T.BufferGeometry().setFromPoints(square.flatMap(([x, y], i) => { const [u, v] = square[(i + 1) % 4]; return [new T.Vector3(x, y, 0), new T.Vector3(u, v, 0)]; })), new T.LineDashedMaterial({ color: colours.act, dashSize: 0.006, gapSize: 0.004 }));
+      this.ghostPad.computeLineDistances();
+      this.ghostPad.visible = false;
+      scene.add(this.ghostPad);
+    }
+    for (const target of (mode === "pick" ? ["block", "pad"] : ["block"]) as Target[]) {
+      const ring = new T.Mesh(new T.RingGeometry(0.046, 0.054, 48), new T.MeshBasicMaterial({ color: colours.see, transparent: true, opacity: 0, depthWrite: false, side: T.DoubleSide }));
+      const arrow = new T.Mesh(new T.ConeGeometry(0.012, 0.03, 20), new T.MeshBasicMaterial({ color: colours.see, transparent: true, opacity: 0 }));
+      arrow.rotation.x = -Math.PI / 2; // the cone's tip is +y: point it down at the thing
+      scene.add(ring, arrow);
+      this.markers.set(target, { ring, arrow });
+    }
 
     // The head camera: a dark body with a glowing lens, its four sight lines, and the patch of bench it can see.
     this.head = new T.Group();
@@ -146,7 +193,7 @@ export class BenchView {
     this.retheme();
   }
 
-  static async create(canvas: HTMLCanvasElement): Promise<BenchView> {
+  static async create(canvas: HTMLCanvasElement, mode: Mode = "reach"): Promise<BenchView> {
     const three = await import("@/lib/three");
     const renderer = new three.WebGLRenderer({ canvas, antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
@@ -154,7 +201,7 @@ export class BenchView {
     renderer.shadowMap.type = three.PCFShadowMap;
     const camera = new three.PerspectiveCamera(34, 1.5, 0.02, 20);
     camera.up.set(0, 0, 1);
-    return new BenchView(three, renderer, new three.Scene(), camera);
+    return new BenchView(three, renderer, new three.Scene(), camera, mode);
   }
 
   /** Fog the colour of whatever is behind the canvas, so the floor's edge disappears into the page in either theme. */
@@ -178,23 +225,32 @@ export class BenchView {
     return ray.ray.intersectPlane(new T.Plane(new T.Vector3(0, 0, 1), -height), hit) ? [hit.x, hit.y] : null;
   }
 
-  /** A press counts as grabbing the block when it lands on it or on the bench within 5 cm of it: a 4 cm block is small on a phone. */
-  grabs(ndcX: number, ndcY: number): boolean {
+  /**
+   * What a press at this point would pick up. It counts when it lands on the thing or on the bench within 5 cm of it (a
+   * 4 cm block is small on a phone); the block wins over the pad when both are near.
+   */
+  grabs(ndcX: number, ndcY: number): Target | null {
     const T = this.three, ray = new T.Raycaster();
     ray.setFromCamera(new T.Vector2(ndcX, ndcY), this.camera);
-    if (ray.intersectObject(this.block).length > 0) return true;
-    const p = this.benchAt(ndcX, ndcY);
-    return p !== null && Math.hypot(p[0] - this.block.position.x, p[1] - this.block.position.y) < 0.05;
+    if (ray.intersectObject(this.block).length > 0) return "block";
+    const p = this.benchAt(ndcX, ndcY, this.block.position.z), q = this.benchAt(ndcX, ndcY, 0);
+    if (p && Math.hypot(p[0] - this.block.position.x, p[1] - this.block.position.y) < 0.05) return "block";
+    if (this.pad && q && Math.hypot(q[0] - this.pad.position.x, q[1] - this.pad.position.y) < 0.055) return "pad";
+    return null;
   }
 
-  /** Light the block up while the pointer is over it or holding it. */
-  highlight(on: boolean) {
-    if (on === this.hot) return;
-    this.hot = on;
-    this.blockMaterial.emissive.set(on ? 0x6a1414 : 0x000000);
+  /** The thing under the pointer (or being dragged) lights up and gets its marker. */
+  hover(target: Target | null) {
+    if (target === this.hovered) return;
+    this.hovered = target;
+    this.blockMaterial.emissive.set(target === "block" ? 0x6a1414 : 0x000000);
+    this.padMaterial?.emissive.set(target === "pad" ? 0x0f4a1c : 0x000000);
   }
 
-  render(bones: Vec3[] | null, block: [number, number], ghost: [number, number] | null, look: { yaw: number; pitch: number }) {
+  /** Until the reader has dragged something, every draggable thing wears a faint marker. */
+  stopHinting() { this.hinting = false; }
+
+  render(frame: Frame) {
     const T = this.three, canvas = this.renderer.domElement, w = canvas.clientWidth, h = canvas.clientHeight;
     if (canvas.width !== Math.round(w * this.renderer.getPixelRatio()) || canvas.height !== Math.round(h * this.renderer.getPixelRatio())) {
       this.renderer.setSize(w, h, false);
@@ -203,9 +259,10 @@ export class BenchView {
       this.camera.fov = w / h < 1.3 ? 46 : 32;
       this.camera.updateProjectionMatrix();
     }
+    const { bones, look } = frame;
     if (bones) {
-      const [shoulder, elbow, wrist, tip] = bones;
-      ([[shoulder, elbow], [elbow, wrist], [wrist, [tip[0], tip[1], tip[2] + 0.012] as Vec3]] as [Vec3, Vec3][]).forEach(([a, b], i) => {
+      const [shoulder, elbow, wrist, tip] = bones, top: Vec3 = [tip[0], tip[1], tip[2] + (this.mode === "pick" ? 0.046 : 0.012)];
+      ([[shoulder, elbow], [elbow, wrist], [wrist, top]] as [Vec3, Vec3][]).forEach(([a, b], i) => {
         const m = this.links[i], d = new T.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), len = d.length();
         m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
         m.scale.set(1, len, 1);
@@ -213,11 +270,29 @@ export class BenchView {
       });
       [shoulder, elbow, wrist].forEach((p, i) => this.joints[i].position.set(...p));
       this.hand.position.set(...tip);
-      this.hand.rotation.z = Math.atan2(tip[1], tip[0]);
+      if (this.mode === "reach") this.hand.rotation.z = Math.atan2(tip[1], tip[0]);
+      // Jaws: 3.4 cm out when open; closed, their inner faces rest on the block's sides (2 cm + half a jaw).
+      const gap = 0.034 - (0.034 - 0.0245) * (frame.jaws ?? 0);
+      this.jaws.forEach((j, i) => (j.position.y = (i ? 1 : -1) * gap));
     }
-    this.block.position.set(block[0], block[1], 0.02);
-    this.ghost.visible = ghost !== null;
-    if (ghost) this.ghost.position.set(ghost[0], ghost[1], 0.023);
+    this.block.position.set(...frame.block);
+    this.ghost.visible = !!frame.ghostBlock;
+    if (frame.ghostBlock) this.ghost.position.set(frame.ghostBlock[0], frame.ghostBlock[1], 0.023);
+    if (this.pad && frame.pad) this.pad.position.set(frame.pad[0], frame.pad[1], 0.0015);
+    if (this.ghostPad) { this.ghostPad.visible = !!frame.ghostPad; if (frame.ghostPad) this.ghostPad.position.set(frame.ghostPad[0], frame.ghostPad[1], 0.004); }
+
+    // Markers: strong on the hovered thing, a slow faint pulse on everything draggable until the first drag.
+    const beat = 0.5 + 0.5 * Math.sin(frame.time / 260), slow = 0.5 + 0.5 * Math.sin(frame.time / 700);
+    for (const [target, { ring, arrow }] of this.markers) {
+      const at = target === "block" ? this.block.position : this.pad!.position, on = this.hovered === target, held = frame.held === target;
+      const strength = on || held ? 1 : this.hinting ? 0.25 + 0.35 * slow : 0;
+      ring.position.set(at.x, at.y, target === "block" && at.z > 0.03 ? 0.003 : 0.0035);
+      ring.scale.setScalar((target === "pad" ? 1.25 : 1) * (1 + 0.12 * (on ? beat : slow)));
+      (ring.material as import("three").MeshBasicMaterial).opacity = 0.9 * strength;
+      arrow.position.set(at.x, at.y, (target === "block" ? at.z + 0.075 : 0.07) + 0.012 * beat);
+      (arrow.material as import("three").MeshBasicMaterial).opacity = on && !held ? 0.95 : 0;
+      ring.visible = strength > 0; arrow.visible = on && !held;
+    }
 
     const f = headForward(look.yaw, look.pitch), corners = footprint(look.yaw, look.pitch);
     this.head.lookAt(HEAD.eye[0] + f[0], HEAD.eye[1] + f[1], HEAD.eye[2] + f[2]); // Object3D.lookAt points +z at the target

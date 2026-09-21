@@ -364,10 +364,11 @@ success rates, said what was wrong.
 | closed + shaken + photo | as trained | pitch 5° | pitch 10° | pitch 20° | yaw 10° | block moved early | pad moved while carrying | shoved 5 cm |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 32 px, 40 000 steps (seeds 11 / 12) | 67 / 69 | 67 / 64 | 69 / 62 | 10 / 1 | 72 / 54 | 62 / 59 | | |
-| **48 px, 20 000 steps** | **92 / 91** | 94 / 90 | 93 / 93 | 38 / 60 | 87 / 94 | 95 / 94 | 92 / 91 | 96 / 93 |
+| **48 px, 20 000 steps** | **92 / 91** | 94 / 90 | 93 / 93 | 38 / 60 | 87 / 94 | 95 / 94 | void (see below) | 96 / 93 |
 
-- **It works at 48 × 48**: about 92 % and flat across the shaken range, follows a moved block and a moved pad, shrugs off a
-  shove. Beside run 15's never-shaken 48 px model (100 / 93 untouched, 31 / 34 at 5°, 0 at 10°) this is the reaching
+- **It works at 48 × 48**: about 92 % and flat across the shaken range, follows a moved block, shrugs off a shove.
+  ("Pad moved while carrying" is VOID in runs 12–17: a bug moved the pad in the first episode only. Fixed in the script;
+  to be measured from the saved weights.) Beside run 15's never-shaken 48 px model (100 / 93 untouched, 31 / 34 at 5°, 0 at 10°) this is the reaching
   article's thesis on a task worth the title.
 - More steps at 32 px steadies the seeds (63 / 35 → 67 / 69) but does not lift the ceiling: resolution, not training, was
   the limit. A pixel at 32 px is 1–2 cm of bench, and the job needs 3 cm twice (grasp and place).
