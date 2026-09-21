@@ -377,6 +377,27 @@ success rates, said what was wrong.
 - Two seeds only. Owed before prose: five seeds, look-once at 48 px with the 3 cm grasp (for the first act), the
   never-shaken row's remaining columns, and how long a single model takes alone.
 
+## Run 17 — pick and place over five seeds: the shape holds in every seed, the training does not (48 px, 200 episodes)
+
+closed at 20 000 steps, open at 10 000; mean (min–max). "Pad moved while carrying" is void here too (the bug was fixed
+after these jobs had loaded the script). Weights saved for every seed in `vla-work/run17/`; the page ships seed 11's.
+
+| | as trained | pitch 5° | pitch 10° | pitch 20° | yaw 10° | block moved early | shoved 5 cm |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| open | 60.0 (54–64) | 0 | 0 | 0 | 0 | 16.1 | 61.5 |
+| open + shaken | 47.1 (16–58) | 45.5 | 47.2 | 0.1 | 40.6 | 14.1 | 46.4 |
+| closed | 71.1 (**12**–100) | 14.5 (0–37) | 0.1 | 0.1 | 1.7 | 68.1 | 72.1 |
+| closed + shaken | 54.0 (**2**–94) | 55.8 | 55.2 | 23.9 | 53.9 | 52.1 | 57.5 |
+
+Per seed, as trained (11…15): closed 100 / 92.5 / 12 / 64 / 87; closed + shaken 93.5 / 92 / 2.5 / 31.5 / 50.5.
+
+- Inside every seed the three acts hold: never shaken collapses with tilt, shaken is flat across the range, look-once
+  cannot follow a moved block (14–16 %) and keep-looking can.
+- **Run 16's 92 / 91 were seeds 11 and 12, the two good ones.** Seed 13 fails in both closed recipes (same seed = same
+  initial weights), 14 and 15 are slow. Their losses are still falling at 20 000 steps (0.25, 0.20, 0.17 against 0.11 for
+  seed 11): slow, not stuck. Run 18 gives them 40 000.
+- Look-once tops out near 60 % even untouched: two positions read from one 48 × 48 picture, each needed to 3 cm.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
