@@ -84,8 +84,13 @@ export function getAllPosts(locale: Locale, opts: QueryOptions = {}): PostMeta[]
     .sort((a, b) => b.date.localeCompare(a.date) || b.no - a.no);
 }
 
+/**
+ * One article, or null. A draft is null wherever drafts are not shown, exactly as it is missing from getAllPosts():
+ * the article page renders unknown slugs on demand, so without this a draft was one typed URL away in production.
+ */
 export function getPostMeta(slug: string, locale: Locale, opts: QueryOptions = {}): PostMeta | null {
-  return load(opts.dir ?? POSTS_DIR, slug, locale)?.meta ?? null;
+  const meta = load(opts.dir ?? POSTS_DIR, slug, locale)?.meta ?? null;
+  return meta?.draft && !showDrafts(opts) ? null : meta;
 }
 
 export function getToc(slug: string, locale: Locale, opts: QueryOptions = {}): TocItem[] {
