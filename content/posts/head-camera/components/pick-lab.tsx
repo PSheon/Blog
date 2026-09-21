@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
 import { NO_SHIFT, type Vec3, type XY } from "./model";
 import { Param } from "./param";
-import { K, PICK_HOME, PICK_SIZE, PickPolicy, type PickState, STEP_XY, STEP_Z, apart, decide, pickAct, pickBones, pickPicture, pickView, usable } from "./pick";
-import { BLIND, type BenchView, type Target } from "./view3d";
+import { K, PICK_HOME, PICK_SIZE, PickPolicy, type PickState, STEP_XY, STEP_Z, decide, inBlockArea, layout, pickAct, pickBones, pickPicture, pickView, usable } from "./pick";
+import type { BenchView, Target } from "./view3d";
 
 const STEP_MS = 150;
 const DOTS = ["#ffff00", "#00ff00", "#ff00ff", "#ffffff", "#000000", "#ff8000", "#00a0ff", "#a0ffa0"];
@@ -47,7 +47,7 @@ export function PickLab() {
   const [policies, setPolicies] = useState<Record<Driver, PickPolicy> | null>(null), [failed, setFailed] = useState(false);
   const [driver, setDriver] = useState<Driver>("shaken"), [pitch, setPitch] = useState(0), [yaw, setYaw] = useState(0);
   const [noise, setNoise] = useState(0), [light, setLight] = useState(1), [playing, setPlaying] = useState<boolean | null>(null), [touched, setTouched] = useState(false);
-  const [status, setStatus] = useState({ what: "fetch" as "fetch" | "carry" | "placed" | "home", placed: 0, keys: [] as XY[], blind: false });
+  const [status, setStatus] = useState({ what: "fetch" as "fetch" | "carry" | "placed" | "home", placed: 0, keys: [] as XY[] });
   const running = playing ?? !reduced;
   const world = useRef<World>(fresh()), placed = useRef(0);
   const knobs = useRef({ driver, pitch, yaw, noise, light, running });
@@ -76,7 +76,7 @@ export function PickLab() {
       if (!w.done) {
         if (policy.kind === "open" && w.phase === "home") {
           // Let go of whatever it holds, go home, then take the one picture.
-          if (s.holding || s.closed) { s.holding = false; s.closed = false; if (!usable(s.block)) s.block = [...START.block]; }
+          if (s.holding || s.closed) { s.holding = false; s.closed = false; s.block = inBlockArea(s.block); if (!usable(s.block)) s.block = [...START.block]; }
           const d: Vec3 = [PICK_HOME[0] - s.hand[0], PICK_HOME[1] - s.hand[1], PICK_HOME[2] - s.hand[2]];
           if (Math.hypot(...d) < 1e-6) {
             const bytes = pickView(s, shift), r = policy.run(pickPicture(bytes, k.noise, k.light), []);
@@ -94,7 +94,7 @@ export function PickLab() {
         if (Math.hypot(...d) > 1e-6) pickAct(s, [s.hand[2] > 0.08 ? d[0] / STEP_XY : 0, s.hand[2] > 0.08 ? d[1] / STEP_XY : 0, d[2] / STEP_Z, 0]);
       }
       if (w.seen) paint(eye.current, w.seen);
-      setStatus({ what: w.done ? "placed" : policy.kind === "open" && w.phase === "home" ? "home" : s.holding ? "carry" : "fetch", placed: placed.current, keys: w.keys, blind: !s.holding && !w.done && s.block[1] < BLIND });
+      setStatus({ what: w.done ? "placed" : policy.kind === "open" && w.phase === "home" ? "home" : s.holding ? "carry" : "fetch", placed: placed.current, keys: w.keys });
     };
 
     const tick = (now: number) => {
@@ -133,13 +133,16 @@ export function PickLab() {
       if (w.drag === "orbit") { bench.orbit(e.clientX - w.px, e.clientY - w.py); w.px = e.clientX; w.py = e.clientY; return; }
       const p = bench.benchAt(x, y, w.drag === "block" ? 0.02 : 0);
       if (!p) return;
-      const q: XY = [Math.max(0.22, Math.min(0.5, p[0])), Math.max(-0.22, Math.min(0.22, p[1]))];
+      // The block stays where the head camera can see it past the arm (BLOCK_AREA); the pad may go anywhere.
+      const q: XY = w.drag === "block" ? inBlockArea(p) : [Math.max(0.22, Math.min(0.5, p[0])), Math.max(-0.22, Math.min(0.22, p[1]))];
       if (!usable(q)) return;
       if (w.drag === "block") w.s.block = q; else w.s.pad = q;
       w.done = false;
     };
     const up = () => {
       const w = world.current;
+      // A block left behind in the arm's shadow (it was placed on a pad there, and the pad has been taken away) comes back in.
+      if (w.drag === "pad" && !w.s.holding && Math.hypot(w.s.block[0] - w.s.pad[0], w.s.block[1] - w.s.pad[1]) > 0.03) w.s.block = inBlockArea(w.s.block);
       if ((w.drag === "block" || w.drag === "pad") && knobs.current.driver === "open") relook();
       w.drag = null;
       bench?.hover(null);
@@ -154,7 +157,7 @@ export function PickLab() {
   }, [policies]);
 
   /** A new layout: block and pad somewhere else, everything back to the start. */
-  const shuffle = () => { const [block, pad] = apart(Math.random); world.current = { ...fresh({ block, pad }), jaws: world.current.jaws }; };
+  const shuffle = () => { world.current = { ...fresh(layout(Math.random)), jaws: world.current.jaws }; };
 
   const panel = "rounded-md border border-border/70 bg-background/75 shadow-sm backdrop-blur-md";
   const names: Record<Driver, string> = { shaken: t.pickShaken, fixed: t.pickFixed, open: t.open };
@@ -183,7 +186,7 @@ export function PickLab() {
         </figure>
         <div className={`absolute bottom-3 left-3 flex items-center gap-3 px-3 py-1.5 ${panel}`} role="status">
           <span className={`size-2 rounded-full ${status.what === "placed" ? "bg-signal" : "animate-pulse bg-signal-2"}`} aria-hidden />
-          <span className="font-sans text-[13px]" data-testid="headcam-pick-status">{status.blind ? t.pickBlind : words[status.what]}</span>
+          <span className="font-sans text-[13px]" data-testid="headcam-pick-status">{words[status.what]}</span>
           <span className="font-mono text-[13px] tabular text-muted-foreground" data-testid="headcam-pick-count">{t.pickCount(status.placed)}</span>
         </div>
         <div className="absolute right-3 bottom-3 flex gap-1.5">

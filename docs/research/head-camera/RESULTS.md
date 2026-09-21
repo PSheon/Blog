@@ -409,6 +409,21 @@ come in from the camera's side and stand between camera and block; the network h
 shake, so it is not cropping. The page tints the strip (y < −0.17) and says so when the block is in it. One head camera,
 one arm on its far side: this is what stereo and palm cameras are for.
 
+## The arm's shadow, mapped, and the page's block area (2026-09-21)
+
+Paul asked for all of it measured and the placements restricted. `maps/*.json`: the shipped shaken checkpoint (seed 11),
+a 2 cm grid over AREA, 5 tries a cell with the other object at random; by block position and by pad position, untouched
+and at 10° of pitch.
+
+- **Block**: the shadow is an L, not a strip. Along the side away from the camera it is wide at both ends (to y = −0.12 at
+  x ≥ 0.42 and at x ≤ 0.24) and one cell deep in the middle (x 0.30–0.38); the row nearest the base (x = 0.22) is weak up to
+  y = −0.08. The map at 10° is the same.
+- **Pad**: fine everywhere. Its scattered misses are episodes whose random block fell in the shadow.
+- The page lets the block go only in **x 0.24–0.50, y −0.10–+0.22** (`BLOCK_AREA`; every cell 4–5 of 5) and tints the rest;
+  the pad may go anywhere. Success over 200 of the page's own layouts (seed 99), untouched / pitch 10°:
+  keep-looking + shaken **100 / 99.5 %**, keep-looking 100 / 0 %, look-once 71.5 / 0 %. These are one checkpoint each
+  (seed 11), not the five-seed means above.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

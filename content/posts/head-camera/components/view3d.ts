@@ -1,9 +1,8 @@
 import type { Vec3 } from "./model";
 import { AREA, HEAD } from "./model";
+import { BLOCK_AREA } from "./pick";
 
 type Three = typeof import("@/lib/three");
-/** Blocks with y below this are in the arm's shadow as the head camera sees it (pick and place; see RESULTS.md, run 17). */
-export const BLIND = -0.17;
 export type Mode = "reach" | "pick";
 export type Target = "block" | "pad";
 /** One drawn moment. `block` is its centre (it rides in the hand when held); `jaws` runs 0 (open) to 1 (closed). */
@@ -107,7 +106,7 @@ export class BenchView {
     bench.position.set(0.34, 0, -0.01);
     scene.add(bench);
     // Where training put blocks, the only place a block can be dropped: a dashed violet outline.
-    const [x0, x1] = AREA.x, [y0, y1] = AREA.y;
+    const region = mode === "pick" ? BLOCK_AREA : AREA, [x0, x1] = region.x, [y0, y1] = region.y;
     const area = new T.LineSegments(new T.BufferGeometry().setFromPoints([[x0, y0], [x1, y0], [x1, y0], [x1, y1], [x1, y1], [x0, y1], [x0, y1], [x0, y0]].map(([x, y]) => new T.Vector3(x, y, 0.001))), new T.LineDashedMaterial({ color: colours.think, dashSize: 0.012, gapSize: 0.008 }));
     area.computeLineDistances();
     scene.add(area);
@@ -156,11 +155,14 @@ export class BenchView {
     this.ghost.visible = false;
     scene.add(this.ghost);
     if (mode === "pick") {
-      // The blind strip: on the side of the bench away from the head camera, the reaching arm stands between the camera and
-      // the block (measured: the block's pixels go to zero with the hand still 8 cm off). Tinted, so a failure there explains itself.
-      const strip = new T.Mesh(new T.PlaneGeometry(AREA.x[1] - AREA.x[0], BLIND - AREA.y[0]), new T.MeshBasicMaterial({ color: colours.act, transparent: true, opacity: 0.16, depthWrite: false }));
-      strip.position.set((AREA.x[0] + AREA.x[1]) / 2, (AREA.y[0] + BLIND) / 2, 0.0012);
-      scene.add(strip);
+      // The arm's shadow, tinted: the part of the training area where the block may NOT go (pick.ts, BLOCK_AREA). An L: the
+      // side away from the head camera, and the row nearest the base.
+      const tint = new T.MeshBasicMaterial({ color: colours.act, transparent: true, opacity: 0.14, depthWrite: false });
+      for (const [x0, x1, y0, y1] of [[AREA.x[0], AREA.x[1], AREA.y[0], BLOCK_AREA.y[0]], [AREA.x[0], BLOCK_AREA.x[0], BLOCK_AREA.y[0], AREA.y[1]]]) {
+        const part = new T.Mesh(new T.PlaneGeometry(x1 - x0, y1 - y0), tint);
+        part.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0.0012);
+        scene.add(part);
+      }
       this.padMaterial = mat(0x46be5a, 0.7);
       this.pad = shadowy(new T.Mesh(new T.BoxGeometry(0.07, 0.07, 0.003), this.padMaterial), false);
       scene.add(this.pad);

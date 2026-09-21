@@ -13,6 +13,22 @@ const HALF = PICK_SIZE / 2;
 export const HIGH = 0.1, LOW = 0.035, STEP_XY = 0.025, STEP_Z = 0.02, GRAB_XY = 0.03, GRAB_Z = 0.01, PLACE_TOL = 0.03, MAX_STEPS = 90;
 const CENTRE = [0.36, 0], SPAN = [0.14, 0.22], FUNNEL = 0.04, FLAT = 0.025, GRIP_XY = 0.022;
 export const PICK_HOME: Vec3 = [0.36, 0, HIGH];
+/**
+ * Where the page lets the reader put the BLOCK. Training drew blocks from all of AREA, but measured on a 2 cm grid
+ * (docs/research/head-camera/maps/) the side away from the head camera is the arm's shadow: coming from the middle, the
+ * hand and forearm stand between camera and block, and its pixels are gone with the hand still 8 cm off. Inside this
+ * rectangle every cell placed 4–5 of 5. The pad may go anywhere in AREA: it is flat, large, and seen past the hand.
+ */
+export const BLOCK_AREA = { x: [0.24, 0.5], y: [-0.1, 0.22] } as const;
+export const inBlockArea = (p: XY): XY => [Math.max(BLOCK_AREA.x[0], Math.min(BLOCK_AREA.x[1], p[0])), Math.max(BLOCK_AREA.y[0], Math.min(BLOCK_AREA.y[1], p[1]))];
+/** A layout for the page: the block inside BLOCK_AREA, the pad anywhere at least 12 cm from it. */
+export function layout(rng: () => number): { block: XY; pad: XY } {
+  for (;;) {
+    const block: XY = [BLOCK_AREA.x[0] + rng() * (BLOCK_AREA.x[1] - BLOCK_AREA.x[0]), BLOCK_AREA.y[0] + rng() * (BLOCK_AREA.y[1] - BLOCK_AREA.y[0])];
+    if (!usable(block)) continue;
+    for (let k = 0; k < 50; k++) { const pad = anywhere(rng); if (Math.hypot(pad[0] - block[0], pad[1] - block[1]) > 0.12) return { block, pad }; }
+  }
+}
 
 export interface PickState { hand: Vec3; closed: boolean; holding: boolean; block: XY; pad: XY }
 
