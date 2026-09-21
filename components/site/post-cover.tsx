@@ -289,6 +289,35 @@ function Playground() {
   );
 }
 
+/** A camera in a head, the patch of bench it sees, and the same patch where a knocked camera would put it; an arm carrying a block to its pad. */
+function HeadCamera() {
+  const eye: [number, number] = [26, 16];
+  // The bench in perspective, and two views of it from the eye: as calibrated (solid) and knocked (dashed).
+  const seen = "62,40 140,48 128,88 40,74", knocked = "72,50 150,60 136,97 48,82";
+  return (
+    <>
+      <polygon points="30,44 150,38 158,92 18,84" fill="none" stroke={DIM} strokeWidth={1} />
+      <polygon points={knocked} fill="none" stroke={S2} strokeWidth={1} strokeDasharray="2.5 2.5" opacity={0.85} />
+      <polygon points={seen} fill={S} fillOpacity={0.08} stroke={S} strokeWidth={1.2} />
+      {seen.split(" ").map((p, i) => <path key={i} d={`M${eye[0]} ${eye[1]} L${p.replace(",", " ")}`} stroke={S} strokeWidth={0.6} opacity={0.45} />)}
+      {/* the head camera */}
+      <g transform={`translate(${eye[0]} ${eye[1]}) rotate(32)`}>
+        <rect x={-7} y={-5} width={14} height={10} rx={2} fill="var(--background)" stroke="var(--foreground)" strokeWidth={1.4} />
+        <circle cx={7} cy={0} r={2.6} fill={S} />
+      </g>
+      {/* the pad, and the way there */}
+      <polygon points="104,64 122,66 119,77 100,74" fill="none" stroke={S3} strokeWidth={1.6} />
+      <path d="M86 50 Q98 44 110 66" fill="none" stroke={S3} strokeWidth={1} strokeDasharray="2 3" />
+      {/* the arm: base, two links, a gripper holding the block */}
+      <rect x={58} y={70} width={11} height={9} rx={1.5} fill={DIM} />
+      <path d="M63.5 70 L74 34 L86 47" fill="none" stroke="var(--foreground)" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" opacity={0.85} />
+      {[[63.5, 70], [74, 34], [86, 47]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.4} fill="var(--background)" stroke="var(--foreground)" strokeWidth={1.2} />)}
+      <path d="M81 49 v8 M91 49 v8 M81 49 h10" fill="none" stroke={S} strokeWidth={1.6} strokeLinecap="round" />
+      <rect x={83} y={51} width={6} height={6} fill={S2} />
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -302,6 +331,7 @@ const covers: Record<string, () => ReactNode> = {
   "task-scheduler": Scheduler,
   "light-from-noise": Light,
   "light-playground": Playground,
+  "head-camera": HeadCamera,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {
