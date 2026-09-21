@@ -38,7 +38,7 @@ const zh = {
   result: "測驗結果",
   straight: "相機沒動", pitched: "相機下傾 5°",
   episodes: (n: number) => `各 ${n} 回合`,
-  toBench: "上面的工作台多了一個「你練的」可以選。",
+  toBench: "下面的工作台多了一個「你練的」可以選。",
   secondsUnit: "秒",
 };
 
@@ -78,7 +78,7 @@ const en: typeof zh = {
   result: "Test",
   straight: "Camera as trained", pitched: "Camera tilted 5°",
   episodes: (n: number) => `${n} episodes each`,
-  toBench: "The bench above now has a “Yours” to choose.",
+  toBench: "The bench below now has a “Yours” to choose.",
   secondsUnit: "s",
 };
 

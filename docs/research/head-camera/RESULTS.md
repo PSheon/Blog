@@ -424,6 +424,27 @@ and at 10° of pitch.
   keep-looking + shaken **100 / 99.5 %**, keep-looking 100 / 0 %, look-once 71.5 / 0 %. These are one checkpoint each
   (seed 11), not the five-seed means above.
 
+## Runs 18–19 — the weak seeds are slow, not stuck; every checkpoint on the page's own layouts
+
+Run 18: closed + shaken seeds 13 / 14 / 15 at 40 000 steps instead of 20 000 (full AREA, 200 episodes): as trained
+2.5 → 53.5, 31.5 → 82, 50.5 → 76.5; flat across tilt as ever. Losses 0.19 / 0.15 / 0.15 and still falling.
+
+Run 19 (`run-19/`, script beside the results): all 23 saved checkpoints re-measured with the page's port on the page's
+layouts (block inside BLOCK_AREA, pad anywhere), 200 episodes, seed 99, and with "pad moved while carrying" working.
+Mean (min–max) over seeds 11–15:
+
+| | as trained | pitch 5° | pitch 10° | pitch 20° | yaw 10° | block moved | pad moved |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| open, 10 000 | 66.3 (52–74) | 0 | 0 | 0 | 0 | 19.4 | 12.7 |
+| open + shaken, 10 000 | 51.7 (24–62) | 51.4 | 53.1 | 0.2 | 45.7 | 16.8 | 10.2 |
+| closed, 20 000 | 74.1 (15–100) | 14.5 (0–39) | 0 | 0 | 1.1 | 73.9 | 73.5 |
+| closed + shaken, 20 000 | 59.0 (2–100) | 59.5 | 57.2 | 26.3 | 59.8 | 59.8 | 59.5 |
+| closed + shaken, 40 000 (seeds 13–15 only) | 76.3 (54–88) | 78.7 | 76.0 | 32.3 | 74.2 | 73.5 | 76.2 |
+
+Per seed, closed + shaken at 20 000, as trained: 100 / 97 / 2.5 / 36.5 / 59. Seeds 11 and 12 are done at 20 000 steps
+(97–100 % everywhere inside the range); 13–15 need far more. The shape of the claim holds in every seed; its size depends
+on the seed until training is made dependable. Run 20 trains all five for 60 000 steps.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
