@@ -10,7 +10,7 @@ import { Param } from "./param";
 import { BIG, type Driver, type Reply, type Request } from "./protocol";
 import { PARAMS, sentence } from "./sim";
 
-const CHECKPOINTS = ["bc-v2", "dart-v2", "dagger-v2"] as const;
+const CHECKPOINTS = ["bc-v2", "dart-v2", "dagger-v2", "dagger-cam-v2"] as const;
 
 function paint(canvas: HTMLCanvasElement | null, bytes: Uint8Array, size: number) {
   const context = canvas?.getContext("2d");

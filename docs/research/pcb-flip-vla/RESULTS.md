@@ -287,3 +287,25 @@ round: 500 episodes, 29895 frames, success on real tasks while collecting 16.2%
   most of the accuracy. A 12 000-step run on the same aggregate is in progress to see whether it is data or training time.
 - Shipped for now: `public/vla/bc-v2`, `dart-v2`, `dagger-v2` (1.91 MB each, f32). `tests/vla/policy.test.ts` holds the
   TypeScript forward pass to PyTorch's logits (< 2e-3) and tokens on five moments of expert episodes.
+
+## The camera question has an answer: it was training time
+
+The same camera-randomised aggregate as "dagger+camrand" above (4 000 camera-jittered demonstrations + five DAgger rounds
+of 500), trained from scratch for **12 000 steps instead of 5 000** (964 s on MPS):
+
+```
+dagger+camrand-12k [124 s]
+  nothing: 90.0% (224/249, 39 steps; nothing-to-do 51/51)
+  slip 1 %: 81.1% (202/249, 39 steps; nothing-to-do 51/51)
+  one shove: 90.0% (224/249, 45 steps; nothing-to-do 51/51)
+  shove + slip 5 %: 57.0% (142/249, 48 steps; nothing-to-do 51/51)
+  board turned back: 82.3% (205/249, 36 steps; nothing-to-do 51/51)
+  camera 5° off: 93.6% (233/249, 39 steps; nothing-to-do 51/51)
+```
+
+Best model so far on every column, and flat across the camera shift (90.0 % straight, 93.6 % at 5°). Shipped as
+`public/vla/dagger-cam-v2`.
+
+**Not a fair comparison yet.** The other recipes had 4 000–5 000 steps. Before the article says "camera randomisation also
+helps with shoves", BC, DART and plain DAgger need the same 12 000 steps; it may be that all of them were under-trained
+and that part of DAgger's lead over BC shrinks. That rerun is the first thing to do (about 16 minutes each).

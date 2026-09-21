@@ -16,8 +16,9 @@ const zh = {
   events: { grasped: "夾住了", missed: "夾歪了，板子被推開", placed: "放好了", dropped: "掉回托盤", lost: "掉到托盤外", slipped: "滑掉了", jammed: "卡住（太低就翻）" },
   lastEvent: "剛剛發生",
   who: "誰在操作", expert: "專家（看得到真實狀態）",
-  models: { "bc-v2": "BC：只看過專家示範", "dart-v2": "DART：專家手抖著示範", "dagger-v2": "DAgger：自己犯錯、專家改考卷" },
-  modelNote: "三個模型架構完全相同，都只看右邊的小圖。",
+  models: { "bc-v2": "BC：只看過專家示範", "dart-v2": "DART：專家手抖著示範", "dagger-v2": "DAgger：自己犯錯、專家改考卷", "dagger-cam-v2": "DAgger + 收資料時相機也亂動" },
+  modelNote: "四個模型架構完全相同，都只看右邊的小圖。",
+
   loading: "下載模型（1.9 MB）…", inference: "模型每步推論", ms: "ms · CPU",
   wouldDo: "專家此刻會",
 };
@@ -36,8 +37,9 @@ const en: typeof zh = {
   events: { grasped: "grasped", missed: "bad pinch, the board was shoved", placed: "placed", dropped: "dropped into the tray", lost: "dropped outside the tray", slipped: "slipped", jammed: "jammed (rolled too low)" },
   lastEvent: "just happened",
   who: "Who is driving", expert: "the expert (sees the true state)",
-  models: { "bc-v2": "BC: expert demonstrations only", "dart-v2": "DART: the expert demonstrates with shaky hands", "dagger-v2": "DAgger: it errs, the expert marks it" },
-  modelNote: "The three models are the same architecture, and all of them see only the small picture.",
+  models: { "bc-v2": "BC: expert demonstrations only", "dart-v2": "DART: the expert demonstrates with shaky hands", "dagger-v2": "DAgger: it errs, the expert marks it", "dagger-cam-v2": "DAgger + a camera that was knocked about while collecting" },
+  modelNote: "The four models are the same architecture, and all of them see only the small picture.",
+
   loading: "Fetching the model (1.9 MB)…", inference: "inference per step", ms: "ms · CPU",
   wouldDo: "the expert would be",
 };
