@@ -1,0 +1,119 @@
+---
+title: "Fewer wasted rays: making every path count"
+description: With the same number of samples the noise can differ more than tenfold, and the only difference is how a ray decides where to go next. Ask the lamp directly, treat a material as a probability distribution, and let MIS give each way of searching the cases it is good at. At the end the white furnace catches a bug of my own.
+date: 2026-09-21
+tags: [graphics, from-scratch]
+no: 12
+interactive: true
+draft: true
+---
+
+import { MaterialLab, RaceLab } from "./components";
+
+Below is one room, drawn four times. The four tiles use the same number of samples and arrive at the same mean brightness. They differ in one thing: after a ray hits a wall, how it decides where to go next. Press Start.
+
+<Instrument fig="01" title="sampling / race" caption="Top left: any direction at all. Top right: chosen by the cosine (the previous article's way). Bottom left: the same, and every hit also asks the lamp directly. Bottom right: both ways of finding the lamp count, each with a weight. The chart on the right is each tile's error, both axes logarithmic.">
+  <RaceLab />
+</Instrument>
+
+[The previous article](/en/posts/light-from-noise) ended on a number: in that room only 3% to 7% of paths ever reach the lamp, and the rest are wasted work. It had one remedy for noise: shoot more. Half the noise costs four times the samples.
+
+This article adds no samples. It only changes how paths are chosen. On my machine, at 719 samples, the bottom-left tile's error was 2.9% and the top-right's was 12%: **one sample that asks the lamp is worth 16 that do not.** And the four tiles' mean brightness was 0.405, 0.406, 0.405 and 0.406. A method may change the noise, never the answer; if the answer changes, the code is wrong.
+
+## Choosing unfairly is fine, if you divide it back out
+
+Look at the top two tiles first. Top left picks every bounce uniformly over the hemisphere. Top right plays favourites: directions close to the surface normal are chosen more often, with probability proportional to the cosine of the angle.
+
+Why is favouritism better? Because that is how a matte surface receives light. Light arriving at a shallow angle is spread over a large area and contributes little; light arriving head-on contributes most. Choose uniformly and more than half of the samples are spent on shallow directions that hardly matter.
+
+Choosing unfairly does not skew the answer, on one condition: **every sample is divided by the probability with which it was chosen.** A direction chosen often counts for less each time, a direction chosen rarely counts for more, and the average is the same. With the cosine the probability happens to cancel the share the surface receives, every sample carries the same weight, and the noise drops. Measured: a uniformly chosen sample is worth only 0.6 of a cosine one.
+
+The name is importance sampling: **spend samples where the contribution is large.** The rest of this article is that one sentence again.
+
+## Where is the largest contribution? The lamp
+
+The direction that contributes most in this room is the direction of the lamp. But the lamp is a small patch of the ceiling, and a cosine-chosen bounce almost never happens to pick it.
+
+So the bottom-left tile does one more thing at every hit: **choose a random point on the lamp, shoot a ray at it, and see whether anything is in the way.** If nothing is, the lamp's brightness is counted at once, divided by the probability of having chosen that direction (higher for a lamp that is large, near, and facing the point). Then the path carries on bouncing as before. This is next event estimation; below it is "asking the lamp".
+
+It has a trap that must be handled. The path may still run into the lamp on its own as it bounces on; count that too and the lamp is counted twice, and the picture is too bright. So a path that has asked the lamp gets nothing for bumping into it. The "mean brightness" column of figure 01 is the check on this: if one tile of the four disagrees, this is where the mistake is.
+
+It is not free. Every hit costs one more ray: I measured 4.2 rays per pixel per sample becoming 7.0, and 2.9 ms per sample becoming 5.7 ms, about double. In return the error of the whole picture fell from 17.7% to 3.3% (at 256 samples). Twice the time bought the effect of twenty-eight times the samples: **for the same time, fourteen times the samples.**
+
+## A material is a probability distribution too
+
+So far every surface has been matte. Here is another room: three balls, matte on the left, glass on the right, and the one in the middle is yours.
+
+<Instrument fig="02" title="sampling / material" caption="The middle ball can be matte, metal or glass. Roughness affects only the metal, the index of refraction only the glass. The white furnace is explained below.">
+  <MaterialLab />
+</Instrument>
+
+To a path tracer a material answers one question: **light arrives from this direction; where does it go, and how much of it?** That is a probability distribution, and the last section said the best way to choose directions is to follow it.
+
+**Matte**: much the same in every direction, so choose by the cosine.
+
+**Metal**: think of the surface as countless tiny mirrors, each facing a slightly different way. Roughness is how disorderly they are. At 0.02 they nearly all face the same way and the ball is a mirror; at 0.6 the reflection is a blur. The method is to pick one tiny mirror that is visible from where you stand, then reflect off it. The model is called GGX. A metal's colour is not painted on: it is how much red, green and blue it reflects head-on. The more obliquely you look, the closer all three get to total reflection, which is why the ball's rim is whiter than its middle. That is the Fresnel effect.
+
+**Glass**: at every surface some light reflects and the rest refracts through, and Fresnel again sets the share: head-on nearly everything passes, at a glancing angle it is a mirror. The index of refraction is how much the light bends. At 1.0 it does not bend and the ball disappears; 2.4 is diamond. The bright patch under the ball is light the glass has gathered together (a caustic). Nobody wrote code for it.
+
+### The white furnace: a material may not make light out of nothing
+
+Material formulas are easy to get wrong, and a wrong one still makes a good-looking picture. There is an old test. Turn the lamp off, make everything outside the room an even white, and make every surface pure white. However light bounces now, the same white arrives from every direction, so **a material that neither eats nor makes light must be as white as the background, and the room shows nothing at all.**
+
+Press "White furnace". What I measured (1.000 is a perfect score):
+
+| The middle ball | Reading on the ball | Rest of the room |
+| --- | --- | --- |
+| Metal, roughness 0.02 | 0.999–1.000 | 0.997–1.000 |
+| Metal, roughness 0.3 | 0.976–0.992 | 0.988–0.993 |
+| Glass | 0.998–1.000 | 0.996–0.999 |
+| Metal, roughness 1.0 | 0.29–0.32 | 0.76–0.86 |
+
+The first three rows pass. In the last, the ball returns only three tenths of its light and drags the walls around it down too. That is not a bug but a known defect of the model: it counts light that bounces once among the tiny mirrors, while on a very rough surface light bounces several times before it gets out, and here that light simply goes missing. I checked the same formula by an entirely different route (no clever choosing, a brute-force integral over the hemisphere) and also got 0.307. Production renderers put that light back.
+
+The first time this test ran, the walls read 2.06. More than 1 means light from nothing. When I "turned the lamp off" I had turned off only the half where a path runs into the lamp by itself; the half that asks the lamp was still asking. Nothing showed in the picture, because a white above 1 is still white on a screen.
+
+## Two ways of searching, each with a blind spot
+
+There are now two ways of finding the lamp: choose a direction by the material and hope, or ask the lamp. Asking was far better above, but that was a matte room with a small lamp. In the room with the metal ball, change the lamp's size and the ball's roughness:
+
+<Instrument fig="03" title="sampling / both" caption="The same four tiles as figure 01, in the room with three balls. Whatever its size, the lamp gives the room the same total power: a small lamp is a very bright one. After a change the picture starts over by itself.">
+  <RaceLab studio />
+</Instrument>
+
+The tile errors I measured (about 500 samples):
+
+| Lamp | Middle ball | Any direction | By the cosine | + ask the lamp | + count both |
+| --- | --- | --- | --- | --- | --- |
+| large | smooth | 6.9% | 5.3% | 48% | 2.3% |
+| large | rough | 6.9% | 5.4% | 2.5% | 2.2% |
+| small | rough | 100% | 82% | 54% | 37% |
+| small | smooth | 140% | 114% | 138% | 55% |
+
+The first row is the point: **with a large lamp, only asking the lamp is nine times worse than not asking at all.** The bottom-left tile grows very bright white specks. The large lamp almost touches the walls; a point on the wall right next to it is asked about a point on the lamp that is extremely close, the formula divides by the squared distance, and the result explodes. Choosing by the material, on the other hand, has no trouble here: with a lamp that large any bounce will run into it. The smooth metal ball is the same story: it reflects one narrow direction, and a random point on the lamp is almost never in it.
+
+The two blind spots are complementary, so there is no need to choose: **do both, and weight each result by how likely this way of searching was to find this path.** The way with the higher probability is the one that is good at this kind of path, so its result counts for more and the other's for less; the two weights sum to 1, so the answer does not change. This is multiple importance sampling (MIS). It does not need to know whether the lamp is large or small or the ball rough or smooth. In all four rows it is the best, or close to it.
+
+In the bottom two rows, with the small lamp, every method has a large error. The picture shows why: the patch of light under the glass ball. That light has to pass through glass to reach the floor, and a ray asking the lamp is blocked by the glass ball itself, so such paths are found by luck alone; the smaller the lamp, the worse the luck. This article does not solve that.
+
+## What is different from the real thing, and how the numbers were measured
+
+**The glass is perfectly smooth.** Frosted glass needs the metal's "many tiny mirrors" carried over to refraction, which is not done here.
+
+**Very rough metal eats light**, as measured in the furnace section.
+
+**Light through glass is still found by luck.** Methods built for caustics (photon mapping, tracing paths from the lamp's end as well) are another subject.
+
+**There is one lamp.** With many, "which lamp to ask" is an importance sampling problem of its own.
+
+**The look of the noise is not discussed.** The same amount of noise is far easier on the eye spread evenly than clumped, and current renderers arrange their random numbers on purpose (Sobol sequences, blue noise). This one still uses the previous article's plain hash.
+
+Where the numbers come from: the readouts in the figures are measured by your browser as it runs. Where the text says "I measured", that was Chrome on an M4 Pro, in this page; the full tables are in this project's `docs/research/light/RESULTS.md`. "One sample is worth" is the square of a ratio of errors, because error falls as the square root of the sample count. That the four methods reach one answer is also tested on the CPU version: three pixels, 6,000 paths per method, means within what the noise allows (`tests/rt/strategies.test.ts`). The GGX formulas have a TypeScript twin, and tests check that the probability it claims matches how often it actually chooses a direction, and that it never returns more than 1 (`tests/rt/materials.test.ts`).
+
+## Sources
+
+- Combining the results of several sampling methods by weight: Veach, Guibas, *Optimally Combining Sampling Techniques for Monte Carlo Rendering*, SIGGRAPH 1995.
+- GGX: Walter, Marschner, Li, Torrance, *Microfacet Models for Refraction through Rough Surfaces*, Eurographics Symposium on Rendering, 2007.
+- Choosing only among visible tiny mirrors: Heitz, *Sampling the GGX Distribution of Visible Normals*, Journal of Computer Graphics Techniques, 2018.
+- The Fresnel approximation used for the metal: Schlick, *An Inexpensive BRDF Model for Physically-based Rendering*, Computer Graphics Forum, 1994.
+- Full derivations of all of this: Pharr, Jakob, Humphreys, *Physically Based Rendering*, fourth edition, 2023 (pbr-book.org, free to read).

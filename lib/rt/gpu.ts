@@ -2,7 +2,11 @@
 import type { Bvh } from "./bvh";
 import { cross, sub, unit } from "./cpu";
 import { KERNEL, MEASURE, PRESENT, WORKGROUP } from "./kernel";
-import type { Scene } from "./scene";
+import type { Material, Scene } from "./scene";
+
+const MATERIAL_FLOATS = 12;
+/** albedo.xyz mirror | emit.xyz roughness | metallic ior glass – : the kernel's `Material`. */
+function packMaterial(m: Material): number[] { return [...m.albedo, m.mirror ? 1 : 0, ...m.emit, m.roughness ?? 1, m.metallic ? 1 : 0, m.ior ?? 1.5, m.glass ? 1 : 0, 0]; }
 
 export interface Counters { rays: number; steps: number; overflow: number }
 
@@ -17,7 +21,9 @@ export class Renderer {
   samples = 0;
   bounces = 16;
   /** See kernel.ts: the 2 × 2 grid of bounce limits, the node-visit heat map (and the count that maps to white), no hierarchy. */
-  quad = false;
+  quad: false | true | "strategies" = false;
+  /** 0 uniform, 1 cosine (article 1), 2 cosine + asking the lamp, 3 both weighted (MIS). Needs `scene.light` for 2 and 3. */
+  strategy = 1;
   heat = false;
   heatMax = 48;
   brute = false;
@@ -26,13 +32,15 @@ export class Renderer {
   skyLevel = 1;
   exposure = 1;
   raster = false;
+  /** Every ray that leaves sees white 1 and no lamp shines: a test of what materials give back. */
+  furnace = false;
   private destroyed = false;
 
   private constructor(
     readonly device: GPUDevice, readonly adapterName: string, private readonly context: GPUCanvasContext, readonly width: number, readonly height: number,
     private readonly params: GPUBuffer, private readonly paramData: ArrayBuffer, private readonly accum: GPUBuffer, private readonly counters: GPUBuffer, private readonly tiles: GPUBuffer, private readonly tileCount: number,
     private readonly tracePipe: GPUComputePipeline, private readonly traceBind: GPUBindGroup, private readonly measurePipe: GPUComputePipeline, private readonly measureBind: GPUBindGroup,
-    private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[],
+    private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[], private readonly mats: GPUBuffer,
   ) {}
 
   static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number): Promise<Renderer | Unavailable> {
@@ -50,15 +58,16 @@ export class Renderer {
 
     const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC, owned: GPUBuffer[] = [];
     const make = (size: number, usage: number, data?: ArrayBuffer | ArrayBufferView) => { const b = device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage }); if (data) device.queue.writeBuffer(b, 0, data as ArrayBuffer); owned.push(b); return b; };
-    const materials = new Float32Array(scene.materials.length * 8);
-    scene.materials.forEach((m, i) => { materials.set(m.albedo, i * 8); materials[i * 8 + 3] = m.mirror ? 1 : 0; materials.set(m.emit, i * 8 + 4); });
+    const materials = new Float32Array(scene.materials.length * MATERIAL_FLOATS);
+    scene.materials.forEach((m, i) => materials.set(packMaterial(m), i * MATERIAL_FLOATS));
     const across = Math.ceil(width / WORKGROUP), down = Math.ceil(height / WORKGROUP), tileCount = across * down;
-    const nodes = make(bvh.nodes.byteLength, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials);
+    const nodes = make(bvh.nodes.byteLength, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials), smooth = make(Math.max(48, bvh.normals?.byteLength ?? 0), STORAGE, bvh.normals?.byteLength ? bvh.normals : undefined);
     const accum = make(width * height * 16 * 2, STORAGE), counters = make(16, STORAGE), tiles = make(tileCount * 8, STORAGE);
-    const paramData = new ArrayBuffer(128), params = make(128, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    const paramData = new ArrayBuffer(176), params = make(176, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
     new Uint32Array(paramData, 0, 4).set([width, height, 0, 16]);
     Renderer.writeCamera(paramData, scene.camera, width / height);
+    if (scene.light) new Float32Array(paramData, 128, 12).set([...scene.light.corner, scene.light.material + 1, ...scene.light.u, 0, ...scene.light.v, 0]);
 
     // A shader that does not compile only logs a warning, and the pipeline promise then rejects with little to say. Ask
     // each module for its messages, so a failure names the line.
@@ -72,22 +81,26 @@ export class Renderer {
     const [tracePipe, measurePipe] = await Promise.all([trace, measure].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
     const presentPipe = await device.createRenderPipelineAsync({ layout: "auto", vertex: { module: shader, entryPoint: "vs" }, fragment: { module: shader, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return new Renderer(device, adapter.info?.description || adapter.info?.architecture || adapter.info?.vendor || "GPU", context, width, height, params, paramData, accum, counters, tiles, tileCount,
-      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params]) }),
+      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth]) }),
       measurePipe, device.createBindGroup({ layout: measurePipe.getBindGroupLayout(0), entries: entries([accum, tiles, params]) }),
-      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params]) }), owned);
+      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params]) }), owned, mats);
   }
 
   private static writeCamera(paramData: ArrayBuffer, camera: Scene["camera"], aspect: number): void {
     const { eye, target, fov } = camera, f = unit(sub(target, eye)), right = unit(cross(f, [0, 1, 0])), up = cross(right, f), half = Math.tan((fov * Math.PI) / 360);
     new Float32Array(paramData, 16, 16).set([...eye, 0, ...f, 0, right[0] * half * aspect, right[1] * half * aspect, right[2] * half * aspect, 0, up[0] * half, up[1] * half, up[2] * half, 0]);
   }
+  /** Change one material in place (a slider moved). What has been accumulated is of the old one: the caller resets. */
+  setMaterial(index: number, material: Material): void { this.device.queue.writeBuffer(this.mats, index * MATERIAL_FLOATS * 4, new Float32Array(packMaterial(material))); }
+
   /** Look from somewhere else. What has been accumulated is of the old view: the caller resets. */
   setCamera(camera: Scene["camera"]): void { Renderer.writeCamera(this.paramData, camera, this.width / this.height); }
 
   private writeParams(): void {
     new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
-    new Float32Array(this.paramData, 96, 8).set([...this.sun, this.exposure, this.skyLevel, 0, 0]);
-    new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : this.raster ? 2 : 0, this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
+    new Float32Array(this.paramData, 96, 6).set([...this.sun, this.exposure, this.skyLevel]);
+    new Uint32Array(this.paramData, 120, 2).set([this.strategy, this.furnace ? 1 : 0]);
+    new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : this.raster ? 2 : 0, this.quad === "strategies" ? 2 : this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
     this.device.queue.writeBuffer(this.params, 0, this.paramData);
   }
 
@@ -155,6 +168,21 @@ export class Renderer {
     for (let i = 0; i < tiles.length; i += 2) { squared += tiles[i]; mean += tiles[i + 1]; }
     const pixels = this.width * this.height;
     return mean > 0 ? Math.sqrt(squared / pixels) / (mean / pixels) : 0;
+  }
+
+  /** `error()` for each tile of the 2 × 2 grid, with the tile's mean radiance: four pictures of one scene should agree on the second and differ in the first. */
+  async errorByTile(): Promise<{ error: number; mean: number }[]> {
+    this.writeParams();
+    const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+    pass.setPipeline(this.measurePipe); pass.setBindGroup(0, this.measureBind);
+    pass.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP));
+    pass.end();
+    this.device.queue.submit([e.finish()]);
+    const tiles = new Float32Array(await this.read(this.tiles, this.tileCount * 8)), across = Math.ceil(this.width / WORKGROUP), down = Math.ceil(this.height / WORKGROUP);
+    const sums = [0, 1, 2, 3].map(() => ({ squared: 0, mean: 0 }));
+    for (let y = 0; y < down; y++) for (let x = 0; x < across; x++) { const q = sums[(y >= down / 2 ? 2 : 0) + (x >= across / 2 ? 1 : 0)], i = (y * across + x) * 2; q.squared += tiles[i]; q.mean += tiles[i + 1]; }
+    const pixels = (this.width * this.height) / 4;
+    return sums.map((q) => ({ error: q.mean > 0 ? Math.sqrt(q.squared / pixels) / (q.mean / pixels) : 0, mean: q.mean / pixels }));
   }
 
   /** One pixel's linear radiance as accumulated so far (both buffers together), or null before any sample. */

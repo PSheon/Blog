@@ -5,7 +5,8 @@ import type { Scene, Vec3 } from "./scene";
  * The path tracer in plain TypeScript, f64, one ray at a time. It exists for two reasons: a test can hold the BVH and
  * the GPU kernel to it, and an instrument can show one path bounce by bounce, which a GPU cannot do for a reader. The
  * algorithm is the kernel's, line for line: cosine-weighted bounces off Lambert surfaces, lights that emit from their
- * front face only, Russian roulette after the third bounce.
+ * front face only, Russian roulette after the third bounce, and the kernel's four ways of looking for the lamp
+ * (`strategy`: 0 uniform, 1 cosine, 2 cosine + asking the lamp directly, 3 both, weighted).
  */
 export interface Hit { t: number; triangle: number; /** BVH nodes visited */ steps: number }
 export type Rng = () => number;
@@ -105,9 +106,10 @@ export class Tracer {
    * One path. `maxBounces` counts scattering events: 0 sees only what glows. Returns the radiance and, for the
    * instrument that draws a path, every vertex with the throughput it arrived with.
    */
-  radiance(o: Vec3, d: Vec3, rng: Rng, maxBounces = 16): { rgb: Vec3; path: PathVertex[]; rays: number; /** where the last ray went, if it hit nothing */ escaped: { from: Vec3; direction: Vec3 } | null } {
+  radiance(o: Vec3, d: Vec3, rng: Rng, maxBounces = 16, strategy = 1): { rgb: Vec3; path: PathVertex[]; rays: number; /** where the last ray went, if it hit nothing */ escaped: { from: Vec3; direction: Vec3 } | null } {
     const rgb: Vec3 = [0, 0, 0], through: Vec3 = [1, 1, 1], path: PathVertex[] = [];
-    let rays = 0, scale = 1, escaped: { from: Vec3; direction: Vec3 } | null = null;
+    let rays = 0, scale = 1, escaped: { from: Vec3; direction: Vec3 } | null = null, lastPdf = 0;
+    const L = this.scene.light, lamp = L && strategy >= 2 ? L : null, lampCross = L ? cross(L.u, L.v) : [0, 0, 1] as Vec3, lampArea = Math.hypot(...lampCross), lampNormal = unit(lampCross);
     for (let bounce = 0; ; bounce++) {
       rays++;
       const h = this.hit(o, d, 1e-5 * scale);
@@ -115,10 +117,30 @@ export class Tracer {
       const at: Vec3 = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t], m = this.materialOf(h.triangle);
       let n = this.normal(h.triangle);
       const front = n[0] * d[0] + n[1] * d[1] + n[2] * d[2] < 0;
-      if (front) for (let k = 0; k < 3; k++) rgb[k] += through[k] * m.emit[k]; // a light shines from its front only
+      if (front && m.emit.some((e) => e > 0)) { // a light shines from its front only
+        let weight = 1; // the eye sees the lamp in full; a bounce that ran into it shares with the direct question
+        if (lamp && bounce > 0) {
+          if (strategy === 2) weight = 0;
+          else { const direct = (h.t * h.t) / (Math.max(-(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]), 1e-6) * lampArea); weight = (lastPdf * lastPdf) / (lastPdf * lastPdf + direct * direct); }
+        }
+        for (let k = 0; k < 3; k++) rgb[k] += through[k] * m.emit[k] * weight;
+      }
       path.push({ at, throughput: [...through], emitted: front && m.emit.some((e) => e > 0), albedo: m.albedo });
       if (bounce >= maxBounces) break;
       if (!front) n = [-n[0], -n[1], -n[2]];
+      scale = Math.max(1, Math.abs(at[0]), Math.abs(at[1]), Math.abs(at[2])); // offsets grow with the numbers they are added to
+      const lifted: Vec3 = [at[0] + n[0] * 1e-4 * scale, at[1] + n[1] * 1e-4 * scale, at[2] + n[2] * 1e-4 * scale];
+      if (lamp) { // ask the lamp directly: a random point on it, one shadow ray
+        const s = rng(), t = rng(), to: Vec3 = [lamp.corner[0] + lamp.u[0] * s + lamp.v[0] * t - at[0], lamp.corner[1] + lamp.u[1] * s + lamp.v[1] * t - at[1], lamp.corner[2] + lamp.u[2] * s + lamp.v[2] * t - at[2]];
+        const distance = Math.hypot(...to), l: Vec3 = [to[0] / distance, to[1] / distance, to[2] / distance], cosLamp = -(l[0] * lampNormal[0] + l[1] * lampNormal[1] + l[2] * lampNormal[2]), cosine = n[0] * l[0] + n[1] * l[1] + n[2] * l[2];
+        if (cosLamp > 0 && cosine > 0) {
+          rays++;
+          if (this.hit(lifted, l, 1e-5 * scale).t >= distance * 0.999) {
+            const direct = (distance * distance) / (cosLamp * lampArea), scattered = cosine / Math.PI, weight = strategy === 3 ? (direct * direct) / (direct * direct + scattered * scattered) : 1, emit = this.scene.materials[lamp.material].emit;
+            for (let k = 0; k < 3; k++) rgb[k] += ((through[k] * m.albedo[k]) / Math.PI) * emit[k] * (cosine / direct) * weight;
+          }
+        }
+      }
       let albedo = m.albedo;
       if (bounce > 2) { // Russian roulette: stop with the probability the path has of mattering less, and pay the survivors back
         const p = Math.max(albedo[0], albedo[1], albedo[2]);
@@ -128,10 +150,13 @@ export class Tracer {
       for (let k = 0; k < 3; k++) through[k] *= albedo[k];
       if (through[0] + through[1] + through[2] === 0) break;
       // Cosine-weighted direction about n: the pdf cancels the cosine and the 1/π of a Lambert surface.
-      const r1 = 2 * Math.PI * rng(), r2 = rng(), r = Math.sqrt(r2), t = unit(cross(Math.abs(n[0]) > 0.1 ? [0, 1, 0] : [1, 0, 0], n)), b = cross(n, t);
-      scale = Math.max(1, Math.abs(at[0]), Math.abs(at[1]), Math.abs(at[2])); // offsets grow with the numbers they are added to
-      o = [at[0] + n[0] * 1e-4 * scale, at[1] + n[1] * 1e-4 * scale, at[2] + n[2] * 1e-4 * scale];
-      d = unit([t[0] * Math.cos(r1) * r + b[0] * Math.sin(r1) * r + n[0] * Math.sqrt(1 - r2), t[1] * Math.cos(r1) * r + b[1] * Math.sin(r1) * r + n[1] * Math.sqrt(1 - r2), t[2] * Math.cos(r1) * r + b[2] * Math.sin(r1) * r + n[2] * Math.sqrt(1 - r2)]);
+      const r1 = 2 * Math.PI * rng(), r2 = rng();
+      let r = Math.sqrt(r2), z = Math.sqrt(1 - r2);
+      if (strategy === 0) { z = r2; r = Math.sqrt(1 - z * z); for (let k = 0; k < 3; k++) through[k] *= 2 * z; } // uniform: the density cancels nothing, the path pays 2·cos
+      lastPdf = strategy === 0 ? 1 / (2 * Math.PI) : z / Math.PI;
+      const t = unit(cross(Math.abs(n[0]) > 0.1 ? [0, 1, 0] : [1, 0, 0], n)), b = cross(n, t);
+      o = lifted;
+      d = unit([t[0] * Math.cos(r1) * r + b[0] * Math.sin(r1) * r + n[0] * z, t[1] * Math.cos(r1) * r + b[1] * Math.sin(r1) * r + n[1] * z, t[2] * Math.cos(r1) * r + b[2] * Math.sin(r1) * r + n[2] * z]);
     }
     return { rgb, path, rays, escaped };
   }

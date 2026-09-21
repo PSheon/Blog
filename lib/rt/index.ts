@@ -2,3 +2,4 @@ export * from "./scene";
 export * from "./bvh";
 export * from "./cpu";
 export * from "./playground";
+export * from "./ggx";

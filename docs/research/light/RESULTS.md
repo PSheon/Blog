@@ -99,3 +99,48 @@ spot check by hand, not a test: CI has no GPU adapter, so it cannot be automated
 
 960×540, 24,545 triangles, M4 Pro: full path tracing (8 bounces, sun by NEE) 3.3 ms per sample; raster view 0.7 ms.
 While W is held the accumulation stays at single-digit samples (7 seen).
+
+## 2026-09-21 — article 2: sampling strategies (M4 Pro, Chrome metal-3, 512², in the page)
+
+Strategies: 0 uniform hemisphere, 1 cosine, 2 cosine + next-event estimation, 3 MIS (power heuristic).
+
+**Cornell box with tori (article 1's room), four tiles from the same samples, at 719 spp:** tile error 16% / 12% / 2.9% /
+3.0%; one sample worth 0.6 / 1 / 16 / 15 of cosine's; tile mean radiance 0.405 / 0.406 / 0.405 / 0.406 (they must
+agree, and do). At 103 spp: 45% / 34% / 8.6% / 9.1%.
+
+**Cost, each strategy alone, 256-sample bursts through `window.__light` (two rounds, second shown):**
+
+| Room | Strategy | ms per sample | rays per pixel per sample | picture error at 256 spp |
+| --- | --- | --- | --- | --- |
+| tori | uniform | 2.72 | 4.29 | 23.8% |
+| tori | cosine | 2.90 | 4.21 | 17.7% |
+| tori | + ask the lamp | 5.71 | 7.00 | 3.32% |
+| tori | MIS | 5.80 | 7.00 | 3.32% |
+| three balls, medium lamp | uniform | 4.55 | 4.50 | 23.7% |
+| three balls | cosine | 4.83 | 4.44 | 18.0% |
+| three balls | + ask the lamp | 7.68 | 7.08 | 6.86% |
+| three balls | MIS | 7.63 | 7.08 | 5.96% |
+
+Tori room: asking the lamp costs 1.97× the time of a cosine sample and cuts the error 5.3×, i.e. 28× the samples'
+worth, 14× per unit of time (whole-picture metric; the four-tile figure says 15–16× per sample because each tile is
+measured against its own mean).
+
+**Three balls, four tiles, ~500 spp (277 for the first row), tile errors uniform / cosine / ask / MIS:**
+
+| Lamp half-side | Middle ball roughness | uniform | cosine | ask the lamp | MIS |
+| --- | --- | --- | --- | --- | --- |
+| 0.06 | 0.08 | 140% | 114% | 138% | 55% |
+| 0.06 | 0.7 | 100% | 82% | 54% | 37% |
+| 0.7 | 0.08 | 6.9% | 5.3% | 48% | 2.3% |
+| 0.7 | 0.7 | 6.9% | 5.4% | 2.5% | 2.2% |
+
+Tile means agree within noise in every row (0.41–0.42). With the small lamp the errors stay huge for every strategy:
+the light that reaches the floor through the glass ball is found by luck only (a shadow ray towards the lamp is
+blocked by the glass). With the large lamp and a smooth ball, asking the lamp alone is nine times WORSE than not
+asking: the lamp almost touches the walls, and a point next to it divides by a tiny squared distance.
+
+**White furnace (lamp off, white 1 outside, every albedo 1, 64 bounces, ~600 spp), green channel, mean of 6 pixels:**
+smooth metal (roughness 0.02): everything 0.997–1.000. Roughness 0.3: 0.976–0.993. Glass: 0.996–1.000. Roughness 1:
+the ball 0.29–0.32, and the room around it darkens to 0.76–0.86. Brute-force integration of the same formulas gives
+0.988 / 0.824 / 0.307 for α = 0.09 / 0.36 / 1, as does lib/rt/ggx.ts. The furnace found a real bug on its first run:
+next-event estimation was still asking the (switched off) lamp, and walls read 2.06.

@@ -18,6 +18,8 @@ export interface Bvh {
   triangleCount: number;
   order: Uint32Array;
   depth: number;
+  /** Interpolated normals, three vec4f per smooth triangle; a packed triangle's second pad word is 1 + its index here. */
+  normals?: ArrayBuffer;
 }
 
 const BUCKETS = 16, LEAF = 4, INNER = 0x80000000;
@@ -97,6 +99,9 @@ export function buildBvh(scene: Scene): Bvh {
     const t = order[i];
     for (let v = 0; v < 3; v++) for (let k = 0; k < 3; k++) tf[i * 12 + v * 4 + k] = P[t * 9 + v * 3 + k];
     tu[i * 12 + 3] = scene.material[t];
+    tu[i * 12 + 7] = (scene.smooth?.[t] ?? -1) + 1;
   }
-  return { nodes, nodeCount: A.length, triangles, triangleCount: n, order, depth };
+  let normals: ArrayBuffer | undefined;
+  if (scene.normals?.length) { normals = new ArrayBuffer((scene.normals.length / 9) * 48); const f = new Float32Array(normals); for (let i = 0; i < scene.normals.length / 3; i++) f.set(scene.normals.slice(i * 3, i * 3 + 3), i * 4); }
+  return { nodes, nodeCount: A.length, triangles, triangleCount: n, order, depth, normals };
 }
