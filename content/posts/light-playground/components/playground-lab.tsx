@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpFromLine, CarFront } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CarFront } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Stick } from "@/components/lab/stick";
@@ -27,9 +27,9 @@ interface Assets { models: Models; world: World; skinner: ReturnType<typeof crea
  */
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<"foot" | "near" | "driving">("foot");
+  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<"foot" | "near" | "driving" | "flying">("foot");
   const settings = useRef({ mode, hour }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
-  const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), interact = useRef(false), seatNow = useRef("foot");
+  const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), down = useRef(false), hover = useRef(false), interact = useRef(false), seatNow = useRef("foot");
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 });
 
   const tracer = useTracer(root, canvas, {
@@ -47,7 +47,9 @@ export function PlaygroundLab() {
     void (async () => {
       const [modelsFile, manFile, groundFile] = await Promise.all([MODELS_URL, BOXMAN_URL, PLAYGROUND_URL].map((url) => fetch(url).then((r) => r.arrayBuffer())));
       const models = parseModels(modelsFile), man = parseBoxman(manFile), ground = parsePlaygroundMesh(groundFile), start = park.spawns.find((s) => s.type === "player")?.at ?? [0, 20, 0];
-      const parked: { name: ModelName; pose: Mat34 }[] = [], near = (s: { at: Vec3 }) => Math.hypot(s.at[0] - start[0], s.at[2] - start[2]);
+      const parked: { name: ModelName; pose: Mat34 }[] = [], airfield = park.spawns.filter((s) => s.type === "player")[1]?.at ?? start;
+      // cars from around the first spawn, the aircraft from around the second (Sketchbook's airfield)
+      const near = (s: { type: string; at: Vec3 }) => { const from = s.type === "car" ? start : airfield; return Math.hypot(s.at[0] - from[0], s.at[2] - from[2]); };
       for (const name of ["car", "heli", "airplane"] as ModelName[]) for (const spawn of park.spawns.filter((s) => s.type === name && s.at[1] < 100).sort((a, b) => near(a) - near(b)).slice(0, name === "car" ? 5 : 1)) parked.push({ name, pose: [...spawn.basis, ...spawn.at] });
       const world = await createWorld(ground, start, models, parked);
       if (!alive) { world.destroy(); return; }
@@ -80,8 +82,8 @@ export function PlaygroundLab() {
     r.setDynamic(assembleDynamicBvh(objects, out.positions, out.materials, r.nodeBase, r.triangleBase));
     timing.current.tree = timing.current.tree * 0.9 + (performance.now() - started) * 0.1; timing.current.triangles = cursor;
 
-    const o = orbit.current, s = settings.current, light = sunAt(s.hour), at = driven ? driven.pose().slice(9) : person.at, head: Vec3 = [at[0], at[1] + (driven ? 1.1 : 0.95), at[2]];
-    const back: Vec3 = [-Math.sin(o.yaw) * Math.cos(o.pitch), -Math.sin(o.pitch), Math.cos(o.yaw) * Math.cos(o.pitch)], distance = a.world.clearance(head, back, driven ? o.distance * 1.7 : o.distance);
+    const o = orbit.current, s = settings.current, light = sunAt(s.hour), at = driven ? driven.pose().slice(9) : person.at, head: Vec3 = [at[0], at[1] + (driven ? 1.1 : 0.95), at[2]], reach = driven ? (driven.craft ? 2.4 : 1.7) : 1;
+    const back: Vec3 = [-Math.sin(o.yaw) * Math.cos(o.pitch), -Math.sin(o.pitch), Math.cos(o.yaw) * Math.cos(o.pitch)], distance = a.world.clearance(head, back, o.distance * reach);
     r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
     r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? 8 : 1;
     r.sample(1); r.present();
@@ -98,9 +100,9 @@ export function PlaygroundLab() {
       if (a && mine.current) {
         const move: [number, number] = [stick.current[0], stick.current[1]];
         for (const key of held.current) { const k = KEYS[key]; if (k) { move[0] += k[0]; move[1] += k[1]; } }
-        const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space"), sprint: held.current.has("shift"), interact: interact.current });
+        const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current });
         jump.current = false; interact.current = false;
-        const now = a.world.driving() ? "driving" : a.world.nearby() ? "near" : "foot";
+        const inside = a.world.driving(), now = inside ? (inside.craft ? "flying" : "driving") : a.world.nearby() ? "near" : "foot";
         if (now !== seatNow.current) { seatNow.current = now; setSeat(now); dirty.current = true; }
         if (changed || dirty.current || relit.current) { const relight = relit.current; dirty.current = false; relit.current = false; draw(1 - Math.exp(-dt * 14), relight); }
       }
@@ -110,6 +112,8 @@ export function PlaygroundLab() {
     return () => { alive = false; };
   }, [draw]);
 
+  /** Stand the character next to the first vehicle of a kind, on its driver's side. */
+  const go = (name: ModelName) => { const a = assets.current, v = a?.world.vehicles.find((x) => x.name === name); if (!a || !v) return; const m = v.pose(); a.world.teleport([m[9] + m[0] * 2.4, m[10] + 0.5, m[11] + m[2] * 2.4]); relit.current = true; };
   const change = (next: Partial<{ mode: Mode; hour: number }>) => { settings.current = { ...settings.current, ...next }; relit.current = true; };
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.key === " " ? "space" : event.key.toLowerCase();
@@ -137,8 +141,9 @@ export function PlaygroundLab() {
             <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} className="size-24 bg-background/70 backdrop-blur-sm" testId="playground-stick" />
           </div>
           <div className="absolute right-2 bottom-2 flex gap-2" onPointerDown={(e) => e.stopPropagation()}>
-            {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-85" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden />{seat === "driving" ? t.getOut : t.getIn}</Button>}
-            <Button size="sm" variant="secondary" className="opacity-85" onClick={() => { jump.current = true; }} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : t.jump}</Button>
+            {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-85" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden />{seat === "near" ? t.getIn : t.getOut}</Button>}
+            {seat === "flying" && <Button size="sm" variant="secondary" className="opacity-85" onPointerDown={() => { down.current = true; }} onPointerUp={() => { down.current = false; }} onPointerLeave={() => { down.current = false; }} onPointerCancel={() => { down.current = false; }} data-testid="playground-down"><ArrowDownToLine className="size-4" aria-hidden />{t.descend}</Button>}
+            <Button size="sm" variant="secondary" className="opacity-85" onClick={() => { jump.current = true; }} onPointerDown={() => { hover.current = seat !== "foot" && seat !== "near"; }} onPointerUp={() => { hover.current = false; }} onPointerLeave={() => { hover.current = false; }} onPointerCancel={() => { hover.current = false; }} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</Button>
           </div>
         </Stage>
       </div>
@@ -152,6 +157,10 @@ export function PlaygroundLab() {
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.mode}>
           <span className="label">{t.mode}</span>
           {MODES.map((m) => <Button key={m} size="sm" variant={mode === m ? "default" : "outline"} aria-pressed={mode === m} disabled={!tracer.live} onClick={() => { setMode(m); change({ mode: m }); }} data-testid={`playground-mode-${m}`}>{t[m]}</Button>)}
+        </div>
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.place}>
+          <span className="label">{t.place}</span>
+          {([["car", t.placeCar], ["heli", t.placeHeli], ["airplane", t.placePlane]] as const).map(([name, text]) => <Button key={name} size="sm" variant="outline" disabled={!ready} onClick={() => go(name)} data-testid={`playground-go-${name}`}>{text}</Button>)}
         </div>
         <label className="flex min-w-48 flex-1 items-center gap-3">
           <span className="label shrink-0">{t.hour} {String(Math.floor(hour)).padStart(2, "0")}:{String(Math.round((hour % 1) * 60)).padStart(2, "0")}</span>
