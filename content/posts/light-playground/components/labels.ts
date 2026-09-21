@@ -12,18 +12,20 @@ const zh = {
   mode: "怎麼畫", raster: "光柵", direct: "只有直接光", full: "完整光追",
   expand: "展開", collapse: "收合", settings: "設定", sppShort: "樣本",
   legend: [
-    { id: "foot", title: "走路", keys: [["W A S D", "移動"], ["Shift", "衝刺"], ["Space", "跳"], ["F", "搭上旁邊的載具"], ["滑鼠", "轉動鏡頭"], ["Esc", "放開滑鼠，再按一次收合"]] },
-    { id: "car", title: "車", keys: [["W S", "油門、倒車"], ["A D", "方向"], ["Space", "煞車"], ["F", "下車"]] },
-    { id: "heli", title: "直升機", keys: [["Shift", "上升"], ["Space", "下降"], ["W S", "前傾、後仰"], ["A D", "左右側傾"], ["Q E", "原地轉向"], ["F", "離開"]] },
-    { id: "plane", title: "飛機", keys: [["Shift", "油門（按住）"], ["S W", "拉起、壓低機頭（升降舵）"], ["A D", "壓坡度（副翼）"], ["Q E", "方向舵；在地上是轉向"], ["Space", "減速"], ["B", "輪煞"], ["F", "跳機"]] },
+    { id: "foot", title: "走路", keys: [["W A S D", "移動"], ["Shift", "衝刺"], ["Space", "跳"], ["F", "搭上旁邊的載具（駕駛）"], ["G", "搭上去當乘客"], ["滑鼠", "轉動鏡頭"], ["Esc", "放開滑鼠，再按一次收合"]] },
+    { id: "car", title: "車", keys: [["W S", "油門、倒車"], ["A D", "方向；在空中是翻滾"], ["Space", "煞車"], ["X", "換座位"], ["V", "第一人稱"], ["F", "下車（慢速時先煞停）"]] },
+    { id: "riding", title: "乘客座", keys: [["X", "換到旁邊的座位"], ["V", "第一人稱"], ["F", "下車"], ["滑鼠", "轉動鏡頭"]] },
+    { id: "heli", title: "直升機", keys: [["Shift", "上升"], ["Space", "下降"], ["W S", "前傾、後仰"], ["A D", "左右側傾"], ["Q E", "原地轉向"], ["X", "換座位"], ["V", "第一人稱"], ["F", "離開"]] },
+    { id: "plane", title: "飛機", keys: [["Shift", "油門（按住）"], ["S W", "拉起、壓低機頭（升降舵）"], ["A D", "壓坡度（副翼）"], ["Q E", "方向舵；在地上是轉向"], ["Space", "減速"], ["B", "輪煞"], ["V", "第一人稱"], ["F", "跳機"]] },
   ] as { id: string; title: string; keys: [string, string][] }[],
   lockOff: "點一下畫面，滑鼠就用來轉鏡頭；Esc 收合", lockOffArticle: "點一下畫面，滑鼠就用來轉鏡頭", lockOn: "滑鼠轉鏡頭中　按 Esc 放開滑鼠",
   enter: "進入遊樂園", entering: "正在下載人物、載具和物理引擎…",
   carry: "沿用上一幀", denoise: "向鄰居借（降噪）",
   place: "帶我去", placeCar: "車", placeHeli: "直升機", placePlane: "飛機",
-  hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", movingTriangles: "會動的三角形", treeMs: "每幀重蓋它們的樹", rendered: "實際算的解析度", jump: "跳", getIn: "上去 (F)", getOut: "下來 (F)", brake: "煞車", climb: "上升／油門", descend: "下降／煞車",
+  hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", movingTriangles: "會動的三角形", treeMs: "每幀重蓋它們的樹", rendered: "實際算的解析度", jump: "跳", getIn: "上去 (F)", getOut: "下來 (F)", brake: "煞車", switchSeat: "換座位 (X)", climb: "上升／油門", descend: "下降／煞車",
   stick: "移動：拖曳搖桿，或選取它之後用方向鍵、W A S D",
-  hint: "用滑鼠的話，點一下畫面，滑鼠就直接轉動鏡頭，按 Esc 放開；觸控則是拖曳。點過畫面之後，用 W A S D 或方向鍵走路，Shift 衝刺，空白鍵跳；走到車、直升機或飛機旁按 F 上去，再按一次下來。車：同樣的鍵是油門、方向，空白鍵煞車。直升機和飛機的鍵照 Sketchbook：直升機按住 Shift 上升、空白鍵下降，W S 前傾後仰，A D 側傾，Q E 原地轉向，放手會自己回正。飛機按住 Shift 加油門，速度夠了按住 S 拉起機頭，A D 壓坡度，Q E 是方向舵（在地上是轉向），空白鍵減速，B 是輪煞；手機用左下角的搖桿和右下角的「跳」。人一動，累積的樣本就全部作廢，畫面回到雜訊；站著不動，它就慢慢變清楚。",
+  hint: "先點一下畫面：滑鼠轉鏡頭（Esc 放開），W A S D 走路，走到車、直升機或飛機旁按 F。觸控用搖桿和拖曳。人一動，累積的樣本就全部作廢，畫面回到雜訊；站著不動，它就慢慢變清楚。",
+  help: "操作說明", helpTouch: "觸控：左下角的搖桿移動，拖曳畫面轉鏡頭；右下角的按鈕依序是換座位、上下車、下降或煞車、跳或上升。直升機的搖桿左右是轉向。",
 };
 
 const en: typeof zh = {
@@ -36,18 +38,20 @@ const en: typeof zh = {
   mode: "Drawn by", raster: "Raster", direct: "Direct light only", full: "Full path tracing",
   expand: "Expand", collapse: "Collapse", settings: "Settings", sppShort: "samples",
   legend: [
-    { id: "foot", title: "On foot", keys: [["W A S D", "move"], ["Shift", "sprint"], ["Space", "jump"], ["F", "get into what is next to you"], ["mouse", "turn the camera"], ["Esc", "release the mouse; again to collapse"]] },
-    { id: "car", title: "Car", keys: [["W S", "throttle, reverse"], ["A D", "steer"], ["Space", "brake"], ["F", "get out"]] },
-    { id: "heli", title: "Helicopter", keys: [["Shift", "climb"], ["Space", "descend"], ["W S", "tilt forward, back"], ["A D", "roll left, right"], ["Q E", "turn on the spot"], ["F", "leave"]] },
-    { id: "plane", title: "Aeroplane", keys: [["Shift", "throttle (hold)"], ["S W", "nose up, down (elevators)"], ["A D", "bank (ailerons)"], ["Q E", "rudder; steering on the ground"], ["Space", "slow down"], ["B", "wheel brake"], ["F", "bail out"]] },
+    { id: "foot", title: "On foot", keys: [["W A S D", "move"], ["Shift", "sprint"], ["Space", "jump"], ["F", "get into what is next to you, to drive"], ["G", "get in as a passenger"], ["mouse", "turn the camera"], ["Esc", "release the mouse; again to collapse"]] },
+    { id: "car", title: "Car", keys: [["W S", "throttle, reverse"], ["A D", "steer; in the air, roll"], ["Space", "brake"], ["X", "switch seats"], ["V", "first person"], ["F", "get out (slow, it stops first)"]] },
+    { id: "riding", title: "Passenger seat", keys: [["X", "slide over to the next seat"], ["V", "first person"], ["F", "get out"], ["mouse", "turn the camera"]] },
+    { id: "heli", title: "Helicopter", keys: [["Shift", "climb"], ["Space", "descend"], ["W S", "tilt forward, back"], ["A D", "roll left, right"], ["Q E", "turn on the spot"], ["X", "switch seats"], ["V", "first person"], ["F", "leave"]] },
+    { id: "plane", title: "Aeroplane", keys: [["Shift", "throttle (hold)"], ["S W", "nose up, down (elevators)"], ["A D", "bank (ailerons)"], ["Q E", "rudder; steering on the ground"], ["Space", "slow down"], ["B", "wheel brake"], ["V", "first person"], ["F", "bail out"]] },
   ] as { id: string; title: string; keys: [string, string][] }[],
   lockOff: "Click the world and the mouse turns the camera; Esc collapses", lockOffArticle: "Click the world and the mouse turns the camera", lockOn: "The mouse turns the camera. Press Esc to release it",
   enter: "Enter the playground", entering: "Fetching the character, the vehicles and the physics engine…",
   carry: "Carry the last frame over", denoise: "Borrow from neighbours (denoise)",
   place: "Take me to", placeCar: "a car", placeHeli: "the helicopter", placePlane: "the aeroplane",
-  hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", movingTriangles: "Triangles that move", treeMs: "Their tree, rebuilt per frame", rendered: "Pixels actually rendered", jump: "Jump", getIn: "Get in (F)", getOut: "Get out (F)", brake: "Brake", climb: "Up / throttle", descend: "Down / brake",
+  hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", movingTriangles: "Triangles that move", treeMs: "Their tree, rebuilt per frame", rendered: "Pixels actually rendered", jump: "Jump", getIn: "Get in (F)", getOut: "Get out (F)", brake: "Brake", switchSeat: "Switch seats (X)", climb: "Up / throttle", descend: "Down / brake",
   stick: "Move: drag the stick, or focus it and use the arrow keys or W A S D",
-  hint: "With a mouse, click the picture and the mouse turns the camera (Esc releases it); on touch, drag. Once it is clicked, walk with W A S D or the arrow keys, Shift to sprint, Space to jump; walk up to a car, the helicopter or the aeroplane and press F to get in, and again to get out. Car: the same keys are throttle and steering, Space brakes. The helicopter and the aeroplane use Sketchbook's keys. Helicopter: hold Shift to climb, Space to descend, W S tilt it forward and back, A D roll it, Q E turn it on the spot, and letting go levels it. Aeroplane: hold Shift for throttle, at speed hold S to lift the nose, A D bank, Q E is the rudder (and steers on the ground), Space slows it, B is the wheel brake; on a phone use the stick in the corner and the Jump button. Any movement throws away every sample so far and the picture is noise again; stand still and it clears.",
+  hint: "Click the picture first: the mouse turns the camera (Esc releases it), W A S D walk, and F beside a car, the helicopter or the aeroplane gets in. On touch, use the stick and drag. Any movement throws away every sample so far and the picture is noise again; stand still and it clears.",
+  help: "Controls", helpTouch: "Touch: the stick in the corner moves, dragging the picture turns the camera; the buttons on the right are switch seats, get in or out, down or brake, and jump or up. In the helicopter the stick's sideways half turns it.",
 };
 
 export type Labels = typeof zh;

@@ -1,6 +1,6 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
 import { compose, fromPose, rotationX, rotationY, type Mat34, type Model, type Part } from "@/lib/rt";
-import { quaternionOf } from "./car";
+import { quaternionOf, Spring } from "./car";
 
 /**
  * Sketchbook's helicopter and aeroplane, ported step for step (vehicles/Helicopter.ts and Airplane.ts, MIT, Jan Blaha).
@@ -15,8 +15,9 @@ import { quaternionOf } from "./car";
  * Aeroplane: Shift is the throttle, Space the air brake, B the wheel brake. The controls only bite with forward speed
  * (all of them at 10 m/s). Drag is taken from the whole velocity and given back along the nose, which is what bends the
  * flight path to where the nose points; lift is small and capped. On the ground Q/E or A/D steer the nose wheel.
- * Not ported: Sketchbook lightens the body by up to 60 % with speed; here the mass stays, since the landing gear's
- * springs are tuned for it.
+ * Sketchbook also writes a lighter mass (down to 40 %) into the body as it gathers speed. In cannon-es that number is
+ * only read by the wheels' springs (the body's inverse mass is not recomputed), so what it does is soften the landing
+ * gear at speed; here the springs' stiffness is scaled the same way.
  */
 export interface Fly { /** roll: −1 left (A) … 1 right (D) */ x: number; /** pitch: 1 nose down (W) … −1 nose up (S) */ y: number; /** −1 left (Q) … 1 right (E) */ yaw: number; /** Shift: climb, or throttle */ up: boolean; /** Space: sink, or air brake */ down: boolean; /** B */ wheelBrake: boolean }
 type V = { x: number; y: number; z: number };
@@ -42,9 +43,6 @@ function correction(from: V, to: V): V {
   const m11 = 1 - 2 * (y * y + z * z), m12 = 2 * (x * y - w * z), m13 = 2 * (x * z + w * y), m22 = 1 - 2 * (x * x + z * z), m23 = 2 * (y * z - w * x), m32 = 2 * (y * z + w * x), m33 = 1 - 2 * (x * x + y * y);
   return Math.abs(m13) < 0.9999999 ? { x: Math.atan2(-m23, m33), y: Math.asin(clamp(m13, -1, 1)), z: Math.atan2(-m12, m11) } : { x: Math.atan2(m32, m22), y: Math.asin(clamp(m13, -1, 1)), z: 0 };
 }
-
-/** Sketchbook's SpringSimulator at its 60 frames a second: one call is one frame. */
-class Spring { position = 0; velocity = 0; target = 0; constructor(private mass: number, private damping: number) {} step(): number { this.velocity += (this.target - this.position) / this.mass; this.velocity *= this.damping; return (this.position += this.velocity); } }
 
 function chassis(R: typeof RAPIER, world: RAPIER.World, model: Model, pose: Mat34, mass: number, lift: number) {
   const body = world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pose[9], pose[10] + lift, pose[11]).setRotation(quaternionOf(pose)).setLinearDamping(0.01).setAngularDamping(0.01)); // cannon-es' defaults, which Sketchbook leaves alone
@@ -123,6 +121,7 @@ export function createAeroplane(R: typeof RAPIER, world: RAPIER.World, model: Mo
       v = plus(v, scaled(a.up, clamp(speed2 * 0.005 * power, 0, 0.05) * k)); // lift
       w = scaled(w, 1 + (0.98 ** k - 1) * flight);
       body.setLinvel(v, true); body.setAngvel(w, true);
+      wheels.forEach((_, i) => gear.setWheelSuspensionStiffness(i, 60 * (1 - flight * 0.6)));
       gear.updateVehicle(dt);
       grounded = wheels.reduce((n, _, i) => n + (gear.wheelIsInContact(i) ? 1 : 0), 0);
     },

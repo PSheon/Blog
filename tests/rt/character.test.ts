@@ -6,9 +6,9 @@ const none: Keys = { anyDirection: false, justDirection: false, run: false, just
 
 function setup() {
   const log: string[] = [], door = { open: false };
-  const w = { grounded: true, speed: 0, impact: 0, turn: 0, vehicle: null as Surroundings["vehicle"], clipLength: (c: string) => LENGTH[c] ?? 0.5, jump: (s: number) => { log.push(`jump ${s}`); w.grounded = false; }, seated: () => log.push("seated"), shifted: () => log.push("shifted"), released: (to: string) => log.push(`released ${to}`), cancelEntry: () => log.push("cancel") };
+  const w = { grounded: true, speed: 0, impact: 0, turn: 0, vehicle: null as Surroundings["vehicle"], clipLength: (c: string) => LENGTH[c] ?? 0.5, jump: (s: number) => { log.push(`jump ${s}`); w.grounded = false; }, seated: () => log.push("seated"), unseated: () => log.push("unseated"), beginShift: (toDriver: boolean) => log.push(`shift ${toDriver ? "to the wheel" : "to the next seat"}`), shifted: () => log.push("shifted"), released: (to: string) => log.push(`released ${to}`), cancelEntry: () => log.push("cancel") };
   const c = new Character(w as Surroundings), run = (seconds: number, keys: Partial<Keys> = {}) => { const seen = new Set<string>(); for (let i = 0; i < Math.round(seconds * 60); i++) { c.update(1 / 60, { ...none, ...keys }); seen.add(c.state); } return [...seen]; };
-  const vehicle = (airplane = false, driverSeat = true): NonNullable<Surroundings["vehicle"]> => ({ driverSeat, shiftSide: "left", airplane, hasDoor: !airplane, get doorOpen() { return door.open; }, side: "right", exitSide: "left", doorSide: "left", speed: 0, open: () => { door.open = true; log.push("door open"); }, close: () => { door.open = false; log.push("door close"); }, noDirection: true });
+  const vehicle = (airplane = false, driverSeat = true, wantsToDrive = true): NonNullable<Surroundings["vehicle"]> => ({ driverSeat, wantsToDrive, canSwitch: !airplane, shiftSide: "left", airplane, hasDoor: !airplane, get doorOpen() { return door.open; }, side: "right", exitSide: "left", doorSide: "left", speed: 0, open: () => { door.open = true; log.push("door open"); }, close: () => { door.open = false; log.push("door close"); }, noDirection: true });
   return { c, w, run, log, vehicle };
 }
 
@@ -81,12 +81,27 @@ describe("the character's states, as Sketchbook has them", () => {
     c.enter("OpenVehicleDoor"); run(0.6); expect(c.state).toBe("EnteringVehicle");
     run(0.6); expect(log).not.toContain("seated"); // in a seat, but not at the wheel
     expect(c.state).toBe("CloseVehicleDoorInside");
-    run(0.8); expect(log.at(-1)).toBe("door close");
+    run(0.8); expect(log.slice(-2)).toEqual(["door close", "shift to the wheel"]); // it got in to drive (F), so it goes on by itself
     expect([c.state, c.clip]).toEqual(["SwitchingSeats", "sitting_shift_left"]);
     run(0.3); expect(c.progress).toBeGreaterThan(0); expect(c.progress).toBeLessThan(1);
     (seat as { driverSeat: boolean }).driverSeat = true; // what `shifted` does in the world
     run(0.4); expect(log.slice(-2)).toEqual(["shifted", "seated"]);
     expect([c.state, c.clip]).toEqual(["Driving", "driving"]);
+  });
+
+  it("as a passenger (G): stays in that seat; X slides over to the wheel and back; F gets out from where it sits", () => {
+    const { c, w, run, log, vehicle } = setup();
+    const seat = vehicle(false, false, false); w.vehicle = seat;
+    c.enter("EnteringVehicle"); run(2);
+    expect([c.state, c.clip]).toEqual(["Sitting", "sitting"]); expect(log).not.toContain("seated");
+    run(3); expect(c.state).toBe("Sitting"); // nobody told it to drive
+    run(1 / 60, { justSwitch: true }); expect(c.state).toBe("SwitchingSeats"); expect(log.at(-1)).toBe("shift to the next seat");
+    (seat as { driverSeat: boolean }).driverSeat = true;
+    run(1); expect(c.state).toBe("Driving"); expect(log.slice(-2)).toEqual(["shifted", "seated"]);
+    run(1 / 60, { justSwitch: true }); expect(log.slice(-2)).toEqual(["unseated", "shift to the next seat"]); // the driver lets go of the wheel first
+    (seat as { driverSeat: boolean }).driverSeat = false;
+    run(1); expect(c.state).toBe("Sitting");
+    run(1 / 60, { justEnter: true }); expect(c.state).toBe("ExitingVehicle");
   });
 
   it("climbs into the aeroplane with its own clip, and leaves it with a jump", () => {

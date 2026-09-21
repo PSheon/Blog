@@ -12,7 +12,7 @@ export type Mat34 = number[];
 
 /** Where someone sits, which door is theirs, and where they stand to get in (all in the model's frame; all facing +z, as the models do). */
 export interface Seat { name: string; type: string; at: Vec3; door: string | null; /** seats one can slide over to from here */ connected: string[]; entries: { name: string; at: Vec3 }[] }
-export interface Part { name: string; role: "body" | "wheel" | "rotor" | "door" | "aileron" | "elevator" | "rudder"; /** an aileron's wing */ side?: "left" | "right" | null; steering?: boolean; drive?: string | null; rest: Mat34 | null; first: number; count: number }
+export interface Part { name: string; role: "body" | "wheel" | "rotor" | "door" | "aileron" | "elevator" | "rudder" | "steering_wheel"; /** an aileron's wing */ side?: "left" | "right" | null; steering?: boolean; drive?: string | null; rest: Mat34 | null; first: number; count: number }
 export interface Model { parts: Part[]; colliders: ({ shape: "sphere"; at: Vec3; radius: number } | { shape: "box"; at: Vec3; half: Vec3; rest: number[] })[]; seats: Seat[]; anchors: { camera?: Vec3 } }
 export interface Models { models: Record<ModelName, Model>; positions: Float32Array; kinds: Uint8Array }
 
@@ -40,6 +40,7 @@ export function compose(a: Mat34, b: Mat34): Mat34 {
   return o;
 }
 export function rotationX(angle: number): Mat34 { const c = Math.cos(angle), s = Math.sin(angle); return [1, 0, 0, 0, c, s, 0, -s, c, 0, 0, 0]; }
+export function rotationZ(angle: number): Mat34 { const c = Math.cos(angle), s = Math.sin(angle); return [c, s, 0, -s, c, 0, 0, 0, 1, 0, 0, 0]; }
 export function rotationY(angle: number): Mat34 { const c = Math.cos(angle), s = Math.sin(angle); return [c, 0, -s, 0, 1, 0, s, 0, c, 0, 0, 0]; }
 /** Position and unit quaternion (x, y, z, w), as a physics engine hands them over. */
 export function fromPose(p: { x: number; y: number; z: number }, q: { x: number; y: number; z: number; w: number }): Mat34 {

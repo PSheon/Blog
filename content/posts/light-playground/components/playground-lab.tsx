@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine, CarFront, Loader2, Maximize2, Minimize2, Play, SlidersHorizontal } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CarFront, Loader2, Maximize2, Minimize2, Play, SlidersHorizontal, ArrowLeftRight, Keyboard, ChevronDown } from "lucide-react";
 import { type KeyboardEvent, type MouseEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Stick } from "@/components/lab/stick";
@@ -24,11 +24,11 @@ const KEYS: Record<string, [number, number]> = { KeyW: [0, 1], KeyS: [0, -1], Ke
 
 interface Assets { models: Models; world: World; skinner: ReturnType<typeof createSkinner>; /** each object's tree, built once from its rest pose */ prepared: Record<ModelName | "person", Prepared>; scratch: { positions: Float32Array; materials: Uint32Array } }
 
-type Seat = "foot" | "near" | "driving" | "flying";
+type Seat = "foot" | "near" | "driving" | "flying" | "riding"; // riding: in a passenger's seat
 
 /** The keys for what you are doing right now, in the corner of the world, as Sketchbook shows them. For a keyboard: a phone has the stick and the buttons. */
 function Hints({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | null }) {
-  const active = seat === "driving" ? "car" : seat === "flying" ? (craft === "airplane" ? "plane" : "heli") : "foot", group = t.legend.find((g) => g.id === active) ?? t.legend[0];
+  const active = seat === "riding" ? "riding" : seat === "driving" ? "car" : seat === "flying" ? (craft === "airplane" ? "plane" : "heli") : "foot", group = t.legend.find((g) => g.id === active) ?? t.legend[0];
   return (
     <div className="pointer-events-none w-60 rounded-md border border-white/15 bg-black/70 px-3 py-2.5 text-xs text-white/90 backdrop-blur-md" data-testid="playground-hints" data-for={active}>
       <div role="heading" aria-level={3} className="label mb-1.5 text-white">{group.title}</div>
@@ -59,6 +59,8 @@ export function PlaygroundLab() {
   const justReleased = () => lockedNow.current || performance.now() - releasedAt.current < 400;
   useEffect(() => { lockedNow.current = locked; }, [locked]);
   const turnedNow = useRef(false);
+  const [help, setHelp] = useState(false);
+  const passenger = useRef(false), switchSeat = useRef(false), firstPerson = useRef(false), heading = useRef<number | null>(null); // G, X (one press each) and V (Sketchbook's first-person view, in a vehicle)
   useEffect(() => { turnedNow.current = turned; }, [turned]);
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 }), quality = useRef({ level: 0, frame: 16, slow: 0, fast: 0, since: 0 }), [level, setLevel] = useState(0);
 
@@ -110,13 +112,21 @@ export function PlaygroundLab() {
     }
     // the character is always there to be seen: walking, opening a door, sitting at the wheel
     const driven = a.world.seated() ? a.world.driving() : null;
-    objects.push({ prepared: a.prepared.person, first: cursor }); a.skinner.pose(person.clip, person.clipTime, person.loop, Math.min(1, blend * (0.1 / Math.max(person.fade, 0.02)))); cursor = a.skinner.write(person.place, park.characterMaterial, out, cursor);
+    objects.push({ prepared: a.prepared.person, first: cursor }); a.skinner.pose(person.clip, person.clipTime, person.loop, Math.min(1, blend * (0.1 / Math.max(person.fade, 0.02))));
+    const inside = a.world.driving(), eyes = firstPerson.current && inside ? inside : null; // first person: the character is not drawn (all of it in one point), as Sketchbook hides it
+    cursor = a.skinner.write(eyes ? [0, 0, 0, 0, 0, 0, 0, 0, 0, person.at[0], person.at[1], person.at[2]] : person.place, park.characterMaterial, out, cursor);
     r.setDynamic(assembleDynamicBvh(objects, out.positions, out.materials, r.nodeBase, r.triangleBase));
     timing.current.tree = timing.current.tree * 0.9 + (performance.now() - started) * 0.1; timing.current.triangles = cursor;
 
+    // In first person the view belongs to the vehicle: it starts looking out of the windscreen and turns as the vehicle turns (ours;
+    // Sketchbook leaves the camera where the mouse last put it, which from inside a car is usually a door).
+    if (eyes) { const m = eyes.pose(), h = Math.atan2(m[6], -m[8]); if (heading.current === null) { orbit.current.yaw = h; orbit.current.pitch = -0.08; } else orbit.current.yaw += Math.atan2(Math.sin(h - heading.current), Math.cos(h - heading.current)); heading.current = h; } else heading.current = null;
     const o = orbit.current, s = settings.current, light = sunAt(s.hour), at = driven ? driven.pose().slice(9) : person.at, head: Vec3 = [at[0], at[1] + (driven ? 1.1 : 0.95), at[2]], reach = driven ? (driven.craft ? 2.4 : 1.7) : 1;
     const back: Vec3 = [-Math.sin(o.yaw) * Math.cos(o.pitch), -Math.sin(o.pitch), Math.cos(o.yaw) * Math.cos(o.pitch)], distance = a.world.clearance(head, back, o.distance * reach);
-    r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
+    if (eyes) { // the camera sits on the model's own camera point (or over the seat) and looks where the mouse says
+      const m = eyes.pose(), c = a.models.models[eyes.name].anchors.camera ?? [eyes.seat.at[0], eyes.seat.at[1] + 0.75, eyes.seat.at[2]], eye: Vec3 = [m[0] * c[0] + m[3] * c[1] + m[6] * c[2] + m[9], m[1] * c[0] + m[4] * c[1] + m[7] * c[2] + m[10], m[2] * c[0] + m[5] * c[1] + m[8] * c[2] + m[11]];
+      r.setCamera({ eye, target: [eye[0] - back[0], eye[1] - back[1], eye[2] - back[2]], fov: 70 });
+    } else r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
     r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? LEVELS[quality.current.level].bounces : 1; r.historyCap = s.carry ? 12 : 0; r.denoise = s.denoise;
     r.sample(1); r.present();
     resume();
@@ -153,9 +163,10 @@ export function PlaygroundLab() {
         // A thumb has no Q and E, so in the helicopter the stick's sideways half is the yaw: pitch and yaw fly it anywhere, pitch and roll do not.
         let turn = (held.current.has("KeyE") ? 1 : 0) - (held.current.has("KeyQ") ? 1 : 0);
         if (seatNow.current === "flying" && a.world.driving()?.name === "heli") { turn += stick.current[0]; move[0] -= stick.current[0]; }
-        const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current, turn, up: held.current.has("shift") || hover.current, down: held.current.has("space") || down.current, wheelBrake: held.current.has("KeyB") });
-        jump.current = false; interact.current = false;
-        const inside = a.world.seated() ? a.world.driving() : null, now = inside ? (inside.craft ? "flying" : "driving") : a.world.nearby() ? "near" : "foot";
+        const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current, passenger: passenger.current, switchSeat: switchSeat.current, turn, up: held.current.has("shift") || hover.current, down: held.current.has("space") || down.current, wheelBrake: held.current.has("KeyB") });
+        jump.current = false; interact.current = false; passenger.current = false; switchSeat.current = false;
+        if (!a.world.driving() && firstPerson.current) { firstPerson.current = false; dirty.current = true; }
+        const inside = a.world.seated() ? a.world.driving() : null, now = inside ? (inside.craft ? "flying" : "driving") : a.world.driving() && a.world.riding() ? "riding" : a.world.nearby() ? "near" : "foot";
         if (now !== seatNow.current) { seatNow.current = now; setSeat(now); setCraft(inside?.name ?? null); dirty.current = true; }
         if (changed || dirty.current || relit.current) { const relight = relit.current; dirty.current = false; relit.current = false; draw(1 - Math.exp(-dt * 14), relight); }
       }
@@ -200,9 +211,12 @@ export function PlaygroundLab() {
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift" : event.code === "Space" ? "space" : event.code;
     if (event.code === "Escape") return; // the window's listener decides (it knows whether this Escape only released the pointer)
-    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF" && k !== "KeyQ" && k !== "KeyE" && k !== "KeyB") return;
+    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF" && k !== "KeyQ" && k !== "KeyE" && k !== "KeyB" && k !== "KeyG" && k !== "KeyX" && k !== "KeyV") return;
     if (k !== "shift") event.preventDefault(); // the arrows and the space bar would scroll the page
     if (k === "KeyF") { if (down && !event.repeat) interact.current = true; return; }
+    if (k === "KeyG") { if (down && !event.repeat) passenger.current = true; return; }
+    if (k === "KeyX") { if (down && !event.repeat) switchSeat.current = true; return; }
+    if (k === "KeyV") { if (down && !event.repeat && assets.current?.world.driving()) { firstPerson.current = !firstPerson.current; dirty.current = true; } return; }
     if (k === "space" && down && !event.repeat) jump.current = true; // held, it is the car's brake
     if (down) held.current.add(k); else held.current.delete(k);
   };
@@ -283,14 +297,15 @@ export function PlaygroundLab() {
             <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} quarterTurn={turned} className={cn("bg-background/70 backdrop-blur-sm", expanded ? "size-28" : "size-24")} testId="playground-stick" />
           </div>
           {/* bottom right: what a stick cannot say (touch), or what the keys are right now (keyboard) */}
-          <div className={cn("absolute right-2 bottom-2 flex gap-2", expanded && "right-4 bottom-4 [@media(pointer:fine)]:hidden", !ready && "hidden")} {...stop}>
-            {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden />{seat === "near" ? t.getIn : t.getOut}</Button>}
-            {seat === "flying" && <Button size="sm" variant="secondary" className="opacity-90" {...holdDown} data-testid="playground-down"><ArrowDownToLine className="size-4" aria-hidden />{t.descend}</Button>}
-            <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { jump.current = true; }} {...(seat === "driving" || seat === "flying" ? holdUp : {})} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</Button>
+          <div className={cn("absolute right-2 bottom-2 flex max-w-[calc(100%-7.5rem)] flex-wrap-reverse justify-end gap-2", expanded && "right-4 bottom-4 [@media(pointer:fine)]:hidden", !ready && "hidden")} {...stop}>
+            {(seat === "driving" || seat === "riding" || (seat === "flying" && craft === "heli")) && <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { switchSeat.current = true; }} data-testid="playground-switch"><ArrowLeftRight className="size-4" aria-hidden /><span className="max-[480px]:sr-only">{t.switchSeat}</span></Button>}
+            {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden /><span className="max-[480px]:sr-only">{seat === "near" ? t.getIn : t.getOut}</span></Button>}
+            {seat === "flying" && <Button size="sm" variant="secondary" className="opacity-90" {...holdDown} data-testid="playground-down"><ArrowDownToLine className="size-4" aria-hidden /><span className="max-[480px]:sr-only">{t.descend}</span></Button>}
+            <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { jump.current = true; }} {...(seat === "driving" || seat === "flying" ? holdUp : {})} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden /><span className="max-[480px]:sr-only">{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</span></Button>
           </div>
           {expanded && ready && <div className="absolute right-4 bottom-4 hidden [@media(pointer:fine)]:block"><Hints t={t} seat={seat} craft={craft} /></div>}
           {/* what the mouse is doing, and how to get it back: at the bottom, clear of the settings */}
-          {ready && <p className={cn("pointer-events-none absolute left-1/2 hidden -translate-x-1/2 whitespace-nowrap", expanded ? "bottom-4" : "bottom-2", "rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs text-white/90 backdrop-blur-md [@media(pointer:fine)]:block")} data-testid="playground-lock" data-locked={locked}>{locked ? t.lockOn : expanded ? t.lockOff : t.lockOffArticle}</p>}
+          {ready && <p className={cn("pointer-events-none absolute left-1/2 hidden -translate-x-1/2 whitespace-nowrap", expanded ? "bottom-4" : "bottom-2", "rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs text-white/90 backdrop-blur-md [@media(pointer:fine)_and_(min-width:481px)]:block")} data-testid="playground-lock" data-locked={locked}>{locked ? t.lockOn : expanded ? t.lockOff : t.lockOffArticle}</p>}
         </Stage>
       </div>
       {!expanded && (
@@ -303,7 +318,28 @@ export function PlaygroundLab() {
             <Readout label={t.rendered} value={<span data-testid="playground-size">{LEVELS[level].size.join(" × ")}</span>} tone={level ? "alt" : "plain"} />
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4">{settings$}</div>
-          <p className="text-muted-foreground">{t.hint}</p>
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+            <p className="max-w-[60ch] text-muted-foreground">{t.hint}</p>
+            <Button size="sm" variant="outline" aria-expanded={help} aria-controls="playground-help" onClick={() => setHelp((h) => !h)} data-testid="playground-help-toggle"><Keyboard className="size-4" aria-hidden />{t.help}<ChevronDown className={cn("size-4 transition-transform", help && "rotate-180")} aria-hidden /></Button>
+          </div>
+          {help && (
+            <div id="playground-help" className="grid gap-x-8 gap-y-5 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="playground-help">
+              {t.legend.map((group) => (
+                <section key={group.id}>
+                  <div role="heading" aria-level={3} className="label mb-2 text-foreground">{group.title}</div>
+                  <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5 text-sm">
+                    {group.keys.map(([keys, what]) => (
+                      <div key={what} className="contents">
+                        <dt className="flex flex-wrap gap-1">{keys.split(" ").map((k) => <kbd key={k} className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] leading-none">{k}</kbd>)}</dt>
+                        <dd className="text-muted-foreground">{what}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </section>
+              ))}
+              <p className="text-sm text-muted-foreground sm:col-span-2 lg:col-span-3">{t.helpTouch}</p>
+            </div>
+          )}
           <p className="label normal-case">{PLAYGROUND_CREDIT}; Rapier (Dimforge), Apache-2.0</p>
         </>
       )}

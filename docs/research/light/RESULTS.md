@@ -205,3 +205,12 @@ plane: on the ground at 7 s (10.75 m/s), airborne at 8 s. A 0.25 s tap of S at 1
 speed to 3 m/s within 6 s (it fell): under throttle Sketchbook switches its nose-follows-velocity correction off on two
 axes so that loops are possible, so nothing lowers the nose again. Helicopter: Shift for 3 s after spin-up climbed
 17.1 → 40.7 m; Q for 1.5 s turned it 2.2 rad; D for 1.5 s rolled it to 59° (up·y 0.51).
+
+## The car, seats and first person, ported from Sketchbook (2026-09-21)
+
+`tests/rt/car.test.ts`, flat ground, full throttle from rest: second gear within 2 s, fifth gear and 17–23 m/s after 14 s
+(Sketchbook's fifth gear tops out at 22); full reverse settles between 2 and 4.5 m/s (its limit is 4). In Chrome on the
+playground a car reached 8.5 m/s in second gear after 3 s. Engine force: Sketchbook's 500 N per wheel on a 50 kg body,
+scaled by 900/50 to this body's mass; all four wheels driven, the brake on the rear pair. Seats: G from beside the rear
+door put the character in seat_3, and X moved it to seat_4 and back (the rear seats connect only to each other, the
+front pair to each other), as the model's `connected_seats` say.

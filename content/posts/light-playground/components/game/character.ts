@@ -16,7 +16,7 @@ export type StateName =
   | "OpenVehicleDoor" | "EnteringVehicle" | "Sitting" | "SwitchingSeats" | "Driving" | "CloseVehicleDoorInside" | "ExitingVehicle" | "ExitingAirplane" | "CloseVehicleDoorOutside";
 
 /** What the keys say this step. `justX`: went down since the last step. */
-export interface Keys { anyDirection: boolean; justDirection: boolean; run: boolean; justRun: boolean; justJump: boolean; justEnter: boolean }
+export interface Keys { anyDirection: boolean; justDirection: boolean; run: boolean; justRun: boolean; justJump: boolean; justEnter: boolean; /** G: get in as a passenger (the world reads it) */ justPassenger?: boolean; /** X: slide over to the connected seat */ justSwitch?: boolean }
 /** Which side of the vehicle, as Sketchbook's detectRelativeSide names it. */
 export type Side = "left" | "right";
 /** What the states need to know about the world, and what they ask of it. */
@@ -30,12 +30,16 @@ export interface Surroundings {
   turn: number;
   clipLength(clip: ClipName): number;
   /** the vehicle being entered or sat in, if any */
-  vehicle: { airplane: boolean; hasDoor: boolean; doorOpen: boolean; /** the seat, seen from the entry point */ side: Side; /** the entry point, seen from the seat */ exitSide: Side; /** the door, seen from the seat */ doorSide: Side; /** is the seat it is in (or getting into) the driver's */ driverSeat: boolean; /** the driver's seat, seen from this one */ shiftSide: Side; speed: number; open(): void; close(): void; noDirection: boolean } | null;
+  vehicle: { airplane: boolean; hasDoor: boolean; doorOpen: boolean; /** the seat, seen from the entry point */ side: Side; /** the entry point, seen from the seat */ exitSide: Side; /** the door, seen from the seat */ doorSide: Side; /** is the seat it is in (or getting into) the driver's */ driverSeat: boolean; /** the seat it slides over to, seen from this one */ shiftSide: Side; /** it got in to drive (F), so from a passenger's seat it slides over by itself */ wantsToDrive: boolean; /** this seat is connected to another */ canSwitch: boolean; speed: number; open(): void; close(): void; noDirection: boolean } | null;
   /** leave the ground with this vertical speed */
   jump(speed: number): void;
-  /** the character is now in the driver's seat / back on its own feet */
+  /** the character is now in the driver's seat, with the controls */
   seated(): void;
-  /** it has slid over: its seat is now the driver's */
+  /** it lets go of the controls (it is about to slide over to a passenger's seat) */
+  unseated(): void;
+  /** about to slide over: to the driver's seat, or to the first seat connected to this one (Sketchbook's connectedSeats[0]) */
+  beginShift(toDriver: boolean): void;
+  /** it has slid over: its seat is now the one it slid to */
   shifted(): void;
   released(to: "Falling" | "DropRolling" | "Idle" | "CloseVehicleDoorOutside"): void;
   /** abandon the way into a vehicle */
@@ -198,15 +202,19 @@ export class Character {
         this.progress = ease(Math.min(1, Math.max(0, this.timer / (this.length - (w.vehicle?.airplane ? 0.3 : 0)))));
         return;
       }
-      case "Sitting": // a passenger seat is on the way to the wheel: close the door first if it stands open, then slide over
-        if (w.vehicle?.hasDoor && w.vehicle.doorOpen && w.vehicle.noDirection) this.enter("CloseVehicleDoorInside"); else this.enter("SwitchingSeats");
+      case "Sitting": // a passenger's seat: close the door if it stands open; whoever got in to drive (F) slides over to the wheel; X slides over by choice
+        if (w.vehicle?.hasDoor && w.vehicle.doorOpen && w.vehicle.noDirection) this.enter("CloseVehicleDoorInside");
+        else if (w.vehicle?.wantsToDrive) { w.beginShift(true); this.enter("SwitchingSeats"); }
+        else if (keys.justSwitch && w.vehicle?.canSwitch) { w.beginShift(false); this.enter("SwitchingSeats"); }
+        else if (keys.justEnter && this.canLeaveVehicles) this.enter(w.vehicle?.airplane ? "ExitingAirplane" : "ExitingVehicle");
         return;
       case "SwitchingSeats":
-        if (this.ended(step)) { w.shifted(); w.seated(); this.enter("Driving"); }
+        if (this.ended(step)) { w.shifted(); if (w.vehicle?.driverSeat) { w.seated(); this.enter("Driving"); } else this.enter("Sitting"); }
         else this.progress = ease(this.timer / this.length);
         return;
       case "Driving":
         if (keys.justEnter && this.canLeaveVehicles) { this.enter(w.vehicle?.airplane ? "ExitingAirplane" : "ExitingVehicle"); return; }
+        if (keys.justSwitch && w.vehicle?.canSwitch) { w.unseated(); w.beginShift(false); this.enter("SwitchingSeats"); return; }
         if (w.vehicle?.hasDoor && w.vehicle.doorOpen && w.vehicle.noDirection) this.enter("CloseVehicleDoorInside");
         return;
       case "CloseVehicleDoorInside":

@@ -71,7 +71,7 @@ for (const name of ["car", "heli", "airplane"]) {
     if (data === "camera") anchors.camera = [world[12], world[13], world[14]].map(round);
     let target = part;
     const door = /^door/.test(node.name);
-    if (data === "wheel" || data === "rotor" || data === "aileron" || data === "elevator" || data === "rudder" || door) movers.push(target = { name: node.name, role: door ? "door" : data, side: node.extras?.side ?? null, steering: node.extras?.steering === "true", drive: node.extras?.drive ?? null, rest: world, inverse: invert(world), triangles: [] });
+    if (data === "wheel" || data === "rotor" || data === "aileron" || data === "elevator" || data === "rudder" || data === "steering_wheel" || door) movers.push(target = { name: node.name, role: door ? "door" : data, side: node.extras?.side ?? null, steering: node.extras?.steering === "true", drive: node.extras?.drive ?? null, rest: world, inverse: invert(world), triangles: [] });
     if (node.mesh != null) for (const primitive of gltf.meshes[node.mesh].primitives) {
       const p = accessor(primitive.attributes.POSITION), uv = primitive.attributes.TEXCOORD_0 != null ? accessor(primitive.attributes.TEXCOORD_0) : null, ix = primitive.indices != null ? accessor(primitive.indices) : null, count = ix ? ix.count : p.count, tex = grey[primitive.material ?? 0];
       for (let t = 0; t + 2 < count; t += 3) {

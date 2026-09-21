@@ -11,6 +11,23 @@ describe("the car", () => {
   const flat = () => { const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 }); world.timestep = 1 / 60; world.createCollider(RAPIER.ColliderDesc.cuboid(500, 0.5, 500).setTranslation(0, -0.5, 0)); return world; };
   const run = (world: RAPIER.World, car: ReturnType<typeof createCar>, seconds: number, input: Parameters<ReturnType<typeof createCar>["drive"]>[0]) => { for (let i = 0; i < seconds * 60; i++) { car.drive(input, 1 / 60); world.step(); } };
 
+  it("shifts up through its gears, tops out near fifth gear's 22 m/s, reverses no faster than 4 m/s, and turns its steering wheel", () => {
+    const world = flat(), car = createCar(RAPIER, world, models.models.car, IDENTITY);
+    run(world, car, 2, { throttle: 0, steer: 0, brake: false });
+    expect(car.gear()).toBe(1);
+    run(world, car, 2, { throttle: 1, steer: 0, brake: false });
+    expect(car.gear()).toBeGreaterThan(1);
+    run(world, car, 12, { throttle: 1, steer: 0, brake: false });
+    expect(car.gear()).toBe(5); expect(car.speed()).toBeGreaterThan(17); expect(car.speed()).toBeLessThan(23);
+    const wheel = models.models.car.parts.find((p) => p.role === "steering_wheel")!;
+    run(world, car, 0.5, { throttle: 0, steer: 1, brake: false });
+    expect(Math.abs(car.wheel(wheel)![1])).toBeGreaterThan(0.05); // a rotation about its own z
+    run(world, car, 6, { throttle: 0, steer: 0, brake: true });
+    run(world, car, 6, { throttle: -1, steer: 0, brake: false });
+    expect(car.speed()).toBeLessThan(-2); expect(car.speed()).toBeGreaterThan(-4.5);
+    world.free();
+  });
+
   it("settles on its wheels, drives forward along +z, steers left when told to, and stops", () => {
     const world = flat(), car = createCar(RAPIER, world, models.models.car, IDENTITY);
     run(world, car, 2, { throttle: 0, steer: 0, brake: false });

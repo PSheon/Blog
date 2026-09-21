@@ -10,7 +10,7 @@ import { Character, type Keys, type Side, type Surroundings } from "./character"
  * Sketchbook's state machine (character.ts); this file gives it a body, a ground to feel, vehicles with doors and
  * seats, and turns its wishes (a speed, a facing, a jump) into movement. Nothing here draws.
  */
-export interface Input { /** the stick: x right, y forward, each −1…1 */ move: [number, number]; /** where the camera looks, radians about y */ yaw: number; jump: boolean; sprint: boolean; /** get in or out (pressed this frame) */ interact: boolean; /** flying: Q −1 … E 1 (yaw), Shift (climb, throttle), Space (sink, air brake), B (the aeroplane's wheel brake) */ turn?: number; up?: boolean; down?: boolean; wheelBrake?: boolean }
+export interface Input { /** the stick: x right, y forward, each −1…1 */ move: [number, number]; /** where the camera looks, radians about y */ yaw: number; jump: boolean; sprint: boolean; /** get in or out (pressed this frame) */ interact: boolean; /** flying: Q −1 … E 1 (yaw), Shift (climb, throttle), Space (sink, air brake), B (the aeroplane's wheel brake) */ turn?: number; up?: boolean; down?: boolean; wheelBrake?: boolean; /** G: get in as a passenger; X: slide over to the next seat (both pressed this frame) */ passenger?: boolean; switchSeat?: boolean }
 export interface Person { /** where its feet are and how it stands, ready for the skinner */ place: Mat34; at: Vec3; clip: ClipName; clipTime: number; fade: number; loop: boolean; moving: boolean; state: string }
 /** Something parked in the playground that can be got into: a car, the helicopter, the aeroplane. */
 export interface Vehicle { name: ModelName; pose(): Mat34; /** a wheel's, a rotor's or a door's own movement */ part(part: Part): Mat34 | null; car: Car | null; craft: Helicopter | Aeroplane | null; body: RAPIER.RigidBody; moving(): boolean; seat: Seat; doors: Map<string, Door> }
@@ -68,8 +68,8 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
 
   // ---- the character: what it wants (character.ts) and what happens to it (here)
   let pending = 0, vy = 0, grounded = false, impact = 0, facing = 0, facingTarget = 0, air: [number, number] = [0, 0], horizontal = 0, turn = 0, doorsMoving = false;
-  let target: { vehicle: Vehicle; seat: Seat; entry: Vec3; since: number } | null = null; // walking to a vehicle's door
-  let inside: { vehicle: Vehicle; /** the seat it is in or on its way into; a passenger's only until it has slid over */ seat: Seat; entry: Vec3; from: Vec3; fromYaw: number; seated: boolean } | null = null; // attached to a vehicle: from the door to the seat and back
+  let target: { vehicle: Vehicle; seat: Seat; entry: Vec3; since: number; wantsToDrive: boolean } | null = null; // walking to a vehicle's door
+  let inside: { vehicle: Vehicle; /** the seat it is in or on its way into; a passenger's only until it has slid over */ seat: Seat; entry: Vec3; from: Vec3; fromYaw: number; seated: boolean; /** F, not G: from a passenger's seat it goes on to the wheel */ wantsToDrive: boolean; /** the seat it is sliding over to */ to: Seat | null } | null = null; // attached to a vehicle: from the door to the seat and back
   const last = { jump: false, run: false, direction: false, enter: false }, doorOf = (v: Vehicle, seat: Seat) => (seat.door ? v.doors.get(seat.door) ?? null : null);
   let stick: [number, number] = [0, 0];
 
@@ -80,11 +80,13 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
       const v = inside?.vehicle ?? target?.vehicle;
       if (!v) return null;
       const seat = inside?.seat ?? target?.seat ?? v.seat, entry = inside?.entry ?? target?.entry ?? seat.at, door = doorOf(v, seat), part = models.models[v.name].parts.find((p) => p.name === seat.door), lv = v.body.linvel();
-      return { airplane: v.name === "airplane", hasDoor: !!door, doorOpen: !!door && door.rotation > 0 && door.target === door.rotation, side: sideOf(entry, seat.at), exitSide: sideOf(seat.at, entry), doorSide: part?.rest ? sideOf(seat.at, [part.rest[9], part.rest[10], part.rest[11]]) : "left", driverSeat: seat === v.seat, shiftSide: sideOf(seat.at, v.seat.at), speed: Math.hypot(lv.x, lv.y, lv.z), open: () => { if (door) door.target = 1; }, close: () => { if (door) door.target = 0; }, noDirection: Math.hypot(stick[0], stick[1]) < 0.05 };
+      return { airplane: v.name === "airplane", hasDoor: !!door, doorOpen: !!door && door.rotation > 0 && door.target === door.rotation, side: sideOf(entry, seat.at), exitSide: sideOf(seat.at, entry), doorSide: part?.rest ? sideOf(seat.at, [part.rest[9], part.rest[10], part.rest[11]]) : "left", driverSeat: seat === v.seat, shiftSide: sideOf(seat.at, (inside?.to ?? v.seat).at), wantsToDrive: !!inside?.wantsToDrive, canSwitch: seat.connected.length > 0, speed: Math.hypot(lv.x, lv.y, lv.z), open: () => { if (door) door.target = 1; }, close: () => { if (door) door.target = 0; }, noDirection: Math.hypot(stick[0], stick[1]) < 0.05 };
     },
     jump: (speed) => { vy = speed > 0 ? Math.max(JUMP * 0.85, speed) : JUMP; grounded = false; },
     seated: () => { if (inside) inside.seated = true; },
-    shifted: () => { if (inside) { const v = inside.vehicle; inside.seat = v.seat; inside.entry = v.seat.entries[0]?.at ?? inside.entry; } }, // from now on the driver's seat, door and way out
+    unseated: () => { if (inside) inside.seated = false; },
+    beginShift: (toDriver) => { if (inside) { const v = inside.vehicle, seats = models.models[v.name].seats; inside.to = toDriver ? v.seat : seats.find((s) => s.name === inside!.seat.connected[0]) ?? null; } },
+    shifted: () => { if (inside?.to) { inside.seat = inside.to; inside.entry = inside.to.entries[0]?.at ?? inside.entry; inside.to = null; inside.wantsToDrive = false; } }, // from now on this seat, its door and its way out
     released: (to) => {
       if (!inside) { character.enter("Idle"); return; }
       const v = inside.vehicle, m = v.pose(), lv = v.body.linvel(), at = apply(m, character.state === "ExitingAirplane" ? [inside.seat.at[0], inside.seat.at[1] + SEAT_UP + 1, inside.seat.at[2]] : [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]]);
@@ -92,7 +94,7 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
       facing = facingTarget = Math.PI - yawOf(m); vy = lv.y; air = [lv.x, lv.z]; character.velocity.position = character.velocity.velocity = 0;
       const ground = world.castRay(new R.Ray({ x: at[0], y: at[1] + 0.5, z: at[2] }, { x: 0, y: -1, z: 0 }), 1.2, true, undefined, undefined, capsule, v.body);
       const next = to === "Falling" || !ground ? "Falling" : to;
-      if (next !== "CloseVehicleDoorOutside") { target = null; inside = null; } else { target = { vehicle: v, seat: inside.seat, entry: inside.entry, since: 0 }; inside = null; } // closing the door still needs to know whose door
+      if (next !== "CloseVehicleDoorOutside") { target = null; inside = null; } else { target = { vehicle: v, seat: inside.seat, entry: inside.entry, since: 0, wantsToDrive: false }; inside = null; } // closing the door still needs to know whose door
       character.enter(next);
     },
     cancelEntry: () => { target = null; },
@@ -103,24 +105,27 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
   const now: Stance = { kind: "foot", at: [...spawn], facing: 0, lean: 0, local: [0, 0, 0], yaw: 0, vehicle: null };
   let was: Stance = { ...now };
   let still = 1, shown: ClipName = "idle", shownAt = 0;
-  const latched = { interact: false, jump: false };
+  let wantsOut = false; // F in a car rolling slowly: Sketchbook brakes it to a stop first, and gets out then
+  const latched = { interact: false, jump: false, passenger: false, switchSeat: false };
 
   const nearest = (reach: number): Vehicle | null => { const t = body.translation(); let best: Vehicle | null = null, d = reach; for (const v of vehicles) { const p = v.body.translation(), dist = Math.hypot(p.x - t.x, p.y - t.y, p.z - t.z); if (dist < d) { d = dist; best = v; } } return best; };
 
   const tick = (input: Input) => {
     stick = input.move;
     const strength = Math.min(1, Math.hypot(input.move[0], input.move[1])), direction = strength > 0.05;
-    const keys: Keys = { anyDirection: direction, justDirection: direction && !last.direction, run: input.sprint, justRun: input.sprint && !last.run, justJump: input.jump && !last.jump, justEnter: input.interact && !last.enter };
+    const keys: Keys = { anyDirection: direction, justDirection: direction && !last.direction, run: input.sprint, justRun: input.sprint && !last.run, justJump: input.jump && !last.jump, justEnter: input.interact && !last.enter, justPassenger: !!input.passenger, justSwitch: !!input.switchSeat };
     last.jump = input.jump; last.run = input.sprint; last.direction = direction; last.enter = false; // `interact` is a press, already one step long
 
     // F on foot: find a vehicle (Sketchbook looks 10 m around), and its driver's nearest entry point; the character then walks there by itself
-    if (keys.justEnter && !inside && character.canFindVehicles) {
-      const v = nearest(10);
-      if (v) { // the driver's seat, or a passenger seat one can slide over from, whichever door is nearer (Sketchbook's findVehicleToEnter)
-        const t = body.translation(), m = v.pose(), seats = models.models[v.name].seats.filter((s) => s === v.seat || s.connected.includes(v.seat.name));
-        let seat = v.seat, best = v.seat.entries[0]?.at ?? v.seat.at, d = Infinity;
+    // G is the same for a passenger's seat, and there it stays.
+    if ((keys.justEnter || keys.justPassenger) && !inside && character.canFindVehicles) {
+      const v = nearest(10), wantsToDrive = !!keys.justEnter;
+      if (v) { // to drive: the driver's seat, or a passenger seat one can slide over from, whichever door is nearer; as a passenger: any passenger seat (Sketchbook's findVehicleToEnter)
+        const t = body.translation(), m = v.pose(), all = models.models[v.name].seats, seats = wantsToDrive ? all.filter((s) => s === v.seat || s.connected.includes(v.seat.name)) : all.filter((s) => s !== v.seat);
+        let seat: Seat | null = null, best: Vec3 | null = null, d = Infinity;
         for (const s of seats) for (const e of s.entries) { const w = apply(m, e.at), dist = Math.hypot(w[0] - t.x, w[2] - t.z); if (dist < d) { d = dist; best = e.at; seat = s; } }
-        target = { vehicle: v, seat, entry: best, since: 0 };
+        if (wantsToDrive && !seat) { seat = v.seat; best = v.seat.entries[0]?.at ?? v.seat.at; }
+        if (seat && best) target = { vehicle: v, seat, entry: best, since: 0, wantsToDrive };
       }
     }
 
@@ -128,22 +133,29 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     doorsMoving = false;
     const driven = inside?.seated ? inside.vehicle : null;
     for (const v of vehicles) {
-      if (v.car && (v === driven || v.car.moving())) v.car.drive(v === driven ? { throttle: input.move[1], steer: -input.move[0], brake: input.jump || input.sprint } : { throttle: 0, steer: 0, brake: false }, STEP);
+      if (v.car && (v === driven || v.car.moving())) v.car.drive(v === driven ? { throttle: input.move[1], steer: -input.move[0], brake: input.jump || input.sprint || wantsOut } : { throttle: 0, steer: 0, brake: false }, STEP);
       if (v.craft && (v === driven || v.craft.moving())) v.craft.drive(v === driven ? { x: Math.max(-1, Math.min(1, input.move[0])), y: Math.max(-1, Math.min(1, input.move[1])), yaw: Math.max(-1, Math.min(1, input.turn ?? 0)), up: !!input.up, down: !!input.down, wheelBrake: !!input.wheelBrake } : null, STEP);
       for (const d of v.doors.values()) if (d.rotation !== d.target) { doorsMoving = true; d.rotation = d.rotation < d.target ? Math.min(d.target, d.rotation + 5 * STEP) : Math.max(d.target, d.rotation - 5 * STEP); }
     }
 
     // ---- attached to a vehicle: the states move the character between the door and the seat, in the vehicle's own frame
     if (inside) {
-      character.update(STEP, keys);
+      let k = keys;
+      if (inside.seated && inside.vehicle.car && character.state === "Driving") {
+        const lv = inside.vehicle.body.linvel(), pace = Math.hypot(lv.x, lv.y, lv.z);
+        // Sketchbook brakes for as long as F is held; a touch button cannot be held while steering, so here one press is enough and the throttle calls it off
+        if (keys.justEnter && pace > 0.1 && pace < 4) wantsOut = true;
+        if (wantsOut) { if (direction) wantsOut = false; else if (pace <= 0.1) { wantsOut = false; k = { ...keys, justEnter: true }; } else k = { ...keys, justEnter: false }; }
+      } else wantsOut = false;
+      character.update(STEP, k);
       world.step();
       if (inside) {
         const v = inside.vehicle, s = character.state, entry: Vec3 = [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]], seat: Vec3 = [inside.seat.at[0], inside.seat.at[1] + SEAT_UP, inside.seat.at[2]], wheel: Vec3 = [v.seat.at[0], v.seat.at[1] + SEAT_UP, v.seat.at[2]];
-        const local = s === "OpenVehicleDoor" ? lerp(inside.from, entry, character.progress) : s === "EnteringVehicle" ? lerp(entry, seat, character.progress) : s === "ExitingVehicle" ? lerp(seat, entry, character.progress) : s === "ExitingAirplane" ? lerp(seat, [seat[0], seat[1] + 1, seat[2]], character.progress) : s === "SwitchingSeats" ? lerp(seat, wheel, character.progress) : seat;
+        const local = s === "OpenVehicleDoor" ? lerp(inside.from, entry, character.progress) : s === "EnteringVehicle" ? lerp(entry, seat, character.progress) : s === "ExitingVehicle" ? lerp(seat, entry, character.progress) : s === "ExitingAirplane" ? lerp(seat, [seat[0], seat[1] + 1, seat[2]], character.progress) : s === "SwitchingSeats" ? lerp(seat, inside.to ? [inside.to.at[0], inside.to.at[1] + SEAT_UP, inside.to.at[2]] : wheel, character.progress) : seat;
         const yaw = s === "OpenVehicleDoor" ? inside.fromYaw * (1 - character.progress) : 0, m = v.pose();
         now.kind = "inside"; now.local = local; now.yaw = yaw; now.vehicle = v;
         const at = apply(m, local); body.setTranslation({ x: at[0], y: at[1] + HALF + RADIUS, z: at[2] }, false);
-        person.moving = s !== "Driving" || v.moving() || doorsMoving;
+        person.moving = (s !== "Driving" && s !== "Sitting") || v.moving() || doorsMoving;
       }
       return;
     }
@@ -156,7 +168,7 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
       if ((dist < 0.2 || (dist < 1.6 && target.since > 1 && horizontal < 0.4) || target.since > 3.5) && character.canEnterVehicles && Math.abs(goal[1] - (t.y - HALF - RADIUS)) < 2) {
         const m = target.vehicle.pose(), feet: Vec3 = [t.x, t.y - HALF - RADIUS, t.z], door = doorOf(target.vehicle, target.seat);
         let relative = Math.PI - facing - yawOf(m); relative = Math.atan2(Math.sin(relative), Math.cos(relative)); // how the model is turned, seen from the vehicle
-        inside = { vehicle: target.vehicle, seat: target.seat, entry: target.entry, from: into(m, feet), fromYaw: relative, seated: false }; target = null;
+        inside = { vehicle: target.vehicle, seat: target.seat, entry: target.entry, from: into(m, feet), fromYaw: relative, seated: false, wantsToDrive: target.wantsToDrive, to: null }; target = null;
         capsule.setEnabled(false); vy = 0;
         character.enter(door && door.rotation < 0.5 ? "OpenVehicleDoor" : "EnteringVehicle");
         if (!door) inside.from = [inside.entry[0], inside.entry[1] + ENTRY_UP, inside.entry[2]];
@@ -204,11 +216,13 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
       // A press lasts one frame of the page, and at 120 Hz not every frame has a physics step in it: keep presses until a step has seen them.
       if (input.interact) latched.interact = true;
       if (input.jump) latched.jump = true;
+      if (input.passenger) latched.passenger = true;
+      if (input.switchSeat) latched.switchSeat = true;
       pending = Math.min(pending + dt, 0.1);
       while (pending >= STEP) {
         was = { ...now, at: [...now.at], local: [...now.local] };
         for (const v of vehicles) { const c = after.get(v.body.handle); if (c) before.set(v.body.handle, c); }
-        tick({ ...input, interact: latched.interact, jump: input.jump || latched.jump }); latched.interact = latched.jump = false;
+        tick({ ...input, interact: latched.interact, jump: input.jump || latched.jump, passenger: latched.passenger, switchSeat: latched.switchSeat }); latched.interact = latched.jump = latched.passenger = latched.switchSeat = false;
         for (const v of vehicles) after.set(v.body.handle, { p: { ...v.body.translation() }, q: { ...v.body.rotation() } }); pending -= STEP; if (character.clip !== shown) { shown = character.clip; shownAt = 0; } else shownAt += STEP; }
       blend = pending / STEP;
       if (now.kind === "inside" && now.vehicle) { // in a vehicle's frame: the vehicle's shown pose carries it
@@ -228,6 +242,8 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     driving: () => inside?.vehicle ?? null,
     /** Is it in the seat, with the controls? */
     seated: () => !!inside?.seated,
+    /** Is it sitting in a passenger's seat? */
+    riding: () => !!inside && !inside.seated && character.state === "Sitting",
     /** Something close enough to get into, or null. */
     nearby: () => (inside || target ? null : nearest(10)),
     /** How far a camera may pull back from `from` along unit `direction` before something is in the way. */
