@@ -74,6 +74,9 @@ export function createAeroplane(R: typeof RAPIER, world: RAPIER.World, model: Mo
       const a = axes(body.rotation()), v = body.linvel(), mass = body.mass(), forwardSpeed = dot(v, a.forward), air = Math.min(1, Math.abs(forwardSpeed) / 22);
       wheels.forEach((w, i) => { if (w.steering) gear.setWheelSteering(i, -(input?.x ?? 0) * 0.5); gear.setWheelBrake(i, input?.down ? 12 : input ? 0.05 : 2); });
       gear.updateVehicle(dt);
+      // Parked on three springs it never quite stops trembling, and a thing that trembles redraws the whole picture every
+      // frame. With nobody in it and next to no speed, it is put to sleep.
+      if (!input && throttle < 0.02 && Math.hypot(v.x, v.y, v.z) < 0.25 && Math.hypot(body.angvel().x, body.angvel().y, body.angvel().z) < 0.25) { body.sleep(); return; }
       if (!input && throttle < 0.02 && !stirring(body)) return;
       body.wakeUp(); body.resetForces(true); body.resetTorques(true);
       body.addForce(scaled(a.forward, mass * 13 * throttle), true); // the propeller

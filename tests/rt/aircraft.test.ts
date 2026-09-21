@@ -41,6 +41,7 @@ describe("the aircraft", () => {
     run(2, null);
     const rest = plane.body.translation().y;
     expect(upright(plane.body)).toBeGreaterThan(0.95); expect(rest).toBeLessThan(1); // it sits a little nose-up on its three wheels
+    expect(plane.moving()).toBe(false); // parked, it comes to rest: a thing that trembles would redraw the picture for ever
     run(7, { ...idle, up: true });
     expect(plane.speed()).toBeGreaterThan(14);
     expect(Math.abs(plane.body.translation().x)).toBeLessThan(6); // straight down the runway

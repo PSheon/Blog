@@ -13,7 +13,7 @@ export interface StageLabels { noWebgpu: string; noAdapter: string; failed: stri
  * The canvas a renderer draws on, with whatever there is to say while there is no picture. `children` lie over it.
  * With `fallback`, a reader without a GPU gets the finished picture and the reason under it, and `children` stay.
  */
-export function Stage({ canvas, status, label, t, children, testid = "light-canvas", fallback, wide }: { canvas: RefObject<HTMLCanvasElement | null>; status: TracerStatus; label: string; t: StageLabels; children?: ReactNode; testid?: string; fallback?: string; /** 16:9 instead of square */ wide?: boolean }) {
+export function Stage({ canvas, status, label, t, children, testid = "light-canvas", fallback, wide, fill }: { canvas: RefObject<HTMLCanvasElement | null>; status: TracerStatus; label: string; t: StageLabels; children?: ReactNode; testid?: string; fallback?: string; /** 16:9 instead of square */ wide?: boolean; /** fill the parent, cropping the picture's edges to its shape (a game that covers the window) */ fill?: boolean }) {
   const live = status === "running" || status === "paused", reason = status === "no-webgpu" ? t.noWebgpu : status === "no-adapter" ? t.noAdapter : status === "failed" ? t.failed : t.building;
   if (fallback && !live && status !== "building")
     return (
@@ -28,8 +28,8 @@ export function Stage({ canvas, status, label, t, children, testid = "light-canv
       </div>
     );
   return (
-    <div className="relative">
-      <canvas ref={canvas} role="img" aria-label={label} className={cn("block w-full rounded-md border border-border bg-black", wide ? "aspect-video" : "aspect-square")} data-testid={testid} />
+    <div className={cn("relative", fill && "size-full")}>
+      <canvas ref={canvas} role="img" aria-label={label} className={cn("block bg-black", fill ? "size-full object-cover" : "w-full rounded-md border border-border", !fill && (wide ? "aspect-video" : "aspect-square"))} data-testid={testid} />
       {live && children}
       {!live && (
         <p className="absolute inset-0 grid place-items-center rounded-md bg-background/80 p-6 text-center text-muted-foreground" data-testid="light-status">

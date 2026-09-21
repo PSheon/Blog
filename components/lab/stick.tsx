@@ -13,13 +13,15 @@ interface Props {
   onChange(x: number, y: number): void;
   testId?: string;
   className?: string;
+  /** The stick sits in something rotated 90° clockwise by CSS (a landscape game on a portrait phone): read the pointer in that frame. */
+  quarterTurn?: boolean;
 }
 
 /**
  * A thumb stick: drag it, or focus it and use the arrow keys / WASD. Springs back to the centre when let go. The site's
  * one control for steering something by hand (the SLAM car, the playground): do not build another.
  */
-export function Stick({ label, hintId, onChange, testId, className }: Props) {
+export function Stick({ label, hintId, onChange, testId, className, quarterTurn }: Props) {
   const [at, setAt] = useState<[number, number]>([0, 0]);
   const held = useRef(new Set<string>());
   const move = (x: number, y: number) => { setAt([x, y]); onChange(x, y); };
@@ -29,6 +31,7 @@ export function Stick({ label, hintId, onChange, testId, className }: Props) {
     if (e.type === "pointerdown") e.currentTarget.setPointerCapture(e.pointerId);
     const box = e.currentTarget.getBoundingClientRect();
     let x = ((e.clientX - box.left) / box.width) * 2 - 1, y = 1 - ((e.clientY - box.top) / box.height) * 2;
+    if (quarterTurn) [x, y] = [-y, x]; // the stick's right is the screen's down, its up is the screen's right
     const r = Math.hypot(x, y);
     if (r > 1) { x /= r; y /= r; }
     move(x, y);

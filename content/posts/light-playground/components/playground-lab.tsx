@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine, CarFront, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CarFront, Maximize2, Minimize2, SlidersHorizontal } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Stick } from "@/components/lab/stick";
@@ -24,24 +24,20 @@ interface Assets { models: Models; world: World; skinner: ReturnType<typeof crea
 
 type Seat = "foot" | "near" | "driving" | "flying";
 
-/** The keys, as Sketchbook shows them: a list per thing you can be in, the one you are in lit up. Desktop only: a phone has the stick and the buttons. */
-function Legend({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | null }) {
-  const active = seat === "driving" ? "car" : seat === "flying" ? (craft === "airplane" ? "plane" : "heli") : "foot";
+/** The keys for what you are doing right now, in the corner of the world, as Sketchbook shows them. For a keyboard: a phone has the stick and the buttons. */
+function Hints({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | null }) {
+  const active = seat === "driving" ? "car" : seat === "flying" ? (craft === "airplane" ? "plane" : "heli") : "foot", group = t.legend.find((g) => g.id === active) ?? t.legend[0];
   return (
-    <div className="grid content-start gap-2.5 text-xs" data-testid="playground-legend">
-      {t.legend.map((group) => (
-        <section key={group.id} className={cn("rounded-md border px-3 py-2.5 transition-colors", group.id === active ? "border-signal bg-signal/5" : "border-border opacity-60")} aria-current={group.id === active}>
-          <div role="heading" aria-level={3} className="label mb-1.5 text-foreground">{group.title}</div>
-          <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1">
-            {group.keys.map(([keys, what]) => (
-              <div key={what} className="contents">
-                <dt className="flex flex-wrap gap-1">{keys.split(" ").map((k) => <kbd key={k} className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] leading-none text-foreground shadow-[0_1px_0_var(--border)]">{k}</kbd>)}</dt>
-                <dd className="text-muted-foreground">{what}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-      ))}
+    <div className="pointer-events-none w-60 rounded-md border border-white/15 bg-black/70 px-3 py-2.5 text-xs text-white/90 backdrop-blur-md" data-testid="playground-hints" data-for={active}>
+      <div role="heading" aria-level={3} className="label mb-1.5 text-white">{group.title}</div>
+      <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1">
+        {group.keys.map(([keys, what]) => (
+          <div key={what} className={cn("contents", seat === "near" && keys === "F" && "[&>dd]:text-signal")}>
+            <dt className="flex flex-wrap gap-1">{keys.split(" ").map((k) => <kbd key={k} className="rounded border border-white/25 bg-white/10 px-1.5 py-0.5 font-mono text-[11px] leading-none text-white">{k}</kbd>)}</dt>
+            <dd>{what}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -53,9 +49,11 @@ function Legend({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | 
  */
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false);
+  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true);
   const settings = useRef({ mode, hour }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
   const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), down = useRef(false), hover = useRef(false), interact = useRef(false), seatNow = useRef("foot");
+  const turnedNow = useRef(false);
+  useEffect(() => { turnedNow.current = turned; }, [turned]);
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 });
 
   const tracer = useTracer(root, canvas, {
@@ -80,6 +78,7 @@ export function PlaygroundLab() {
       const world = await createWorld(ground, start, models, parked);
       if (!alive) { world.destroy(); return; }
       made = world;
+      if (process.env.NODE_ENV !== "production") (window as unknown as { __world?: World }).__world = world; // for measurements, as window.__lights
       const scratch = { positions: new Float32Array(DYNAMIC * 9), materials: new Uint32Array(DYNAMIC) }, skinner = createSkinner(man), prepared = {} as Assets["prepared"];
       for (const name of ["car", "heli", "airplane"] as ModelName[]) prepared[name] = prepareObject(scratch.positions, writeModel(models, name, 0, [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], () => null, scratch, 0));
       skinner.pose("idle", 0, true); prepared.person = prepareObject(scratch.positions, skinner.write([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 0, scratch, 0));
@@ -138,12 +137,23 @@ export function PlaygroundLab() {
     return () => { alive = false; };
   }, [draw]);
 
-  // Expanded, the figure covers the window (the same canvas: nothing is rebuilt). The page behind must not scroll, Escape closes it.
+  // Expanded, the world covers the window (the same canvas: nothing is rebuilt). The page behind must not scroll and
+  // Escape closes it. On a phone the game wants to be landscape: ask for fullscreen and an orientation lock (Android
+  // gives both); where that is refused (an iPhone has neither) and the screen is upright, turn the whole overlay a
+  // quarter turn with CSS instead, and the reader turns the phone.
   useEffect(() => {
     if (!expanded) return;
     const before = document.documentElement.style.overflow, close = (e: globalThis.KeyboardEvent) => { if (e.code === "Escape") setExpanded(false); };
     document.documentElement.style.overflow = "hidden"; window.addEventListener("keydown", close);
-    return () => { document.documentElement.style.overflow = before; window.removeEventListener("keydown", close); };
+    const touch = window.matchMedia("(pointer: coarse)").matches, upright = () => touch && window.innerHeight > window.innerWidth;
+    let locked = false, alive = true;
+    const settle = () => { if (alive) setTurned(!locked && upright()); };
+    if (touch && root.current?.requestFullscreen) {
+      void root.current.requestFullscreen({ navigationUI: "hide" }).then(() => (screen.orientation as ScreenOrientation & { lock?(o: string): Promise<void> }).lock?.("landscape")).then(() => { locked = true; }).catch(() => undefined).finally(settle);
+    } else settle();
+    const left = () => { if (!document.fullscreenElement && locked) setExpanded(false); };
+    window.addEventListener("resize", settle); document.addEventListener("fullscreenchange", left);
+    return () => { alive = false; document.documentElement.style.overflow = before; window.removeEventListener("keydown", close); window.removeEventListener("resize", settle); document.removeEventListener("fullscreenchange", left); screen.orientation?.unlock?.(); if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); setTurned(false); };
   }, [expanded]);
 
   /** Stand the character next to the first vehicle of a kind, on its driver's side. */
@@ -162,52 +172,80 @@ export function PlaygroundLab() {
   const look = (event: PointerEvent<HTMLDivElement>) => {
     if (!drag.current) return;
     const o = orbit.current;
-    o.yaw += (event.clientX - drag.current.x) * 0.006; o.pitch = Math.max(-1.2, Math.min(0.45, o.pitch - (event.clientY - drag.current.y) * 0.005));
+    let dx = event.clientX - drag.current.x, dy = event.clientY - drag.current.y;
+    if (turnedNow.current) [dx, dy] = [dy, -dx]; // the overlay is a quarter turn clockwise: its right is the screen's down
+    o.yaw += dx * 0.006; o.pitch = Math.max(-1.2, Math.min(0.45, o.pitch - dy * 0.005));
     drag.current = { x: event.clientX, y: event.clientY }; dirty.current = true;
   };
 
+  const settings$ = (
+    <>
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.mode}>
+        <span className="label">{t.mode}</span>
+        {MODES.map((m) => <Button key={m} size="sm" variant={mode === m ? "default" : "outline"} aria-pressed={mode === m} disabled={!tracer.live} onClick={() => { setMode(m); change({ mode: m }); }} data-testid={`playground-mode-${m}`}>{t[m]}</Button>)}
+      </div>
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.place}>
+        <span className="label">{t.place}</span>
+        {([["car", t.placeCar], ["heli", t.placeHeli], ["airplane", t.placePlane]] as const).map(([name, text]) => <Button key={name} size="sm" variant="outline" disabled={!ready} onClick={() => go(name)} data-testid={`playground-go-${name}`}>{text}</Button>)}
+      </div>
+      <label className="flex min-w-44 flex-1 items-center gap-3">
+        <span className="label shrink-0">{t.hour} {String(Math.floor(hour)).padStart(2, "0")}:{String(Math.round((hour % 1) * 60)).padStart(2, "0")}</span>
+        <Slider value={[hour]} min={6.5} max={17.5} step={0.25} aria-label={t.hour} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
+      </label>
+    </>
+  );
+  // held for as long as they are pressed: down / brake, and up / throttle
+  const holdDown = { onPointerDown: () => { down.current = true; }, onPointerUp: () => { down.current = false; }, onPointerLeave: () => { down.current = false; }, onPointerCancel: () => { down.current = false; } };
+  const holdUp = { onPointerDown: () => { hover.current = true; }, onPointerUp: () => { hover.current = false; }, onPointerLeave: () => { hover.current = false; }, onPointerCancel: () => { hover.current = false; } };
+  const stop = { onPointerDown: (e: PointerEvent) => e.stopPropagation() }; // a press on a control is not the start of a camera drag
+
   return (
-    <div ref={root} className={cn("grid gap-4 text-sm", expanded && "fixed inset-0 z-50 grid-rows-[minmax(0,1fr)_auto] content-start overflow-y-auto bg-background p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_auto_auto_1fr]")} role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined} aria-label={expanded ? t.picture : undefined} data-expanded={expanded}>
-      <div tabIndex={0} role="application" aria-label={t.picture} className={cn("relative touch-pan-y rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring", expanded && "mx-auto w-full max-w-[calc((100dvh-12rem)*16/9)] lg:col-start-1 lg:max-w-[calc((100dvh-9rem)*16/9)]")} onKeyDown={(e) => key(e, true)} onKeyUp={(e) => key(e, false)} onBlur={() => held.current.clear()}
+    // Expanded, this is a game: the world covers the window and everything else floats over it. `turned`: a quarter turn, for an upright phone that cannot be asked to rotate.
+    <div ref={root} className={cn("text-sm", expanded ? "fixed inset-0 z-50 overflow-hidden bg-black" : "grid gap-4")}
+      role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined} aria-label={expanded ? t.picture : undefined} data-expanded={expanded} data-turned={turned}>
+      <div tabIndex={0} role="application" aria-label={t.picture} className={cn("relative outline-none", expanded ? "touch-none" : "touch-pan-y rounded-md focus-visible:ring-2 focus-visible:ring-ring", expanded && !turned && "size-full")}
+        // The quarter turn is on this inner element: a browser overrides the transform of the fullscreen element itself.
+        style={expanded && turned ? { position: "absolute", top: 0, left: "100%", width: "100dvh", height: "100dvw", transform: "rotate(90deg)", transformOrigin: "top left" } : undefined} onKeyDown={(e) => key(e, true)} onKeyUp={(e) => key(e, false)} onBlur={() => held.current.clear()}
         onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); e.currentTarget.focus({ preventScroll: true }); }} onPointerMove={look} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)} data-testid="playground-stage" data-ready={ready} data-seat={seat}>
-        <Stage canvas={canvas} status={tracer.status} label={t.picture} t={t} testid="playground-canvas" wide>
-          <div className="absolute top-2 right-2" onPointerDown={(e) => e.stopPropagation()}>
-            <Button size="sm" variant="secondary" className="opacity-85" onClick={() => setExpanded(!expanded)} aria-pressed={expanded} data-testid="playground-expand">{expanded ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}{expanded ? t.collapse : t.expand}</Button>
+        <Stage canvas={canvas} status={tracer.status} label={t.picture} t={t} testid="playground-canvas" wide fill={expanded}>
+          {/* top right: what the renderer is doing, and the way out */}
+          <div className="absolute top-2 right-2 flex items-center gap-2" {...stop}>
+            {expanded && seen && <span className="rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] text-white/85 backdrop-blur-sm tabular">{seen.spp.toLocaleString()} {t.sppShort} · {seen.ms.toFixed(1)} {t.ms}</span>}
+            <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { if (!expanded) setTools(!window.matchMedia("(pointer: coarse)").matches); setExpanded(!expanded); }} aria-pressed={expanded} data-testid="playground-expand">{expanded ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}{expanded ? t.collapse : t.expand}</Button>
           </div>
-          {/* The site's thumb stick (components/lab/stick.tsx), laid over the corner; jumping is the one thing it cannot say. */}
-          <div className="absolute bottom-2 left-2 opacity-80" onPointerDown={(e) => e.stopPropagation()}>
-            <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} className="size-24 bg-background/70 backdrop-blur-sm" testId="playground-stick" />
+          {/* top left, expanded only: the settings, folded away on a phone until asked for */}
+          {expanded && (
+            <div className="absolute top-2 left-2 flex max-w-[min(46rem,calc(100%-11rem))] items-start gap-2" {...stop}>
+              <Button size="icon" variant="secondary" className="shrink-0 opacity-90" aria-label={t.settings} aria-pressed={tools} onClick={() => setTools(!tools)} data-testid="playground-tools"><SlidersHorizontal className="size-4" aria-hidden /></Button>
+              {tools && <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md border border-white/15 bg-background/80 px-3 py-2 backdrop-blur-sm">{settings$}</div>}
+            </div>
+          )}
+          {/* bottom left: the site's thumb stick. Expanded on a machine with a mouse and a keyboard it would only be in the way. */}
+          <div className={cn("absolute bottom-2 left-2 opacity-80", expanded && "bottom-4 left-4 [@media(pointer:fine)]:hidden")} {...stop}>
+            <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} quarterTurn={turned} className={cn("bg-background/70 backdrop-blur-sm", expanded ? "size-28" : "size-24")} testId="playground-stick" />
           </div>
-          <div className="absolute right-2 bottom-2 flex gap-2" onPointerDown={(e) => e.stopPropagation()}>
-            {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-85" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden />{seat === "near" ? t.getIn : t.getOut}</Button>}
-            {seat === "flying" && <Button size="sm" variant="secondary" className="opacity-85" onPointerDown={() => { down.current = true; }} onPointerUp={() => { down.current = false; }} onPointerLeave={() => { down.current = false; }} onPointerCancel={() => { down.current = false; }} data-testid="playground-down"><ArrowDownToLine className="size-4" aria-hidden />{t.descend}</Button>}
-            <Button size="sm" variant="secondary" className="opacity-85" onClick={() => { jump.current = true; }} onPointerDown={() => { hover.current = seat !== "foot" && seat !== "near"; }} onPointerUp={() => { hover.current = false; }} onPointerLeave={() => { hover.current = false; }} onPointerCancel={() => { hover.current = false; }} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</Button>
+          {/* bottom right: what a stick cannot say (touch), or what the keys are right now (keyboard) */}
+          <div className={cn("absolute right-2 bottom-2 flex gap-2", expanded && "right-4 bottom-4 [@media(pointer:fine)]:hidden")} {...stop}>
+            {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden />{seat === "near" ? t.getIn : t.getOut}</Button>}
+            {seat === "flying" && <Button size="sm" variant="secondary" className="opacity-90" {...holdDown} data-testid="playground-down"><ArrowDownToLine className="size-4" aria-hidden />{t.descend}</Button>}
+            <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { jump.current = true; }} {...(seat === "driving" || seat === "flying" ? holdUp : {})} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</Button>
           </div>
+          {expanded && <div className="absolute right-4 bottom-4 hidden [@media(pointer:fine)]:block"><Hints t={t} seat={seat} craft={craft} /></div>}
         </Stage>
       </div>
-      {expanded && <div className="hidden lg:col-start-2 lg:row-span-4 lg:row-start-1 lg:block"><Legend t={t} seat={seat} craft={craft} /></div>}
-      <div className={cn("grid grid-cols-2 gap-4 sm:grid-cols-4", expanded && "lg:col-start-1")}>
-        <Readout label={t.spp} value={<span data-testid="playground-spp">{seen ? seen.spp.toLocaleString() : "–"}</span>} />
-        <Readout label={t.msPerSample} value={seen?.ms ? seen.ms.toFixed(1) : "–"} unit={t.ms} tone="plain" />
-        <Readout label={t.movingTriangles} value={seen?.moving ? seen.moving.toLocaleString() : "–"} tone="plain" />
-        <Readout label={t.treeMs} value={seen?.tree ? seen.tree.toFixed(1) : "–"} unit={t.ms} tone="plain" />
-      </div>
-      <div className={cn("flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4", expanded && "lg:col-start-1")}>
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.mode}>
-          <span className="label">{t.mode}</span>
-          {MODES.map((m) => <Button key={m} size="sm" variant={mode === m ? "default" : "outline"} aria-pressed={mode === m} disabled={!tracer.live} onClick={() => { setMode(m); change({ mode: m }); }} data-testid={`playground-mode-${m}`}>{t[m]}</Button>)}
-        </div>
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.place}>
-          <span className="label">{t.place}</span>
-          {([["car", t.placeCar], ["heli", t.placeHeli], ["airplane", t.placePlane]] as const).map(([name, text]) => <Button key={name} size="sm" variant="outline" disabled={!ready} onClick={() => go(name)} data-testid={`playground-go-${name}`}>{text}</Button>)}
-        </div>
-        <label className="flex min-w-48 flex-1 items-center gap-3">
-          <span className="label shrink-0">{t.hour} {String(Math.floor(hour)).padStart(2, "0")}:{String(Math.round((hour % 1) * 60)).padStart(2, "0")}</span>
-          <Slider value={[hour]} min={6.5} max={17.5} step={0.25} aria-label={t.hour} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
-        </label>
-      </div>
-      {!expanded && <p className="text-muted-foreground">{t.hint}</p>}
-      <p className={cn("label normal-case", expanded && "lg:col-start-1")}>{PLAYGROUND_CREDIT}; Rapier (Dimforge), Apache-2.0</p>
+      {!expanded && (
+        <>
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <Readout label={t.spp} value={<span data-testid="playground-spp">{seen ? seen.spp.toLocaleString() : "–"}</span>} />
+            <Readout label={t.msPerSample} value={seen?.ms ? seen.ms.toFixed(1) : "–"} unit={t.ms} tone="plain" />
+            <Readout label={t.movingTriangles} value={seen?.moving ? seen.moving.toLocaleString() : "–"} tone="plain" />
+            <Readout label={t.treeMs} value={seen?.tree ? seen.tree.toFixed(1) : "–"} unit={t.ms} tone="plain" />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4">{settings$}</div>
+          <p className="text-muted-foreground">{t.hint}</p>
+          <p className="label normal-case">{PLAYGROUND_CREDIT}; Rapier (Dimforge), Apache-2.0</p>
+        </>
+      )}
     </div>
   );
 }
