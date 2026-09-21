@@ -71,7 +71,7 @@ export function PostFooter({ locale, post, newer, older, related, t }: Props) {
             {related.map((p) => (
               <li key={p.slug} className="border-b border-rule">
                 <Link href={`/${locale}/posts/${p.slug}`} prefetch={false} className="group flex items-baseline gap-4 py-3">
-                  <EntryNo no={p.no} draft={p.draft} className="shrink-0 text-xs text-signal" />
+                  <EntryNo no={p.no} draft={p.draft} locale={locale} className="shrink-0 text-xs text-signal" />
                   <span className="font-heading text-base font-medium decoration-signal decoration-1 underline-offset-4 group-hover:underline">
                     {p.title}
                   </span>

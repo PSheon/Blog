@@ -80,7 +80,7 @@ export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
                   </div>
                   <div className={cn("flex flex-1 flex-col gap-2 p-4", big && "lg:flex-none lg:p-6")}>
                     <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                      <EntryNo no={row.no} draft={row.draft} className="text-signal" />
+                      <EntryNo no={row.no} draft={row.draft} locale={locale} className="text-signal" />
                       <time dateTime={row.date} className="label">{row.dateLabel}</time>
                       <span className="label">{row.minutesLabel}</span>
                     </p>

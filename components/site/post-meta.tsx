@@ -7,21 +7,21 @@ import { cn } from "@/lib/utils";
  * listed only by `next dev`, where they used to look exactly like published articles: nothing on the page said so.
  * The mark rides on the number because the number is on every surface an article appears on.
  */
-export function EntryNo({ no, draft, className }: { no: number; draft?: boolean; className?: string }) {
+export function EntryNo({ no, draft, locale, className }: { no: number; draft?: boolean; /** needed with `draft`: the mark is in the page's language */ locale?: Locale; className?: string }) {
   return (
     // Wraps as two whole pieces: in the index the number has a 4.5rem column, and the mark drops under it.
     <span className={cn("inline-flex flex-wrap items-center gap-x-2 gap-y-1 font-mono tabular", className)}>
       <span className="whitespace-nowrap">№ {String(no).padStart(3, "0")}</span>
-      {draft && <DraftMark />}
+      {draft && <DraftMark locale={locale} />}
     </span>
   );
 }
 
-/** Both languages at once: it is a note to the author, shown only on their own machine. */
-export function DraftMark({ className }: { className?: string }) {
+/** A note to the author, shown only on their own machine, in the language of the page it is on. */
+export function DraftMark({ locale, className }: { locale?: Locale; className?: string }) {
   return (
     <span data-testid="draft-mark" className={cn("inline-block rounded-sm border border-signal-2 bg-signal-2/10 px-1 py-px font-mono text-[0.625rem] leading-tight font-semibold whitespace-nowrap text-signal-2", className)}>
-      草稿 DRAFT
+      {locale === "en" ? "DRAFT" : "草稿"}
     </span>
   );
 }
