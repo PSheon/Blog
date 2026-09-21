@@ -1,0 +1,237 @@
+old	new	subject
+5c4844e	d2b5604	fix(content): date migrated posts by notebook entry; the CNN ending no longer promises an unwritten article
+51ce3f4	c40cac1	fix: full page load on language switch (no client remount of theme script), scroll-behavior hint; move language and theme controls to the footer
+3df173b	9c2ed7f	feat(post): train a transformer from scratch in the browser (№ 004)
+aa4d701	04afe76	feat(ui): adopt Launch UI primitives (footer, navbar, section, glow, glass/fade utilities); rebuild footer; segmented theme switch
+50cbd6d	d9f2ca3	feat(search): full-text index served statically and loaded on demand; ranked CJK-friendly matching with highlighted snippets and section deep links; redesigned palette
+4a68ffb	9dfb7d0	feat(transformer): make the instrument self-explanatory — task example, live pop quiz, optional own problem, attention caption that reads the map only when the claim holds
+4c8ffa8	a73b692	refactor(transformer): drop the pop quiz; the task card now shows the model's live answer
+3f40f30	f192420	fix(home): hero glow read as a cut-off shape — replace with an eased, self-contained elliptical glow; clip decorative overflow at the full-width main
+dc2d7f2	cb5eee3	feat(header): phone layout — menu left, mark centred, search and preferences in a restyled left drawer; pointer cursor on the search field; un-nest nav landmarks
+98187bf	4297dd2	feat(header): search icon back on the right of the phone header; drawer keeps navigation and preferences
+19ce775	980fe1b	chore: take the canonical origin from Vercel's production domain unless NEXT_PUBLIC_SITE_URL is set
+a8e667b	896bbd0	feat(ml): image ops for the autodiff engine — conv2d, maxPool2, upsample2, bceWithLogits, mse
+86228c4	0f765a6	perf(site): system CJK fonts, idle model load, AA-contrast code theme; view transitions; axe on every page
+2d54ca6	2aabdc0	feat: OG images for the site and every post (subsetted CJK font, no-tofu fallback); decorative UI from the profile banner — viewfinder corners on instruments, fading hero grid, See→Think→Act topic rail
+5db09c2	ed31e69	Merge pull request #1 from PSheon/dev
+0818a8b	bbd6bbb	docs(research): HydraNet article research — box-head designs measured over 3 seeds, article outline, emoji data pitfalls
+e053013	2c0788f	feat(ml): ops for an integral box head and U-Net skips — concatRows, sliceRows, marginal, softmax, l1 (all gradient-checked, plus the composed head end to end)
+2002789	8b99d95	feat(hydranet): scene annotation and a two-headed model with an integral box head
+69139ef	b426131	feat(hydranet): emoji scene source with a no-colour-font fallback; draft article hosting a measuring instrument
+8020b46	260a441	docs(research): № 006 topic choice and Lite3 feasibility spike
+0fc2341	0193f2e	feat(post): draft of № 005 — a two-headed HydraNet trained on emoji fruit in the browser (zh + en)
+c17fe6c	443998b	perf(site): load the search palette, mobile drawer and hero classifier on demand; fix heading order
+a05198a	8ecebdb	feat(lite3): spike the official Lite3 walking policy on MuJoCo WASM, loaded on request
+58d27a1	2162b48	feat(lite3): spike a Three.js chase-camera view with the real Lite3 meshes; friction result verified
+330d96f	f754df7	docs(research): instrument design proposal for the Lite3 article
+6993806	a458365	docs: handoff notes for the next main session
+86fada6	ebbb6c0	feat(lite3): first zh draft of № 006 around the measured results
+3e03e71	1f10e99	feat(lite3): latency, noise and friction knobs in the simulator; re-measure the article's numbers on the shipped meshes
+8dca8e8	9061cd5	feat(lite3): one shared simulator for the whole article; instruments 01 (remote) and 02 (senses)
+960420c	2b10520	feat(lite3): instruments 03 (PD gains), 04 (push) and 05 (latency, noise, friction) on the shared simulator
+3baf697	c97d011	feat(hydranet): publish № 005, the emoji-fruit HydraNet (zh + en)
+84a5cc5	98f4fcd	feat(lite3): publish № 006, the Lite3 robot dog walking in the browser (zh + en)
+81256bd	b8e1e83	Merge pull request #2 from PSheon/dev
+e11e32b	12546c3	feat(seo): hreflang with x-default, the feed link and Open Graph basics on every page; richer BlogPosting data
+db410b7	f220704	feat(seo): short titles and descriptions for search results; spread the articles' dates; site-verification hooks
+1357119	4da5849	Merge pull request #3 from PSheon/dev
+a488eaa	5626f0e	feat(fly): spike a connectome-wired motion network in TypeScript
+88c3b08	823bede	feat(fly): spike ON/OFF moving-edge stimuli; T4 comes out ON-selective, T5 does not become OFF-selective
+46630cb	bd9380d	feat(fly): spike a draft page with a throwaway instrument
+962139f	f98d464	docs(fly): add a plain-language section on the male CNS connectome
+9cc3cbb	0ce0848	docs(fly): rewrite № 007 around one question in plain language; wiring figure from the connectome kernels
+212436e	8b432f5	docs(research): direction change for № 007 — classify pictures with the fly's optic lobe; whole-optic-lobe kernels (45 types, 27 KB) and the classification prototype
+711baf2	ee01c7b	perf(site): answer the external review with measurements (compressible meshes, security headers, CI, parity tests)
+7b47e71	4d058ad	chore: mark the package UNLICENSED (all rights reserved) until Paul picks a licence
+eb85ac6	3bd6e73	test(e2e): fetch the JSON-LD image from the test server, not the canonical origin; don't smooth-scroll to the Lite3 stages
+02792ed	e62ab82	test(e2e): wait for the HydraNet mask head too — it trails the box head, which failed on CI
+54cbb76	299fa92	docs(research): fly-brain image classification, measured — real wiring never beats shuffled wiring on MNIST and ties it on cat-vs-dog
+8c2c4c6	e82fa4b	docs(fly): rewrite № 007 as the honest version, with a results figure
+30664a9	ea47c01	chore(fly): drop article № 007; research notes and the generic autograd ops stay
+f60e497	3937285	feat(diffusion): spike a from-scratch DDPM over 3-D points that trains in the browser
+f9630c2	b816ee4	feat(diffusion): spike coloured points, procedural fruit and a landscape instead of the robot dog
+4f62518	46ef38e	feat(diffusion): draft № 007 as a real page with three instruments (zh)
+a4fbe92	dfb0109	docs(diffusion): timing claims from what was observed; an E2E test for the draft; spike notes updated
+5954a38	aa60537	fix(diffusion): with reduced motion the clouds grow once and hold still; add a sample-again button
+f4dac0c	f4afd37	docs(diffusion): explain the principles in depth; better fruit
+f480dc5	b255ec5	docs(diffusion): say up front that the model memorises two fruit; drop an overused reveal sentence
+45c04eb	7340e86	perf(diffusion): move the model into a Web Worker; name the three clouds; lower instruments refresh themselves
+fcb4bc3	ec3247e	feat(diffusion): English version; references checked against arXiv; finished fruit stays on screen for 2.5 s
+491450a	d00267d	feat(diffusion): publish № 007, a 3-D diffusion model you train in the browser (zh + en)
+b86dd01	159d324	feat(site): the site's own 404, an Apple touch icon, Blog structured data on the home page; lighter first paint
+da0f74c	5eaca06	feat(site): a readable light theme; Vercel analytics; weekly dependency updates
+8e8e120	1761964	fix(mobile): the hero instrument on the first screen; 24 px touch areas for sidenote markers and sliders
+afd11f0	17b7b09	feat(home): a title that says what the site is, with a subtitle; the rail gains a stop for generative models
+4f79310	e375f08	docs(series): zh revision of articles 001–006 after the editorial review
+1969486	d3f948e	docs(trading): keep the 'build a trading squad' hook in the title; the honest half moves to the subtitle
+d7e7b2a	fb12b5e	docs(flappy): a title in Paul's own words
+68bb2cd	097473e	docs(trading): subtitle in Paul's voice
+84c2af6	1916e47	docs(trading): final title, as Paul worded it
+46fc771	4b21d75	docs(series): technical edit of № 001–007 in zh and en; unsourced numbers measured with seeded scripts
+1937421	4449472	docs(series): replace every unverified marker with a measurement kept in docs/research
+0188e35	7497f36	fix(series): the trading instrument defaults to 30 generations; English search titles match the Chinese ones
+ae3be9d	2170b992	feat(pwa): articles read offline once opened, the site installs, slow navigations show a progress bar
+0999da2	ea1361f	feat(slam): spike 2-D pose-graph SLAM from scratch (simulated lidar, point-to-line ICP, Gauss-Newton back end)
+549858d	744eaaa	docs(research): SyncAI-Dog uses 3-D lidar plus vision — what that means for the article's closing section
+cfb6779	c418147	feat(slam): spike a drivable draft page with the real world beside the car's own map
+c3d963c	4d2098b	docs(research): effect of one wrong loop closure (0.10 m -> 3.9 m mean error) and the instrument design proposal for the SLAM article
+167436f	6896345	feat(slam): spike a one-row panoramic camera and appearance-based loop candidates
+f083cd5	66f18ad	feat(slam): spike a 16-ring 3-D lidar and six-degree-of-freedom point-to-plane ICP
+2d63124	5942f25	feat(slam): six instruments and a first zh draft for № 008
+0231ea2	19505e7	feat(slam): drive with a thumb stick; the driving instruments are now 3-D
+f98870b	b2f883c	fix(slam): autopilot no longer stalls; every instrument is now 3-D
+f3af0d7	692fecf	fix(slam): an autopilot that does not drive into walls
+89d4132	48c3d32	feat(slam): section 5 becomes four side-by-side outcomes; the opener fast-forwards to the snap
+39da012	5246b17	docs(slam): de-duplicate the zh draft; stale opener numbers and the key-based wording removed
+9dd7818	bd2bc25	feat(slam): English version of № 008; preset hand-off scrolls instantly under reduced motion
+73ca649	a965d22	test(e2e): SLAM smoke test — autopilot closes the loop, the four outcomes compute, a card hands its setting to the car; skips while the article is a draft
+56ed4d5	86a0179	docs(research): editorial review of all eight articles — series-level problems first, then per article
+42ddd99	4560f0a	docs(slam): plain-language half of the title first; the uncertainty ellipse moves into a sidenote (zh + en)
+9bd0440	ae3a1cb	docs(slam): short English title and description for search results
+8175396	d536544	test(e2e): put the describe block's closing brace back where the rebase moved it
+749d921	a41ea62	feat(home): the latest article under the hero, a drawing per article, section marks; Next.js gaps closed
+5e9d847	87ab48d	feat(slam): publish № 008, SLAM from scratch (zh + en); a favicon.ico; the E2E port can be overridden
+54704ee	023b7d4	test(slam): a CI-sized timeout for the lapping test; the 200-start autopilot sweep runs 40 by default
+e65b0a8	ca4544b	docs(readme): say what the repo is in its first lines; link every article in both languages; badges
+167c91c	913e917	fix(home): the third readout says what it counts, and the numbers stay in line when a label wraps
+a051d56	1251c54	fix(a11y): every control shows the hand and is 24 px or larger, enforced by a test
+fe97460	4aabf02	docs: DESIGN.md — the design system as built: tokens, components, interaction and a11y rules, content rules, publishing checklist
+52b2498	dfbe01c	feat(site): the footer redesigned as the notebook's colophon; № 008 no longer freezes the page while it loads
+c8f7f44	c9cdc55	Merge pull request #4 from PSheon/dev
+8542d61	6301fbf	feat(ui): motion borrowed from Magic UI, rebuilt in plain CSS
+354f038	b63e505	feat(mobile): the article outline sticks under the header; an install button and a one-time hint
+35825ad	10bb012	chore(deps): Bump actions/checkout from 4 to 7
+d1e934a	05c153e	Merge pull request #5 from PSheon/dependabot/github_actions/dev/actions/checkout-7
+de82854	879b8e6	chore(deps): Bump actions/setup-node from 4 to 7
+5c9a7c2	21e84d2	Merge pull request #6 from PSheon/dependabot/github_actions/dev/actions/setup-node-7
+5e19e53	0225207	chore(deps): Bump actions/upload-artifact from 4 to 7
+d05a519	13af283	Merge pull request #7 from PSheon/dependabot/github_actions/dev/actions/upload-artifact-7
+883ff04	36d6728	feat(home): the index as a bento grid; the phone menu and page transitions move
+09b9b40	5c1a0d9	chore(deps): Bump pnpm/action-setup from 4 to 6
+10ee0ea	d20e2b0	Merge pull request #8 from PSheon/dependabot/github_actions/dev/pnpm/action-setup-6
+c46cc89	38367c9	fix(home): the index no longer repeats the latest article; bento drawings move on hover
+b065817	5ff4a70	perf(hydranet): train one image at a time so the frame budget means something
+26e781d	21059a7	fix(home): stop the page transition replaying on load; cap the bento; animate the phone outline
+95f8354	2e50950	test(e2e): click SLAM's autopilot until it is on
+42a822a	c5b5586	Merge pull request #10 from PSheon/dev
+39e1dee	79540cd	docs(research): project audit after the release — measured, ranked, nothing changed
+dbf09eb	e0a30d7	feat(slam): SLAM follows the theme and gets a cover; index and tag pages share a card; a11y and i18n fixes
+75d52c1	14a7a13	perf(site): each article ships only its own instruments (292 KB to 203 KB gzip of page scripts)
+6462739	dc2addc	feat(pwa): one visit is enough to read offline, and the installed app starts offline
+21d651f	3d93d05	chore(site): thin tag pages, sitemap dates, a shorter description, no footer prefetch; HANDOFF rewritten
+0da0d81	5572087	perf(hydranet): score the test set a slice per frame; start the second figure when it is near
+862efec	ae300ac	refactor(site): a CSP, trimmed three.js, dead code out, stricter compiler, leaner dependencies
+1bc63b3	937e1c0	fix(site): arrow keys for the align figure, feed details and redirects, source links, a race in offline warming
+4efb34e	e56956a	docs(home): the hero says what the notebook is, not who wrote it
+242d3d5	62a842a	feat(city): the simulation behind № 009 — a seeded city, pavement A*, steering, four needs and utility, three decision modes, an event record that replays without re-simulating; tests, bench and the measured case for new need rates
+44d40bc	b04150d	feat(city): the city in three.js — seven draw calls, one light that is sun by day and moon by night, lamps and windows as functions of the hour; a draft page to look at it
+7c0d8f8	136fdeb	feat(city): people in the scene — two instanced meshes, drawn between simulated minutes, coloured by what they are doing; the three decision modes and the duty switch act on the running world
+d0cf3f1	74fcc23	feat(city): the Overseer — everyone's state in a windowed table, the record as sentences, every knob, follow camera, and a timeline that replays positions and need bars from the record alone
+4987acd	b33db2d	feat(city): three 2-D figures worked out in the page (one person's needs, the utility function, the three heads as a day of activity), a cover drawing, a smoke test that waits for publication; the timeline slider gets a name; bundle and axe results
+3474eb3	42646a2	feat(city): English skeleton of № 009; event sentences read as English; the need-bar column gets a header that fits
+28b5a93	4fe2f28	docs(research): every article page ships every article's lab code — measured, the cause, what did not fix it
+0a695dc	1616fac	feat(city): write № 009 in zh and en; every number is measured and says where
+7836563	a6a824f	fix(city): a building between the follow camera and the person sinks to a stub and rises again; duty is explained where it first appears and on its switch
+a2e8e4a	2b106c3	docs(city): call the fourth need 待辦事項 / backlog everywhere a reader sees it
+d9c740c	464da6e	docs(city): RESULTS.md says that the code's duty is the article's 待辦事項 / backlog
+1963580	a0a41d8	fix(city): the Overseer's snapshot carries its own city — rows from before a rebuild were read against the city after it and crashed on a missing place; a fresh snapshot is published with every action; regression test
+75a5e72	cb84fa1	chore(city): onto the new conventions — labs.ts behind a lazy client index, the shared locale-label hook, three.js through @/lib/three (seven classes added to it)
+3de3117	3e41ba5	fix(home): the rail reads as a sequence on a phone; a list row's glow fades into the gutter; dates regenerated
+56bf760	c18e569	feat(home): prototype the hero as four stations (see, think, generate, act)
+fc9101a	b71c083	feat(home): the rail under the hero is the same control as the hero stations
+f6eea16	6e6e4a8	fix(home): nothing in the hero stations is cut off at any width, in either language
+b2d0340	ce8c641	fix(home): the hero tabs' text scales with the instrument, so a wide fallback serif fits a 320 px phone
+86cae72	a12aa85	fix(home): the apple sits in the middle of its picture; the flock runs by the clock, a little slower
+45b8ce8	4afe4b0	feat(city): publish № 009, a city nobody schedules
+d1b87af	eabab1a	feat(post): a draft says so, with a mark beside its number everywhere and a banner on its own page
+65e9e41	56fa37c	Merge pull request #11 from PSheon/dev
+671fbc0	40dac55	docs(research): the positioning proposal, checked — who really trains in the browser, what Sam Rose's three systems essays leave untouched, and what a scheduler article would have to answer first
+143ae7e	b76e833	docs(research): a one-page proposal — why the progress bar sits at 99 %, with a throwaway prototype's numbers: counting tasks spends a quarter to a third of the time above 90 %, and more workers make every bar less honest
+1d01b20	b7e6662	docs(research): the review counts what is published (nine) and says where the tenth is
+67db887	7e765f8	feat(progress): stage 0 — a seeded job graph, workers, four progress bars (count, work, replay the plan, replay and learn) and a measure of honesty; measured: 10–17 points off for counting, under 1 for the plan with good estimates, and learning halves it when they are biased
+a75426d	f7e904c	feat(progress): the article — four figures worked out in the page (the race, unequal tasks, more workers, a bar that learns), zh and en with every number measured, a cover, a smoke test that waits for publication
+5a16b9a	fc1fc5c	feat(scheduler): the article becomes 'a task scheduler from scratch' — four rules with the core loop, attempts that fail and are scheduled again (a new figure, measured: one in five failing costs 15 % and turns the forecast optimistic), the forecast told as calling the scheduler again; slug, tests and research folder renamed
+bf9ae08	66b7bb2	docs(scheduler): reread the article end to end after the retitle
+18cee2f	221db93	feat(scheduler): the review's fixes — a step-through figure of the job graph where a running task can be clicked to fail; the knee drawn; the scheduler as a class the listing quotes; pink kept for what went wrong; readable timeline rows on a phone; a test that re-measures every number in the prose; references checked
+70b8fbd	cee74b5	fix(e2e): my replace-all had put the scheduler's step checks into four other articles' tests; they are back as they were, and the block is only in this article's test
+856b8d1	e49c5d0	fix(scheduler): check task sizes against this project's own tests; the slider goes to 3.0
+88b33a5	64dfe30	fix(site): the 404 page has one language and no runtime error for an unknown URL
+cac56a6	d99eca8	fix(post): a draft is not reachable by its URL
+2a510d2	5ee5d0b	feat(scheduler): publish № 010 (a task scheduler from scratch) with the architecture review's fixes
+cf9f2a6	1ad1b27	Merge pull request #13 from PSheon/dev
+62c618b	f79feb5	feat(light): add a path tracer in lib/rt and the first playable figure (draft № 011)
+64f3137	493004d	feat(light): add figures 2–4 of part one (one path, bounce limits, BVH heat map)
+6f37653	601c860	docs: production is blog.psheon.me
+1a79ab2	2d387e9	feat(light): show a finished picture to readers without WebGPU
+2c723d2	b530b40	fix(light): figures wait for Start; the pacing clock keeps time on a 120 Hz display
+275306d	ca40c57	feat(light): write part one's prose (zh); the BVH figure runs again after a change of scene
+810eb70	db2185e	feat(playground): fly through Sketchbook's world (geometry only) while it is path traced
+528745c	5a43833	feat(light): part one in English, its cover, and a CPU-against-GPU spot check
+a392f14	61f1909	feat(light): draft the sampling and materials article (zh + en)
+5bf83a8	f094e97	refactor(light): two articles instead of four; part one absorbs the best of the sampling draft
+459fe7e	8c347fb	feat(playground): add vehicles in a second tree that is rebuilt every frame
+b90c799	d8af115	fix(playground): steer with the site's thumb stick instead of new buttons
+c38df94	863aef5	feat(playground): add a character you steer through the path-traced playground
+54ed72b	af28f23	feat(playground): add cars you can get into and drive
+7139c47	4623bf4	perf(playground): cut the ground's long triangles and refit the moving trees instead of rebuilding
+fdfef1a	3e1a57b	feat(rt): carry the picture across movements instead of starting from nothing
+a129ab7	1c4a302	test(e2e): retry the city's 'back to now' click until it takes
+5b704d2	64e002c	feat(playground): add a helicopter and an aeroplane that fly
+751b068	1b83964	fix(controls): read physical keys so an input method cannot take them away; the playground expands with a key legend
+b631b47	779c536	feat(playground): the expanded view is a game HUD with contextual key hints
+74fe7e7	43878bd	feat(playground): port Sketchbook's character whole (34 clips, state machine, doors, seats, entry points)
+8f00c6e	5c0ea4a	feat(playground): a designed palette; moving things keep their history too
+a6b92f5	b5fc40d	fix(playground): the character turns as Sketchbook's does; add part two's prose, cover and test
+7c255d8	cc2558c	docs(light-playground): put the fun at the front of the title
+4dc51b1	e2d04fe	docs(light-playground): use Paul's title; test that cars really collide
+89b44ce	1d618c1	fix(playground): getting in from the passenger's side works (sit down, slide over to the wheel)
+5213c11	ccbe0b8	feat(playground): a click takes the mouse and Escape gives it back (pointer lock)
+462a619	3a61c3d	feat(rt): borrow from neighbouring pixels with an edge-stopping filter, as a switch in figure 01 and a section
+4dcde42	2137aca	docs(light): the playground's text matches how it is played; HANDOFF and DESIGN cover the series
+4f4dfc6	9f48fe1	perf(playground): adaptive quality, fetch the game on request, and vehicle interiors
+1fb8aa2	df9e95e	chore(repo): enforce Conventional Commits with a commit-msg hook
+210e846	0cbfceb	docs(vla): № 010 plan — a VLA that turns a PCB over and recovers; WebGPU training when the reader's GPU allows, checkpoints otherwise; the two research notes behind it
+3c545f1	125603e	feat(vla): stage 0.1 — the bench, two boards, a 4-joint arm with closed-form IK, the kinematic rules, a memoryless expert that recovers, and a z-buffer rasteriser for the model's 48 × 48 eye; 14 tests, expert measured
+6990ea7	348a4f2	docs(vla): the drop arithmetic in RESULTS.md, from the counts and not from a guess
+9b0d70a	1e16b8c	feat(vla): stage 0.2 — BC from 48 × 48 pixels: data from seeds, a PyTorch model and trainer, closed-loop evaluation with the world in node; the grasp window moves to pixel scale after a measured 0 %; 84 % unperturbed, 20 % after one shove
+df7f8ce	a662c12	feat(vla): stage 0.3 — WebGPU kernels with backward passes (matmul in all three forms and batched, layer norm, prefix-masked softmax, ReLU, add, Adam), parity with lib/ml to 1e-7, and a timed training step: 206 ms at batch 128, ten minutes for the recipe that reached 84 %
+f163f26	c616ed8	feat(vla): a draft page to look at — the bench and the expert drawn by the rasteriser beside the model's 48 × 48 view, with the reader's four ways of getting in the way
+3d655ad	1d74cc7	feat(vla): stage 1a — batched closed-loop rollouts against a PyTorch checkpoint, DAgger rounds and camera randomisation, a pipeline script for the four recipes; a CPU forward pass in TypeScript with a KV cache, pinned to PyTorch by golden values; causalSoftmax learns a fully visible prefix
+5448e58	507d07f	style(vla): use const
+57e45fc	86e0a81	feat(vla): the draft bench runs in a worker and can be driven by the BC checkpoint (78 ms a step on the CPU): shove it and watch it not come back
+12e8a87	1bab3a6	feat(vla): stage 1b — the four recipes measured twice: DAgger 82.7 % against BC 35.7 % with nobody interfering, 53.4 % against 7.6 % after a shove; the wrist now starts any way up; DART did nothing and RESULTS.md says why; three checkpoints on the draft page
+1a500a9	967267b	test(city): count the edge-through-building checks and assert once — 640 000 expects timed out under load
+d93a0ce	7ac1ba5	feat(vla): the camera answer — the same camera-randomised DAgger aggregate at 12 000 steps is the best model on every column (90 % / 90 % shoved / 93.6 % camera 5° off), with the caveat that the others had fewer steps; a handover note
+a4e378d	9852a03	fix(site): the 404 page has one language and no runtime error; the rasteriser draws any scene
+9972ebb	78d69ee	docs(research): head-camera, does a robot that keeps looking at its own hand survive a knocked camera?
+095439b	b7d1ec3	docs(research): vla, every recipe at the same 12 000 steps; it was the method, not the budget
+fdb03e7	b3f0a0d	docs(research): head-camera, three seeds; the order holds, the sizes do not; what the keypoints follow
+413ca81	0d5d8a8	fix(post): a draft is not reachable by its URL
+7de0284	d4c50d7	docs(research): head-camera, dependable training, and the three acts at one budget
+c16817f	0b70328	docs(research): head-camera, a reader's seconds, and aux on the look-once side too
+2268759	d193563	docs(research): head-camera, option A decided; run 8, disturbances training never showed
+f66d447	8ec78c0	docs(research): head-camera run 9, vary the pixels in training too
+e38f2eb	67bd5eb	docs(research): head-camera run 10, a first language experiment
+2e7102a	288f39a	docs(research): head-camera run 11, language at 20 000 steps
+63feaa4	1a7d8e8	feat(head-camera): a 3D prototype; drag the block, turn the head camera, compare two checkpoints
+f44722b	9799596	feat(head-camera): the article in zh, and training in the page
+c45c903	a0776b9	feat(head-camera): a nicer bench with shadows, a cylinder arm, the head camera's view in the scene, overlays
+ce8c687	f31df9e	docs(research): head-camera run 12, pick and place; nothing learns with a height-gated teacher
+6823baf	d39d56c	fix(head-camera): the hand is a touch pad, not a gripper
+e5f1cbe	edc1290	docs(head-camera): tighten the article; an honest title, two new figures, the language section cut
+c22934e	a1732f1	docs(research): head-camera runs 13–15, pick and place learns once the grasp allows 3 cm
+78269a1	5f1f14d	docs(research): head-camera run 16, shaken pick and place works at 48 px (92 %, flat across tilt)
+7d07537	da6e9af	feat(head-camera): pick and place in the page; a gripper, a target pad, three checkpoints, hover markers
+b55eb7e	a7174cf	docs(research): head-camera run 17, pick and place over five seeds; the shape holds, training is not dependable
+3f94a99	d03ecc0	feat(head-camera): the blind strip, where the arm hides the block from the head camera, tinted and named
+1932439	a679eb2	fix(head-camera): map the arm's shadow on a 2 cm grid; the page keeps the block out of it
+12a03c6	df24ddb	docs(head-camera): rewrite the article around pick and place
+dc62397	3c74fb3	docs(head-camera): the title gets its hook back
+43abe69	83e1d15	docs(head-camera): use Paul's title
+899d4bf	63b1b93	fix(head-camera): cut the block area's far corner; the forbidden part is no longer tinted
+6de91a0	f6d6a42	feat(head-camera): the picture-in-picture shows what the network is shown; fig. 04 is gone
+332b479	ec54e0f	docs(pcb-flip-vla): say it in plain words instead of 光柵器
+8cb7eef	40c37a4	docs(research): head-camera runs 20–21, pick and place is dependable at 60 000 steps (94.8 %, every seed ≥ 92)
+79eb38d	3f97cea	feat(head-camera): ship the 60 000-step checkpoint; the table's last row is now dependable
+0146f73	78ea26c	feat(head-camera): the English version, a cover, and end-to-end tests
+85bb249	01ab4ca	fix(head-camera): an equal-budget table, and a figure that could pause itself in plain sight

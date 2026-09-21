@@ -10,5 +10,6 @@ if ! printf '%s' "$first" | grep -Eq '^(feat|fix|docs|style|refactor|perf|test|b
   echo "  $first" >&2
   echo "expected: type(scope): summary   e.g. feat(playground): pointer lock, fix(rt): counters overflow, docs: handoff" >&2
   echo "types: feat fix docs style refactor perf test build ci chore revert" >&2
+  echo "which type, which scope, how to word it: docs/COMMITS.md" >&2
   exit 1
 fi
