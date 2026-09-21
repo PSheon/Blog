@@ -5,7 +5,7 @@ seoTitle: "A task scheduler from scratch"
 seoDescription: "Sixty dependent tasks, four workers, 215 lines of TypeScript. The scheduler is four rules; the hard part is 'how long is left'. Three bars mislead; one learns."
 date: 2026-09-21
 tags: [ai-agent, from-scratch]
-no: 11
+no: 10
 interactive: true
 draft: true
 ---
@@ -102,9 +102,11 @@ How well that works depends on how unequal the tasks are. The next chart is not 
   <SkewLab />
 </Instrument>
 
-With tasks all about the same size, both lines hug the diagonal and counting is perfectly good. Move right and the counting bar bulges: measured offline over 200 jobs at the default setting, it is off by 10 points on average and spends 24% of the run above 90% (an honest bar: 10%). Weighting by estimated work halves that, to 6 points.
+The number on the slider is the standard deviation of the logarithm of the task sizes: 0.2 is "all about the same", and at 1.2 (the default) the largest tenth of the tasks is a bit over four tenths of the work. With tasks all about the same size, both lines hug the diagonal and counting is perfectly good. Move right and the counting bar bulges: measured offline over 200 jobs at the default setting, it is off by 10 points on average and spends 24% of the run above 90% (an honest bar: 10%). Weighting by estimated work halves that, to 6 points.
 
-It does not reach the diagonal either, and this time the estimates are not to blame, because here they are right.
+Is 1.2 an exaggeration? I checked it against this project's own tests (one run each, on my machine): for the durations of its 168 end-to-end tests that number is 1.0; for its 237 unit tests it is 2.8, and the largest tenth of them take 98% of the time. Drag the slider to 2.8: the counting bar is off by 28 points on average and spends 45% of the run above 90%. Real work is more unequal than my default, not less.
+
+The bar that weighs by work does not reach the diagonal either, and this time the estimates are not to blame, because here they are right.
 
 ## The more workers, the less honest the bar
 
@@ -142,9 +144,9 @@ It has a price too: **it goes backwards.** When a task outruns its estimate, the
 
 ## What differs from the real thing, and how the numbers were measured
 
-**The task sizes are a distribution I chose** (log-normal) at a spread I chose. I have not checked it against a public workload; your build or your CI may be more unequal, or less. That is what the slider in figure 04 is for.
+**The task sizes are a distribution I chose** (log-normal). I have only checked its spread against this project's own two test suites (1.0 and 2.8, above), not against anyone else's workload; what it is for your build or your CI, the slider in figure 04 lets you set.
 
-**The scheduling rule is the plainest there is**: whichever task is ready goes first, and a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails, and no job needs four workers to start together. Those are exactly what real schedulers of the Kubernetes or Airflow kind have to deal with. Clusters that train large models more than most: OpenAI wrote in 2021 that their jobs have to be scheduled as a whole gang or not at all. What to do downstream when a task is cancelled, and who should go first, are other articles too.
+**The scheduling rule is the plainest there is**: whichever task is ready goes first, and a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails, and no job needs four workers to start together. Those are exactly what real schedulers of the Kubernetes or Airflow kind have to deal with. Clusters that train large models add one more: every member of a job has to get a machine at the same moment, or the whole job waits (gang scheduling). What to do downstream when a task is cancelled, and who should go first, are other articles too.
 
 **The unit is a whole job of tasks that wait for each other, not a single request.** How one request queues, gets routed, and how long to wait before retrying it, Sam Rose has covered in three fine interactive essays (see the sources); this article does not repeat them.
 
@@ -156,7 +158,6 @@ Where the numbers come from: figures 03 to 06 and their read-outs are your brows
 
 ## Sources
 
-- Scheduling on a real cluster (gangs scheduled together, nodes allotted by team): OpenAI, *Scaling Kubernetes to 7,500 nodes*, 2021.
 - Queueing, retrying and routing single requests: Sam Rose, *Queueing* and *Retries* (encore.dev/blog), *Load Balancing* (samwho.dev).
 - How people perceive progress bars: Harrison, Amento, Kuznetsov, Bell, *Rethinking the Progress Bar*, UIST 2007, pp. 115–118.
 - The longest chain of dependencies sets the floor: Kelley, Walker, *Critical-Path Planning and Scheduling*, Eastern Joint Computer Conference, 1959, pp. 160–173.

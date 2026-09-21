@@ -68,3 +68,29 @@ default (biased) estimates, fail 0.3: job 58.7 min, 25.0 failed attempts a job, 
 - The scheduler is a class (`Scheduler`: `assign`, `advance`, `kill`) so that the step-through figure and the forecast run
   the same code; `schedule()` is `while (s.left > 0) { s.assign(); s.advance(); }`. Every number above was re-measured
   after that change and is identical.
+
+## How unequal are real tasks? This project's own tests
+
+One run each on the M4 Pro (`pnpm exec vitest run --reporter=json`, `pnpm exec playwright test --reporter=json`); passed
+tests only; "spread" is the standard deviation of the logarithm of the durations, the same quantity as `skew`.
+
+| workload | tasks | spread | median | largest | the largest tenth takes |
+| --- | --- | --- | --- | --- | --- |
+| unit tests, each test | 237 | 2.76 | 1 ms | 28 250 ms | 98 % of the time |
+| unit tests, each file | 30 | 2.89 | 25 ms | 30 634 ms | 74 % |
+| end-to-end tests | 168 | 0.99 | 1 206 ms | 24 184 ms | 48 % |
+| the simulation's default (skew 1.2) | 60 | 1.2 | — | — | 43 % |
+
+And what the bars do at that much inequality (200 jobs, good estimates, 4 workers):
+
+```
+skew 1.2: top 10% of tasks = 43% of the work | count 10.1 (24%) | work 5.8 (8%) | plan 0.7 (10%) | learn 0.8 (10%)
+skew 2: top 10% of tasks = 68% of the work | count 21.1 (38%) | work 10.8 (5%) | plan 1.2 (10%) | learn 1.3 (10%)
+skew 2.8: top 10% of tasks = 83% of the work | count 27.8 (45%) | work 17.0 (3%) | plan 1.4 (10%) | learn 1.6 (9%)
+```
+
+The default is between the two real suites, nearer the tamer one. At the unit tests' spread the counting bar is off by 28
+points and sits above 90 % for 45 % of the run; weighting by work runs *behind* instead (3 % above 90); replaying the plan
+stays within 1.4. A log-normal with spread 2.8 puts 83 % of the work in the top tenth where the real suite has 98 %: the
+real tail is heavier than log-normal. Durations depend on the machine and the day; the spreads will move a little.
+The figure's slider now goes to 3.0.
