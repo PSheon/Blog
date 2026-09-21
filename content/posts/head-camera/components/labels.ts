@@ -4,10 +4,10 @@ import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 
 const zh = {
   bench: "工作台的 3D 視圖：拖紅色方塊移動它，拖空白處轉視角",
-  benchHint: "拖方塊 · 拖空白處轉視角",
+  benchHint: "拖紅色方塊 · 拖空白處轉視角",
   eye: "頭部相機看到的 32 × 32 畫面",
-  eyeNow: "它現在看到的（每一步都重看）",
-  eyeOnce: "它唯一看過的那一張（手臂收起來時拍的）",
+  eyeNow: "頭部相機 32×32 · 每步重看",
+  eyeOnce: "頭部相機 · 只看過這一張",
   dots: "彩色點是網路壓出來的 8 個關鍵點。",
   loading: "載入模型中…",
   failed: "模型載入失敗，重新整理再試一次。",
@@ -18,7 +18,8 @@ const zh = {
   play: "播放", pause: "暫停", reset: "重來",
   gap: "手離方塊", status: "狀態",
   there: "到了", going: "前往中", homing: "回原位拍照",
-  pitch: "相機下傾", yaw: "相機左右轉", noise: "畫面雜訊", light: "光線",
+  pitch: "下傾", yaw: "左右轉", noise: "雜訊", light: "光線",
+  cameraGroup: "撞歪頭部相機", pictureGroup: "弄髒畫面",
 
   train: "開始訓練", again: "重新訓練", stop: "停止",
   trainNote: "在你的瀏覽器裡、用 JavaScript 從零訓練。訓練期間可以繼續往下讀。",
@@ -34,10 +35,10 @@ const zh = {
 
 const en: typeof zh = {
   bench: "The bench in 3D: drag the red block to move it, drag anywhere else to turn the view",
-  benchHint: "drag the block · drag elsewhere to turn",
+  benchHint: "drag the red block · drag elsewhere to turn",
   eye: "The head camera's 32 × 32 picture",
-  eyeNow: "What it sees now (it looks again every step)",
-  eyeOnce: "The only picture it saw (taken with the arm parked)",
+  eyeNow: "Head camera 32×32 · every step",
+  eyeOnce: "Head camera · its only look",
   dots: "The coloured dots are the eight keypoints the network squeezes the picture into.",
   loading: "Loading the models…",
   failed: "The models failed to load. Reload the page to try again.",
@@ -48,7 +49,8 @@ const en: typeof zh = {
   play: "Play", pause: "Pause", reset: "Reset",
   gap: "Hand to block", status: "Status",
   there: "There", going: "On its way", homing: "Going home to look",
-  pitch: "Camera tilt", yaw: "Camera turn", noise: "Picture noise", light: "Light",
+  pitch: "Tilt", yaw: "Turn", noise: "Noise", light: "Light",
+  cameraGroup: "Knock the head camera", pictureGroup: "Spoil the picture",
 
   train: "Start training", again: "Train again", stop: "Stop",
   trainNote: "Trained from scratch in your browser, in JavaScript. Keep reading while it runs.",

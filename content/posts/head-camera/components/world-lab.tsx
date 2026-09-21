@@ -2,7 +2,6 @@
 
 import { Pause, Play, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Readout } from "@/components/lab/readout";
 import { useNear } from "@/components/lab/use-near";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
@@ -48,6 +47,7 @@ export function WorldLab() {
   const [policies, setPolicies] = useState<Record<Kind, Policy> | null>(null), [failed, setFailed] = useState(false);
   const [kind, setKind] = useState<Kind | "mine">("closed"), [pitch, setPitch] = useState(0), [yaw, setYaw] = useState(0);
   const [noise, setNoise] = useState(0), [light, setLight] = useState(1), [playing, setPlaying] = useState<boolean | null>(null);
+  const [touched, setTouched] = useState(false);
   const [status, setStatus] = useState({ gap: 0, there: false, keys: [] as XY[], phase: "home" as Phase });
   const running = playing ?? !reduced;
   const world = useRef<World>({ tip: [...HOME], from: [...HOME], at: 0, block: [...START_BLOCK], held: 0, phase: "home", goal: null, seen: null, keys: [], drag: null, px: 0, py: 0 });
@@ -104,11 +104,13 @@ export function WorldLab() {
       if (!bench) return;
       const w = world.current, [x, y] = ndc(e);
       w.drag = bench.grabs(x, y) ? "block" : "orbit"; w.px = e.clientX; w.py = e.clientY;
+      bench.highlight(w.drag === "block"); setTouched(true);
       c.setPointerCapture(e.pointerId);
     };
     const move = (e: PointerEvent) => {
       const w = world.current;
-      if (!bench || !w.drag) return;
+      if (!bench) return;
+      if (!w.drag) { const [x, y] = ndc(e), over = bench.grabs(x, y); bench.highlight(over); c.style.cursor = over ? "grab" : ""; return; }
       if (w.drag === "orbit") { bench.orbit(e.clientX - w.px, e.clientY - w.py); w.px = e.clientX; w.py = e.clientY; return; }
       const [x, y] = ndc(e), p = bench.benchAt(x, y);
       if (p) w.block = onBench(p, w.block);
@@ -117,10 +119,14 @@ export function WorldLab() {
       const w = world.current;
       if (w.drag === "block" && knobs.current.kind === "open") { w.phase = "home"; w.goal = null; } // look-once looks again only when the block is put down
       w.drag = null;
+      bench?.highlight(false);
     };
+    // The site switches theme by a class on <html>: repaint the fog to match.
+    const themes = new MutationObserver(() => bench?.retheme());
+    themes.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "data-theme", "style"] });
     c.addEventListener("pointerdown", down); c.addEventListener("pointermove", move); c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
     return () => {
-      alive = false; cancelAnimationFrame(frame); io.disconnect(); bench?.dispose();
+      alive = false; cancelAnimationFrame(frame); io.disconnect(); themes.disconnect(); bench?.dispose();
       c.removeEventListener("pointerdown", down); c.removeEventListener("pointermove", move); c.removeEventListener("pointerup", up); c.removeEventListener("pointercancel", up);
     };
   }, [policies]);
@@ -132,45 +138,63 @@ export function WorldLab() {
     paint(eye.current, seen);
     setStatus({ gap: Math.hypot(HOME[0] - START_BLOCK[0], HOME[1] - START_BLOCK[1]), there: false, keys: [], phase: "home" });
   };
+  const panel = "rounded-md border border-border/70 bg-background/75 shadow-sm backdrop-blur-md";
+  const choices: { id: Kind | "mine"; label: string }[] = [{ id: "closed", label: t.closed }, { id: "open", label: t.open }, ...(mine ? [{ id: "mine" as const, label: t.mine }] : [])];
   return (
-    <div ref={root} className="grid gap-4 text-sm">
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3 sm:gap-4">
-        <div className="relative aspect-[4/3] w-full overflow-hidden rounded-md border border-border bg-background">
-          <canvas ref={canvas} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" role="img" aria-label={t.bench} data-testid="headcam-bench" />
-          {!policies && <p className="absolute inset-0 grid place-items-center text-muted-foreground" role={failed ? "alert" : "status"}>{failed ? t.failed : t.loading}</p>}
-          <p className="label pointer-events-none absolute bottom-2 left-3">{t.benchHint}</p>
+    <div ref={root} className="grid gap-5 text-sm">
+      <div className="relative aspect-[4/5] w-full overflow-hidden rounded-md border border-border bg-background sm:aspect-[16/10]">
+        <canvas ref={canvas} className="absolute inset-0 h-full w-full touch-none cursor-grab active:cursor-grabbing" role="img" aria-label={t.bench} data-testid="headcam-bench" />
+        {!policies && <p className="absolute inset-0 grid place-items-center text-muted-foreground" role={failed ? "alert" : "status"}>{failed ? t.failed : t.loading}</p>}
+
+        {/* Who drives: a segmented switch, top left. */}
+        <div className={`absolute top-3 left-3 flex gap-0.5 p-0.5 ${panel}`} role="group" aria-label={t.policy}>
+          {choices.map((c) => (
+            <button key={c.id} type="button" aria-pressed={kind === c.id} onClick={() => setKind(c.id)} data-testid={`headcam-${c.id}`}
+              className={`rounded-[5px] px-2.5 py-1 font-sans text-[13px] transition-colors ${kind === c.id ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+              {c.label}
+            </button>
+          ))}
         </div>
-        <div className="grid content-start gap-2">
-          <div className="relative aspect-square w-full overflow-hidden rounded-sm bg-[#181c2c]">
+
+        {/* What the network sees, picture in picture, top right. */}
+        <figure className={`absolute top-3 right-3 w-[34%] max-w-[190px] overflow-hidden ${panel}`}>
+          <div className="relative aspect-square w-full bg-[#181c2c]">
             <canvas ref={eye} width={SIZE} height={SIZE} className="absolute inset-0 h-full w-full [image-rendering:pixelated]" role="img" aria-label={t.eye} data-testid="headcam-eye" />
             <svg viewBox="-1 -1 2 2" className="pointer-events-none absolute inset-0 h-full w-full" aria-hidden>
-              {status.keys.slice(0, K).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={0.045} fill={DOTS[i]} stroke="#000" strokeWidth={0.012} />)}
+              {status.keys.slice(0, K).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={0.05} fill={DOTS[i]} stroke="#000" strokeWidth={0.014} />)}
             </svg>
           </div>
-          <p className="label">{kind === "open" ? t.eyeOnce : t.eyeNow}</p>
-          <p className="text-muted-foreground">{t.dots}</p>
+          <figcaption className="px-2 py-1.5 font-mono text-[10.5px] leading-snug text-muted-foreground">{kind === "open" ? t.eyeOnce : t.eyeNow}</figcaption>
+        </figure>
+
+        {/* How it is doing, bottom left. */}
+        <div className={`absolute bottom-3 left-3 flex items-center gap-3 px-3 py-1.5 ${panel}`} role="status" data-testid="headcam-status-panel">
+          <span className={`size-2 rounded-full ${status.there ? "bg-signal" : "animate-pulse bg-signal-2"}`} aria-hidden />
+          <span className="font-sans text-[13px]" data-testid="headcam-status">{status.there ? t.there : kind === "open" && status.phase !== "go" ? t.homing : t.going}</span>
+          <span className="font-mono text-[13px] tabular text-muted-foreground" data-testid="headcam-gap">{(status.gap * 100).toFixed(1)} cm</span>
         </div>
+
+        {/* Play and reset, bottom right. */}
+        <div className="absolute right-3 bottom-3 flex gap-1.5">
+          <Button size="icon-sm" variant="outline" className="bg-background/75 backdrop-blur-md" aria-label={running ? t.pause : t.play} onClick={() => setPlaying(!running)}>{running ? <Pause /> : <Play />}</Button>
+          <Button size="icon-sm" variant="outline" className="bg-background/75 backdrop-blur-md" aria-label={t.reset} onClick={reset}><RotateCcw /></Button>
+        </div>
+        {!touched && policies && <p className="label pointer-events-none absolute inset-x-0 bottom-14 text-center">{t.benchHint}</p>}
       </div>
-      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.policy}>
-        <span className="label mr-1">{t.policy}</span>
-        <Button size="sm" variant={kind === "closed" ? "secondary" : "ghost"} aria-pressed={kind === "closed"} onClick={() => setKind("closed")} data-testid="headcam-closed">{t.closed}</Button>
-        <Button size="sm" variant={kind === "open" ? "secondary" : "ghost"} aria-pressed={kind === "open"} onClick={() => setKind("open")} data-testid="headcam-open">{t.open}</Button>
-        {mine && <Button size="sm" variant={kind === "mine" ? "secondary" : "ghost"} aria-pressed={kind === "mine"} onClick={() => setKind("mine")} data-testid="headcam-mine">{t.mine}</Button>}
-        <span className="ml-auto flex gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => setPlaying(!running)}>{running ? <Pause aria-hidden /> : <Play aria-hidden />}{running ? t.pause : t.play}</Button>
-          <Button size="sm" variant="ghost" onClick={reset}><RotateCcw aria-hidden />{t.reset}</Button>
-        </span>
+
+      <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+        <fieldset className="grid gap-4">
+          <legend className="mb-3 font-sans text-[13px] font-semibold">{t.cameraGroup}</legend>
+          <Param label={t.pitch} shown={`${pitch}°`} value={pitch} min={-10} max={20} step={1} onChange={setPitch} />
+          <Param label={t.yaw} shown={`${yaw}°`} value={yaw} min={-20} max={20} step={1} onChange={setYaw} />
+        </fieldset>
+        <fieldset className="grid gap-4">
+          <legend className="mb-3 font-sans text-[13px] font-semibold">{t.pictureGroup}</legend>
+          <Param label={t.noise} shown={noise.toFixed(2)} value={noise} min={0} max={0.15} step={0.01} onChange={setNoise} />
+          <Param label={t.light} shown={`${Math.round(light * 100)}%`} value={light} min={0.5} max={1.2} step={0.05} onChange={setLight} />
+        </fieldset>
       </div>
-      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-        <Readout label={t.gap} value={(status.gap * 100).toFixed(1)} unit="cm" tone={status.there ? "signal" : "muted"} />
-        <Readout label={t.status} value={<span className="font-sans text-base" role="status" data-testid="headcam-status">{status.there ? t.there : kind === "open" && status.phase !== "go" ? t.homing : t.going}</span>} tone="plain" />
-      </div>
-      <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-        <Param label={t.pitch} shown={`${pitch}°`} value={pitch} min={-10} max={20} step={1} onChange={setPitch} />
-        <Param label={t.yaw} shown={`${yaw}°`} value={yaw} min={-20} max={20} step={1} onChange={setYaw} />
-        <Param label={t.noise} shown={noise.toFixed(2)} value={noise} min={0} max={0.15} step={0.01} onChange={setNoise} />
-        <Param label={t.light} shown={`${Math.round(light * 100)}%`} value={light} min={0.5} max={1.2} step={0.05} onChange={setLight} />
-      </div>
+      <p className="text-muted-foreground">{t.dots}</p>
     </div>
   );
 }
