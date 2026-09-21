@@ -8,3 +8,5 @@ const labs = () => loading ?? import("./labs");
 
 export const WorldLab = dynamic(() => labs().then((m) => m.WorldLab));
 export const TrainLab = dynamic(() => labs().then((m) => m.TrainLab));
+export const OffsetLab = dynamic(() => labs().then((m) => m.OffsetLab));
+export const KeypointsLab = dynamic(() => labs().then((m) => m.KeypointsLab));

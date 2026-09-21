@@ -197,3 +197,17 @@ export function evaluate(policy: Policy, shift: CameraShift, episodes: number, s
   }
   return wins / episodes;
 }
+
+/**
+ * What "look once" computes: where on the plane z = h the camera it BELIEVES it has (unturned) would put this pixel.
+ * Newton on the 2 × 2 problem, as in the research script.
+ */
+export function backProject(pixel: XY, h: number): XY {
+  let guess: XY = [0.36, 0];
+  for (let k = 0; k < 20; k++) {
+    const at = project([guess[0], guess[1], h], NO_SHIFT), e = 1e-4, ax = project([guess[0] + e, guess[1], h], NO_SHIFT), ay = project([guess[0], guess[1] + e, h], NO_SHIFT);
+    const j = [(ax[0] - at[0]) / e, (ay[0] - at[0]) / e, (ax[1] - at[1]) / e, (ay[1] - at[1]) / e], det = j[0] * j[3] - j[1] * j[2], rx = pixel[0] - at[0], ry = pixel[1] - at[1];
+    guess = [guess[0] + (j[3] * rx - j[1] * ry) / det, guess[1] + (-j[2] * rx + j[0] * ry) / det];
+  }
+  return guess;
+}

@@ -20,6 +20,9 @@ const zh = {
   there: "到了", going: "前往中", homing: "回原位拍照",
   pitch: "下傾", yaw: "左右轉", noise: "雜訊", light: "光線",
   cameraGroup: "撞歪頭部相機", pictureGroup: "弄髒畫面",
+  kpFixed: "訓練時相機沒動過", kpShaken: "訓練時相機被晃過", kpShuffle: "換一個場景",
+  offsetView: "從上往下看的工作台：紅色是方塊真正的位置，粉紅虛線是算出來的位置",
+  offsetMean: "九個位置平均差", offsetNote: "差 3 公分以上就碰不到方塊。這裡沒有任何學習，只有幾何：計算是完美的，錯的只是它以為相機還在原位。",
 
   train: "開始訓練", again: "重新訓練", stop: "停止",
   trainNote: "在你的瀏覽器裡、用 JavaScript 從零訓練。訓練期間可以繼續往下讀。",
@@ -51,6 +54,9 @@ const en: typeof zh = {
   there: "There", going: "On its way", homing: "Going home to look",
   pitch: "Tilt", yaw: "Turn", noise: "Noise", light: "Light",
   cameraGroup: "Knock the head camera", pictureGroup: "Spoil the picture",
+  kpFixed: "Camera never moved in training", kpShaken: "Camera shaken in training", kpShuffle: "Another scene",
+  offsetView: "The bench from above: red is where each block is, dashed pink is where the calculation puts it",
+  offsetMean: "Mean error, nine places", offsetNote: "More than 3 cm off misses the block. Nothing is learned here, it is geometry: the calculation is perfect and only its belief about the camera is stale.",
 
   train: "Start training", again: "Train again", stop: "Stop",
   trainNote: "Trained from scratch in your browser, in JavaScript. Keep reading while it runs.",
