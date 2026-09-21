@@ -5,8 +5,9 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { Tracer, buildBvh, cornell, cross, streamFor, sub, unit, type PathVertex, type Vec3 } from "@/lib/rt";
 import { useLabels } from "./labels";
-import { FALLBACK, Stage } from "./stage";
-import { useTracer } from "./use-tracer";
+import { Stage } from "@/components/rt/stage";
+import { FALLBACK } from "./labels";
+import { useTracer } from "@/components/rt/use-tracer";
 
 const SIZE = 512, KEEP = 24, START = { x: 196, y: 430 }; // the floor, left of centre: red from the wall reaches it
 

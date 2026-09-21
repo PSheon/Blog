@@ -5,8 +5,9 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLabels } from "./labels";
-import { FALLBACK, Stage, Transport } from "./stage";
-import { useTracer } from "./use-tracer";
+import { Stage, Transport } from "@/components/rt/stage";
+import { FALLBACK } from "./labels";
+import { useTracer } from "@/components/rt/use-tracer";
 
 const SIZE = 512, SIZES = [1_000, 10_000, 100_000, 1_000_000] as const, BOUNCES = [0, 1, 2, 16] as const;
 /** GPU time a frame may spend on samples: the rest of the 16 ms belongs to the page. */

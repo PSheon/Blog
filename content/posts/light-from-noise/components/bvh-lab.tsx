@@ -5,8 +5,8 @@ import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
-import { Stage } from "./stage";
-import { useTracer } from "./use-tracer";
+import { Stage } from "@/components/rt/stage";
+import { useTracer } from "@/components/rt/use-tracer";
 
 const SIZES = [1_000, 10_000, 100_000, 1_000_000] as const;
 /** Without a hierarchy every ray tests every triangle. Past this many, one sample is long enough for a browser to kill the GPU task. */
@@ -56,7 +56,7 @@ export function BvhLab() {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <Readout label={off ? t.testsPerRay : t.steps} value={seen ? seen.perRay.toFixed(seen.perRay > 100 ? 0 : 1) : "–"} large tone={off ? "alt" : "signal"} />
+          <Readout label={off ? t.testsPerRay : t.steps} value={seen ? seen.perRay > 100 ? Math.round(seen.perRay).toLocaleString() : seen.perRay.toFixed(1) : "–"} large tone={off ? "alt" : "signal"} />
           <Readout label={t.rays} value={seen ? seen.mrays.toFixed(seen.mrays < 10 ? 1 : 0) : "–"} unit={t.million} large tone="plain" />
           <Readout label={t.triangles} value={seen ? seen.count.toLocaleString() : "–"} tone="plain" />
           <Readout label={t.depth} value={seen ? seen.depth : "–"} tone="plain" />

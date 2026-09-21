@@ -10,8 +10,13 @@ export type TracerStatus = "building" | "running" | "paused" | "no-webgpu" | "no
 export interface Built { triangles: number; buildMs: number; nodeCount: number; depth: number }
 
 interface Options {
-  triangles: number;
+  /** The Cornell box with about this many triangles… */
+  triangles?: number;
+  /** …or a packed scene to fetch (lib/rt/playground.ts). */
+  playground?: string;
+  /** Pixels across; the picture is square unless `height` says otherwise. */
   size: number;
+  height?: number;
   /** Called once the renderer exists and again after every restart: set bounce limits and modes here. */
   configure(renderer: Renderer): void;
   /**
@@ -41,7 +46,7 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
   useEffect(() => { latest.current = options; });
   const autostart = !!options.autostart;
   useEffect(() => { wantRunning.current = autostart && !still; }, [autostart, still]);
-  const { triangles, size } = options;
+  const { triangles, playground, size } = options, height = options.height ?? size;
 
   useEffect(() => {
     let alive = true, visible = false;
@@ -54,7 +59,7 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
       if (!canvas.current) return;
       const { Renderer } = await import("@/lib/rt/gpu");
       const scene = { positions: [], material: [], materials: result.materials, camera: result.camera }, bvh = { nodes: result.nodes, nodeCount: result.nodeCount, triangles: result.packed, triangleCount: result.triangles, order: new Uint32Array(0), depth: result.depth };
-      const made = await Renderer.create(canvas.current, scene, bvh, size, size);
+      const made = await Renderer.create(canvas.current, scene, bvh, size, height);
       if (!alive) { if (typeof made !== "string") made.destroy(); return; }
       if (typeof made === "string") { setStatus(made); return; }
       const r = (renderer.current = made), info: Built = { triangles: result.triangles, buildMs: result.buildMs, nodeCount: result.nodeCount, depth: result.depth };
@@ -91,11 +96,11 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
 
     // Never leave the figure saying "building" for ever: whatever goes wrong becomes a state the reader is told about.
     const failed = (error: unknown) => { console.error("[light] the renderer could not start", error); if (alive) setStatus("failed"); };
-    worker.onmessage = (event: MessageEvent<BuildResult>) => void run(event.data).catch(failed);
+    worker.onmessage = (event: MessageEvent<BuildResult>) => { if (event.data.error) failed(event.data.error); else void run(event.data).catch(failed); };
     worker.onerror = failed;
-    worker.postMessage({ triangles } satisfies BuildRequest);
+    worker.postMessage((playground ? { scene: "playground", url: new URL(playground, location.href).href } : { scene: "cornell", triangles: triangles ?? 1_000 }) satisfies BuildRequest);
     return () => { alive = false; io.disconnect(); worker.terminate(); renderer.current?.destroy(); renderer.current = null; restartRef.current = null; };
-  }, [triangles, size, epoch, root, canvas]);
+  }, [triangles, playground, size, height, epoch, root, canvas]);
 
   const toggle = useCallback(() => {
     wantRunning.current = !wantRunning.current;
@@ -103,9 +108,11 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
     if (wantRunning.current && r && r.samples >= (latest.current.maxSamples ?? Infinity)) restartRef.current?.(); 
     setStatus((s) => (s === "running" || s === "paused" ? (wantRunning.current ? "running" : "paused") : s));
   }, []);
+  /** Carry on after the picture finished or was paused: for a figure whose picture the reader just invalidated (a moved camera). */
+  const resume = useCallback(() => { if (wantRunning.current) return; wantRunning.current = true; setStatus((s) => (s === "paused" ? "running" : s)); }, []);
   /** Start the picture over with the current settings. */
   const restart = useCallback(() => restartRef.current?.(), []);
   /** A different scene (or another try at getting a GPU): back to "building", and the effect above does the rest. */
   const rebuild = useCallback(() => { wantRunning.current = true; /* the reader pressed something: the new scene runs */ setStatus("building"); setBuilt(null); setEpoch((e) => e + 1); }, []);
-  return { status, built, renderer, toggle, restart, rebuild, live: status === "running" || status === "paused", unavailable: status === "no-webgpu" || status === "no-adapter" || status === "failed" };
+  return { status, built, renderer, toggle, resume, restart, rebuild, live: status === "running" || status === "paused", unavailable: status === "no-webgpu" || status === "no-adapter" || status === "failed" };
 }

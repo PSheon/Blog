@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { useLabels } from "./labels";
-import { Stage, Transport } from "./stage";
-import { useTracer } from "./use-tracer";
+import { Stage, Transport } from "@/components/rt/stage";
+import { useTracer } from "@/components/rt/use-tracer";
 
 /**
  * Figure 3: the same picture four times, with light allowed 0, 1, 2 and any number of bounces. One renderer, one

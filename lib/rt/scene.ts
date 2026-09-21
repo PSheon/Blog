@@ -9,6 +9,8 @@ export type Vec3 = [number, number, number];
 export interface Material {
   albedo: Vec3;
   emit: Vec3;
+  /** Reflects like still water: Fresnel's share of the light is mirrored, the rest meets `albedo`. GPU only. */
+  mirror?: boolean;
 }
 
 export interface Scene {

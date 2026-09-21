@@ -730,3 +730,26 @@ test("a picture clears from noise on the reader's GPU, or the figure says why it
   expect(await spp()).toBe(held);
   expect(errors).toEqual([]);
 });
+
+test("the playground is flown through while it is path traced, or the figure says why it cannot", async ({ page }) => {
+  const response = await page.goto("/zh/posts/light-playground");
+  test.skip(response?.status() === 404, "light-playground is still a draft");
+  const errors = watchErrors(page);
+  const figure = page.locator('[data-instrument="playground / fly"]');
+  await figure.scrollIntoViewIfNeeded();
+  const adapter = await page.evaluate(async () => { const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu; return gpu ? Boolean(await gpu.requestAdapter()) : false; });
+  if (!adapter) {
+    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the playground was not rendered; only the message was checked" });
+    await expect(figure.getByTestId("light-status")).toContainText(/WebGPU/);
+    expect(errors).toEqual([]);
+    return;
+  }
+  const spp = async () => Number((await figure.getByTestId("playground-spp").textContent())!.replace(/\D/g, "") || 0);
+  await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(32);
+  await figure.getByTestId("playground-stage").focus();
+  await page.keyboard.down("w");
+  await page.waitForTimeout(400);
+  expect(await spp()).toBeLessThan(32); // moving throws the samples away
+  await page.keyboard.up("w");
+  expect(errors).toEqual([]);
+});

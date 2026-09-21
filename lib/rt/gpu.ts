@@ -21,6 +21,11 @@ export class Renderer {
   heat = false;
   heatMax = 48;
   brute = false;
+  /** Outdoors. `sun`: unit direction towards it and its strength (0 = indoors: no sky, no sun). `raster`: draw what a rasteriser would. */
+  sun: [number, number, number, number] = [0, 1, 0, 0];
+  skyLevel = 1;
+  exposure = 1;
+  raster = false;
   private destroyed = false;
 
   private constructor(
@@ -46,15 +51,14 @@ export class Renderer {
     const STORAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC, owned: GPUBuffer[] = [];
     const make = (size: number, usage: number, data?: ArrayBuffer | ArrayBufferView) => { const b = device.createBuffer({ size: Math.max(16, Math.ceil(size / 4) * 4), usage }); if (data) device.queue.writeBuffer(b, 0, data as ArrayBuffer); owned.push(b); return b; };
     const materials = new Float32Array(scene.materials.length * 8);
-    scene.materials.forEach((m, i) => { materials.set(m.albedo, i * 8); materials.set(m.emit, i * 8 + 4); });
+    scene.materials.forEach((m, i) => { materials.set(m.albedo, i * 8); materials[i * 8 + 3] = m.mirror ? 1 : 0; materials.set(m.emit, i * 8 + 4); });
     const across = Math.ceil(width / WORKGROUP), down = Math.ceil(height / WORKGROUP), tileCount = across * down;
     const nodes = make(bvh.nodes.byteLength, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials);
     const accum = make(width * height * 16 * 2, STORAGE), counters = make(16, STORAGE), tiles = make(tileCount * 8, STORAGE);
-    const paramData = new ArrayBuffer(96), params = make(96, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    const paramData = new ArrayBuffer(128), params = make(128, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
-    const { eye, target, fov } = scene.camera, f = unit(sub(target, eye)), right = unit(cross(f, [0, 1, 0])), up = cross(right, f), half = Math.tan((fov * Math.PI) / 360), aspect = width / height;
     new Uint32Array(paramData, 0, 4).set([width, height, 0, 16]);
-    new Float32Array(paramData, 16, 16).set([...eye, 0, ...f, 0, right[0] * half * aspect, right[1] * half * aspect, right[2] * half * aspect, 0, up[0] * half, up[1] * half, up[2] * half, 0]);
+    Renderer.writeCamera(paramData, scene.camera, width / height);
 
     // A shader that does not compile only logs a warning, and the pipeline promise then rejects with little to say. Ask
     // each module for its messages, so a failure names the line.
@@ -73,9 +77,17 @@ export class Renderer {
       presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params]) }), owned);
   }
 
+  private static writeCamera(paramData: ArrayBuffer, camera: Scene["camera"], aspect: number): void {
+    const { eye, target, fov } = camera, f = unit(sub(target, eye)), right = unit(cross(f, [0, 1, 0])), up = cross(right, f), half = Math.tan((fov * Math.PI) / 360);
+    new Float32Array(paramData, 16, 16).set([...eye, 0, ...f, 0, right[0] * half * aspect, right[1] * half * aspect, right[2] * half * aspect, 0, up[0] * half, up[1] * half, up[2] * half, 0]);
+  }
+  /** Look from somewhere else. What has been accumulated is of the old view: the caller resets. */
+  setCamera(camera: Scene["camera"]): void { Renderer.writeCamera(this.paramData, camera, this.width / this.height); }
+
   private writeParams(): void {
     new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
-    new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : 0, this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
+    new Float32Array(this.paramData, 96, 8).set([...this.sun, this.exposure, this.skyLevel, 0, 0]);
+    new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : this.raster ? 2 : 0, this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
     this.device.queue.writeBuffer(this.params, 0, this.paramData);
   }
 

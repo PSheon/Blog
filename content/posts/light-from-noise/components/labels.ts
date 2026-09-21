@@ -2,6 +2,9 @@
 
 import { useLocaleLabels } from "@/components/lab/use-locale-labels";
 
+/** The finished picture (512², 10,497 samples, captured from figure 1 on an M4 Pro), for readers whose browser cannot draw it. */
+export const FALLBACK = "/posts/light-from-noise/cornell.jpg";
+
 const zh = {
   picture: "路徑追蹤中的 Cornell box：一開始全是雜訊，樣本越多越清楚",
   spp: "每像素樣本數", rays: "每秒光線", million: "百萬", noise: "畫面誤差", steps: "每條光線走訪的節點", triangles: "三角形", build: "建 BVH", ms: "ms",

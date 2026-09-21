@@ -1,0 +1,19 @@
+---
+title: 走進被光算出來的遊樂園
+description: 草稿。Sketchbook 的遊樂園，拆掉紋理、換上自己的色盤，在瀏覽器裡即時路徑追蹤。可以飛、可以切換光柵和光追、可以拉太陽的時間。
+date: 2026-09-21
+tags: [graphics, from-scratch]
+no: 14
+interactive: true
+draft: true
+---
+
+import { PlaygroundLab } from "./components";
+
+{/* 草稿頁：系列第四篇的場景先上線給 Paul 看。車、直升機、物理、降噪都還沒有。幾何來自 Sketchbook（Jan Blaha / swift502，MIT），紋理全部拿掉了。 */}
+
+這是「光是怎麼被算出來的」最後一篇要用的遊樂園，先放上來看。現在只有遊樂園本身和一台會飛的相機：沒有車、沒有物理、沒有降噪。切到「光柵」再切回「完整光追」，看陰影、屋簷下的亮度和草地染到牆上的綠。
+
+<Instrument fig="01" title="playground / fly" size="wide" caption="24,545 個三角形，960×540。光柵：太陽用 N·L，天空是一個常數，沒有東西擋得住光。只有直接光：每個點朝太陽問一次有沒有被擋住，再看一次天空。完整光追：最多彈 8 次。">
+  <PlaygroundLab />
+</Instrument>

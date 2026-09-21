@@ -10,14 +10,19 @@
  *   quad   the picture four times over in a 2 × 2 grid, with bounce limits 0, 1, 2 and `bounces`
  *   view   1 = do not shade at all: store how many BVH nodes the camera ray visited (a heat map of the hierarchy's work)
  *   brute  1 = no hierarchy: every ray tests every triangle. For small scenes only; this is what the BVH is for.
+ *
+ * Outdoors (`sun.w` > 0; the Cornell box never sets it, and cpu.ts does not have it): a ray that leaves sees a sky
+ * gradient, every hit asks the sun directly with one shadow ray (next-event estimation, a 1.5° disc), a material with
+ * `mirror` reflects by Fresnel's share (the sea), and view 2 is what a plain rasteriser would draw of the same scene:
+ * N·L and a constant ambient, no shadows, no bounces.
  */
 export const WORKGROUP = 8;
 
 export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
 struct Tri { v0: vec3f, m: u32, v1: vec3f, p1: u32, v2: vec3f, p2: u32 };
-struct Material { albedo: vec3f, p0: f32, emit: vec3f, p1: f32 };
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32 };
+struct Material { albedo: vec3f, mirror: f32, emit: vec3f, p1: f32 };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, p0: f32, p1: f32 };
 
 @group(0) @binding(0) var<storage, read> nodes: array<Node>;
 @group(0) @binding(1) var<storage, read> tris: array<Tri>;
@@ -94,6 +99,16 @@ fn traceBrute(o: vec3f, d: vec3f, eps: f32) -> Hit {
   return h;
 }
 
+const COS_SUN = 0.99966; // a disc of 1.5° radius
+const SUN_SOLID = 6.2831853 * (1.0 - COS_SUN);
+fn sunRadiance() -> vec3f { return vec3f(18000.0, 16500.0, 14000.0) * params.sun.w; }
+fn sky(d: vec3f) -> vec3f {
+  let horizon = vec3f(0.75, 0.85, 1.0); let zenith = vec3f(0.25, 0.45, 0.9);
+  return mix(horizon, zenith, sqrt(max(d.y, 0.0))) * 1.1 * params.skyLevel * select(0.3, 1.0, d.y > -0.05);
+}
+fn basis(n: vec3f) -> mat3x3f { let t = normalize(cross(select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(n.x) > 0.1), n)); return mat3x3f(t, cross(n, t), n); }
+fn towardsSun() -> vec3f { let c = 1.0 - rnd() * (1.0 - COS_SUN); let s = sqrt(1.0 - c * c); let p = 6.2831853 * rnd(); return basis(params.sun.xyz) * vec3f(cos(p) * s, sin(p) * s, c); }
+
 fn nearest(o: vec3f, d: vec3f, eps: f32) -> Hit {
   if (params.brute == 1u) { return traceBrute(o, d, eps); }
   return trace(o, d, eps);
@@ -120,25 +135,44 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
     let u = ((px.x + jx) / extent.x) * 2.0 - 1.0; let v = 1.0 - ((px.y + jy) / extent.y) * 2.0;
     var o = params.eye.xyz; var d = normalize(params.forward.xyz + params.right.xyz * u + params.up.xyz * v);
     var through = vec3f(1.0); var rgb = vec3f(0.0); var scale = 1.0;
+    let outdoors = params.sun.w > 0.0; var sharp = true; // sharp: the ray came from the eye or a mirror, so it may see the sun's disc
     for (var bounce = 0u; ; bounce++) {
       rays++;
       let h = nearest(o, d, 1e-5 * scale); steps += h.steps; overflow += h.overflow;
       if (params.view == 1u) { rgb = vec3f(f32(h.steps)); break; } // the heat map: the camera ray's node visits, nothing else
-      if (h.tri == MISS) { break; }
+      if (h.tri == MISS) {
+        if (outdoors) { var seen = sky(d); if (sharp && dot(d, params.sun.xyz) > COS_SUN) { seen += sunRadiance(); } rgb += through * seen; }
+        break;
+      }
       let t = tris[h.tri]; let m = materials[t.m];
       var n = normalize(cross(t.v1 - t.v0, t.v2 - t.v0));
       let front = dot(n, d) < 0.0;
       if (front) { rgb += through * m.emit; }
+      if (params.view == 2u) { // a rasteriser's answer: the sun by N·L, the sky as a constant, nothing in the way of either
+        let facing = select(-n, n, front);
+        rgb = m.albedo * (sunRadiance() * SUN_SOLID / 3.14159 * max(dot(facing, params.sun.xyz), 0.0) + sky(vec3f(0.0, 1.0, 0.0)) * 0.6);
+        if (m.mirror > 0.0) { rgb += 0.04 * sky(reflect(d, facing)); }
+        break;
+      }
       if (bounce >= limit) { break; }
       if (!front) { n = -n; }
+      let at = o + d * h.t;
+      scale = max(1.0, max(abs(at.x), max(abs(at.y), abs(at.z))));
+      if (m.mirror > 0.0) {
+        let c = 1.0 - max(dot(-d, n), 0.0); let fresnel = 0.02 + 0.98 * c * c * c * c * c;
+        if (rnd() < fresnel) { o = at + n * (1e-4 * scale); d = reflect(d, n); sharp = true; continue; }
+      }
+      if (outdoors) { // ask the sun directly: one shadow ray towards a point on its disc
+        let l = towardsSun(); let cosine = dot(n, l);
+        if (cosine > 0.0) { rays++; let shadow = nearest(at + n * (1e-4 * scale), l, 1e-5 * scale); steps += shadow.steps; if (shadow.tri == MISS) { rgb += through * m.albedo / 3.14159 * sunRadiance() * SUN_SOLID * cosine; } }
+      }
+      sharp = false;
       var albedo = m.albedo;
       if (bounce > 2u) { let p = max(albedo.x, max(albedo.y, albedo.z)); if (rnd() >= p) { break; } albedo /= p; }
       through *= albedo;
       if (through.x + through.y + through.z == 0.0) { break; }
       let r1 = 6.2831853 * rnd(); let r2 = rnd(); let r = sqrt(r2);
       let tangent = normalize(cross(select(vec3f(1.0, 0.0, 0.0), vec3f(0.0, 1.0, 0.0), abs(n.x) > 0.1), n)); let bitangent = cross(n, tangent);
-      let at = o + d * h.t;
-      scale = max(1.0, max(abs(at.x), max(abs(at.y), abs(at.z))));
       o = at + n * (1e-4 * scale);
       d = normalize(tangent * cos(r1) * r + bitangent * sin(r1) * r + n * sqrt(1.0 - r2));
     }
@@ -157,7 +191,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
  * samples most pixels are black in both pictures and agree by accident, and the clamp hides every bright hit.
  */
 export const MEASURE = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32 };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, p0: f32, p1: f32 };
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> tiles: array<vec2f>;
 @group(0) @binding(2) var<uniform> params: Params;
@@ -187,7 +221,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
 
 /** A full-screen triangle that shows A + B, tone-mapped (Narkowicz's ACES fit) and gamma-encoded. */
 export const PRESENT = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32 };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, p0: f32, p1: f32 };
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<uniform> params: Params;
 struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
@@ -207,7 +241,8 @@ struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
     let ramp = mix(mix(vec3f(0.03, 0.02, 0.10), vec3f(0.45, 0.20, 0.85), smoothstep(0.0, 0.35, t)), mix(vec3f(1.0, 0.43, 0.59), vec3f(1.0, 0.95, 0.70), smoothstep(0.6, 1.0, t)), smoothstep(0.3, 0.7, t));
     return vec4f(ramp, 1.0);
   }
-  let mapped = clamp(c * (2.51 * c + 0.03) / (c * (2.43 * c + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
+  let e = c * params.exposure;
+  let mapped = clamp(e * (2.51 * e + 0.03) / (e * (2.43 * e + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
   return vec4f(pow(mapped, vec3f(1.0 / 2.2)), 1.0);
 }
 `;
