@@ -8,7 +8,7 @@ interactive: true
 draft: true
 ---
 
-import { ConvergeLab } from "./components";
+import { BouncesLab, BvhLab, ConvergeLab, PathLab } from "./components";
 
 {/* 草稿頁：先給 Paul 看可玩的頁面，內文之後才寫。引擎在 lib/rt/。 */}
 
@@ -16,4 +16,22 @@ import { ConvergeLab } from "./components";
 
 <Instrument fig="01" title="light / converge" caption="左：正在累積的畫面。右上的數字全部是在你這個分頁裡即時量的。右下：畫面誤差對樣本數，兩軸都是對數；虛線的斜率是 −½，也就是誤差 ∝ 1/√N。把三角形從一千拉到一百萬，看「每條光線走訪的節點」只多了幾個。">
   <ConvergeLab />
+</Instrument>
+
+## 一個像素，一條光線
+
+<Instrument fig="02" title="light / one path" caption="畫面是 GPU 算好的；疊在上面的線是從虛線圈住的那個像素射出去的一條路徑。大部分的路徑到最後都沒碰到燈，算出來是黑的；碰到的那幾條非常亮。把它們平均起來，才是這個像素的顏色。按「射 100 條」，看平均值怎麼靠近 GPU 的答案。">
+  <PathLab />
+</Instrument>
+
+## 光要彈幾次
+
+<Instrument fig="03" title="light / bounces" caption="同一個場景、同樣的樣本，只差在光最多能反彈幾次。0 次只看得到燈本身；1 次是直接照明，陰影全黑；紅牆和綠牆染到地板和環面上的顏色，要到第 2 次才出現。">
+  <BouncesLab />
+</Instrument>
+
+## 一百萬個三角形為什麼還跑得動
+
+<Instrument fig="04" title="light / bvh" caption="這張圖不上色，每個像素的顏色是它的光線走訪了幾個 BVH 節點。把三角形從一千拉到一百萬，看右邊的數字變了多少；再回到一千，把 BVH 關掉。">
+  <BvhLab />
 </Instrument>

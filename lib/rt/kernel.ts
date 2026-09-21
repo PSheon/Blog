@@ -5,6 +5,11 @@
  * Samples alternate between two accumulation buffers, A (even samples) and B (odd). Shown together they are the
  * picture; compared with each other they are two independent estimates of it, so half their difference is the error of
  * the picture, measured with no reference image at all. `measure` reduces that to one number per workgroup.
+ *
+ * Three switches, for the figures that take the renderer apart:
+ *   quad   the picture four times over in a 2 × 2 grid, with bounce limits 0, 1, 2 and `bounces`
+ *   view   1 = do not shade at all: store how many BVH nodes the camera ray visited (a heat map of the hierarchy's work)
+ *   brute  1 = no hierarchy: every ray tests every triangle. For small scenes only; this is what the BVH is for.
  */
 export const WORKGROUP = 8;
 
@@ -12,7 +17,7 @@ export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
 struct Tri { v0: vec3f, m: u32, v1: vec3f, p1: u32, v2: vec3f, p2: u32 };
 struct Material { albedo: vec3f, p0: f32, emit: vec3f, p1: f32 };
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32 };
 
 @group(0) @binding(0) var<storage, read> nodes: array<Node>;
 @group(0) @binding(1) var<storage, read> tris: array<Tri>;
@@ -72,6 +77,28 @@ fn trace(o: vec3f, d: vec3f, eps: f32) -> Hit {
   return h;
 }
 
+fn traceBrute(o: vec3f, d: vec3f, eps: f32) -> Hit {
+  var h = Hit(1e30, MISS, 0u, 0u);
+  let count = arrayLength(&tris);
+  for (var i = 0u; i < count; i++) {
+    h.steps++;
+    let t = tris[i]; let e1 = t.v1 - t.v0; let e2 = t.v2 - t.v0; let p = cross(d, e2); let det = dot(e1, p);
+    if (abs(det) < 1e-12) { continue; }
+    let f = 1.0 / det; let s = o - t.v0; let u = dot(s, p) * f;
+    if (u < 0.0 || u > 1.0) { continue; }
+    let q = cross(s, e1); let v = dot(d, q) * f;
+    if (v < 0.0 || u + v > 1.0) { continue; }
+    let tt = dot(e2, q) * f;
+    if (tt > eps && tt < h.t) { h.t = tt; h.tri = i; }
+  }
+  return h;
+}
+
+fn nearest(o: vec3f, d: vec3f, eps: f32) -> Hit {
+  if (params.brute == 1u) { return traceBrute(o, d, eps); }
+  return trace(o, d, eps);
+}
+
 @compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
 fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_index) li: u32) {
   if (li == 0u) { atomicStore(&tally[0], 0u); atomicStore(&tally[1], 0u); atomicStore(&tally[2], 0u); }
@@ -81,18 +108,28 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
     let pixel = gid.y * params.size.x + gid.x;
     state = pcg(pixel + pcg(params.sample));
     let jx = rnd(); let jy = rnd();
-    let u = ((f32(gid.x) + jx) / f32(params.size.x)) * 2.0 - 1.0; let v = 1.0 - ((f32(gid.y) + jy) / f32(params.size.y)) * 2.0;
+    // In the 2 × 2 grid every tile is the whole picture at half size, and the tile decides how far light may bounce.
+    var px = vec2f(f32(gid.x), f32(gid.y)); var extent = vec2f(f32(params.size.x), f32(params.size.y)); var limit = params.bounces;
+    if (params.quad == 1u) {
+      extent = extent * 0.5;
+      let tile = vec2u(u32(px.x >= extent.x), u32(px.y >= extent.y));
+      px = px - vec2f(f32(tile.x), f32(tile.y)) * extent;
+      let index = tile.y * 2u + tile.x;
+      if (index < 3u) { limit = index; }
+    }
+    let u = ((px.x + jx) / extent.x) * 2.0 - 1.0; let v = 1.0 - ((px.y + jy) / extent.y) * 2.0;
     var o = params.eye.xyz; var d = normalize(params.forward.xyz + params.right.xyz * u + params.up.xyz * v);
     var through = vec3f(1.0); var rgb = vec3f(0.0); var scale = 1.0;
     for (var bounce = 0u; ; bounce++) {
       rays++;
-      let h = trace(o, d, 1e-5 * scale); steps += h.steps; overflow += h.overflow;
+      let h = nearest(o, d, 1e-5 * scale); steps += h.steps; overflow += h.overflow;
+      if (params.view == 1u) { rgb = vec3f(f32(h.steps)); break; } // the heat map: the camera ray's node visits, nothing else
       if (h.tri == MISS) { break; }
       let t = tris[h.tri]; let m = materials[t.m];
       var n = normalize(cross(t.v1 - t.v0, t.v2 - t.v0));
       let front = dot(n, d) < 0.0;
       if (front) { rgb += through * m.emit; }
-      if (bounce >= params.bounces) { break; }
+      if (bounce >= limit) { break; }
       if (!front) { n = -n; }
       var albedo = m.albedo;
       if (bounce > 2u) { let p = max(albedo.x, max(albedo.y, albedo.z)); if (rnd() >= p) { break; } albedo /= p; }
@@ -120,7 +157,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
  * samples most pixels are black in both pictures and agree by accident, and the clamp hides every bright hit.
  */
 export const MEASURE = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32 };
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> tiles: array<vec2f>;
 @group(0) @binding(2) var<uniform> params: Params;
@@ -150,7 +187,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
 
 /** A full-screen triangle that shows A + B, tone-mapped (Narkowicz's ACES fit) and gamma-encoded. */
 export const PRESENT = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32 };
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<uniform> params: Params;
 struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
@@ -164,6 +201,12 @@ struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
   let half = params.size.x * params.size.y; let pixel = y * params.size.x + x;
   let a = accum[pixel]; let b = accum[half + pixel]; let n = max(a.w + b.w, 1.0);
   let c = (a.rgb + b.rgb) / n;
+  if (params.view == 1u) {
+    // Node visits as heat: black → violet → pink → yellow → white, linear in the count up to heatMax.
+    let t = clamp(c.x / f32(params.heatMax), 0.0, 1.0);
+    let ramp = mix(mix(vec3f(0.03, 0.02, 0.10), vec3f(0.45, 0.20, 0.85), smoothstep(0.0, 0.35, t)), mix(vec3f(1.0, 0.43, 0.59), vec3f(1.0, 0.95, 0.70), smoothstep(0.6, 1.0, t)), smoothstep(0.3, 0.7, t));
+    return vec4f(ramp, 1.0);
+  }
   let mapped = clamp(c * (2.51 * c + 0.03) / (c * (2.43 * c + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
   return vec4f(pow(mapped, vec3f(1.0 / 2.2)), 1.0);
 }

@@ -50,3 +50,28 @@ buffer and odd ones in another, and half their difference is the error of their 
   WebGPU, only a sentence.
 - Figures 2–4 (one ray bounce by bounce on the CPU, bounce limit side by side, the BVH heat map), the prose, en.mdx,
   the cover, the series field.
+
+## 2026-09-21 — figure 4 (BvhLab), in the page
+
+M4 Pro, Chrome (adapter metal-3), 256², camera rays only (heat mode stops at the first hit). Each row is one exact
+64-sample burst: counters are zeroed, the burst runs alone, and the u32 counters cannot wrap inside it.
+
+| Triangles | BVH | Node visits or triangle tests per ray | M rays/s |
+| --- | --- | --- | --- |
+| 876 | on | 9.5 | 112 |
+| 9,612 | on | 10.4 | 170 |
+| 101,412 | on | 11.4 | 158 |
+| 998,796 | on | 11.9 | 141 |
+| 876 | off | 876 | 45 |
+| 9,612 | off | 9,612 | 5.4 |
+
+1,140× the triangles cost 1.25× the visits. With the BVH off the switch is locked above 10,000 triangles: one sample
+would run long enough for the browser to kill the GPU task. The 876-triangle row is slower than the 9,612 one because
+at that size the burst is too short for the GPU to reach its clock; do not quote it as a trend.
+
+## 2026-09-21 — figure 2 (PathLab), CPU paths against the GPU's pixel
+
+Paths are traced on the main thread by `lib/rt/cpu.ts` with `streamFor(pixel, n)`, so a pixel's paths are the same on
+every visit. Pixel (40, 256) on the red wall: mean of 101 paths tone-maps to rgb(195, 38, 36); the GPU's 1,024-sample
+pixel is rgb(163, 31, 29). Pixel (196, 430) on the floor: 201 paths rgb(194, 183, 183) against rgb(183, 168, 168).
+About 3–7% of paths reach the light (no next-event estimation yet: that is article 2).

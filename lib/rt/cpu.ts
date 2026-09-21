@@ -9,6 +9,8 @@ import type { Scene, Vec3 } from "./scene";
  */
 export interface Hit { t: number; triangle: number; /** BVH nodes visited */ steps: number }
 export type Rng = () => number;
+/** One vertex of a path: where it hit, what the path was still worth when it arrived, and what it hit. */
+export interface PathVertex { at: Vec3; throughput: Vec3; emitted: boolean; albedo: Vec3 }
 
 const INNER = 0x80000000, MISS: Hit = { t: Infinity, triangle: -1, steps: 0 };
 
@@ -103,18 +105,18 @@ export class Tracer {
    * One path. `maxBounces` counts scattering events: 0 sees only what glows. Returns the radiance and, for the
    * instrument that draws a path, every vertex with the throughput it arrived with.
    */
-  radiance(o: Vec3, d: Vec3, rng: Rng, maxBounces = 16): { rgb: Vec3; path: { at: Vec3; throughput: Vec3; emitted: boolean }[]; rays: number } {
-    const rgb: Vec3 = [0, 0, 0], through: Vec3 = [1, 1, 1], path: { at: Vec3; throughput: Vec3; emitted: boolean }[] = [];
-    let rays = 0, scale = 1;
+  radiance(o: Vec3, d: Vec3, rng: Rng, maxBounces = 16): { rgb: Vec3; path: PathVertex[]; rays: number; /** where the last ray went, if it hit nothing */ escaped: { from: Vec3; direction: Vec3 } | null } {
+    const rgb: Vec3 = [0, 0, 0], through: Vec3 = [1, 1, 1], path: PathVertex[] = [];
+    let rays = 0, scale = 1, escaped: { from: Vec3; direction: Vec3 } | null = null;
     for (let bounce = 0; ; bounce++) {
       rays++;
       const h = this.hit(o, d, 1e-5 * scale);
-      if (h.triangle < 0) break;
+      if (h.triangle < 0) { escaped = { from: o, direction: d }; break; }
       const at: Vec3 = [o[0] + d[0] * h.t, o[1] + d[1] * h.t, o[2] + d[2] * h.t], m = this.materialOf(h.triangle);
       let n = this.normal(h.triangle);
       const front = n[0] * d[0] + n[1] * d[1] + n[2] * d[2] < 0;
       if (front) for (let k = 0; k < 3; k++) rgb[k] += through[k] * m.emit[k]; // a light shines from its front only
-      path.push({ at, throughput: [...through], emitted: front && m.emit.some((e) => e > 0) });
+      path.push({ at, throughput: [...through], emitted: front && m.emit.some((e) => e > 0), albedo: m.albedo });
       if (bounce >= maxBounces) break;
       if (!front) n = [-n[0], -n[1], -n[2]];
       let albedo = m.albedo;
@@ -131,7 +133,7 @@ export class Tracer {
       o = [at[0] + n[0] * 1e-4 * scale, at[1] + n[1] * 1e-4 * scale, at[2] + n[2] * 1e-4 * scale];
       d = unit([t[0] * Math.cos(r1) * r + b[0] * Math.sin(r1) * r + n[0] * Math.sqrt(1 - r2), t[1] * Math.cos(r1) * r + b[1] * Math.sin(r1) * r + n[1] * Math.sqrt(1 - r2), t[2] * Math.cos(r1) * r + b[2] * Math.sin(r1) * r + n[2] * Math.sqrt(1 - r2)]);
     }
-    return { rgb, path, rays };
+    return { rgb, path, rays, escaped };
   }
 }
 

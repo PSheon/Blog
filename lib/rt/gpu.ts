@@ -16,6 +16,11 @@ export type Unavailable = "no-webgpu" | "no-adapter";
 export class Renderer {
   samples = 0;
   bounces = 16;
+  /** See kernel.ts: the 2 × 2 grid of bounce limits, the node-visit heat map (and the count that maps to white), no hierarchy. */
+  quad = false;
+  heat = false;
+  heatMax = 48;
+  brute = false;
   private destroyed = false;
 
   private constructor(
@@ -45,15 +50,22 @@ export class Renderer {
     const across = Math.ceil(width / WORKGROUP), down = Math.ceil(height / WORKGROUP), tileCount = across * down;
     const nodes = make(bvh.nodes.byteLength, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials);
     const accum = make(width * height * 16 * 2, STORAGE), counters = make(16, STORAGE), tiles = make(tileCount * 8, STORAGE);
-    const paramData = new ArrayBuffer(80), params = make(80, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    const paramData = new ArrayBuffer(96), params = make(96, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
     const { eye, target, fov } = scene.camera, f = unit(sub(target, eye)), right = unit(cross(f, [0, 1, 0])), up = cross(right, f), half = Math.tan((fov * Math.PI) / 360), aspect = width / height;
     new Uint32Array(paramData, 0, 4).set([width, height, 0, 16]);
     new Float32Array(paramData, 16, 16).set([...eye, 0, ...f, 0, right[0] * half * aspect, right[1] * half * aspect, right[2] * half * aspect, 0, up[0] * half, up[1] * half, up[2] * half, 0]);
 
+    // A shader that does not compile only logs a warning, and the pipeline promise then rejects with little to say. Ask
+    // each module for its messages, so a failure names the line.
+    const compile = async (code: string, name: string) => {
+      const shader = device.createShaderModule({ code, label: name }), problems = (await shader.getCompilationInfo()).messages.filter((m) => m.type === "error");
+      if (problems.length) throw new Error(`${name}: ${problems.map((m) => `line ${m.lineNum}: ${m.message}`).join("; ")}`);
+      return shader;
+    };
     const entries = (buffers: GPUBuffer[]) => buffers.map((buffer, binding) => ({ binding, resource: { buffer } }));
-    const [tracePipe, measurePipe] = await Promise.all([KERNEL, MEASURE].map((code) => device.createComputePipelineAsync({ layout: "auto", compute: { module: device.createShaderModule({ code }), entryPoint: "main" } })));
-    const shader = device.createShaderModule({ code: PRESENT });
+    const [trace, measure, shader] = await Promise.all([compile(KERNEL, "path tracing kernel"), compile(MEASURE, "error measurement"), compile(PRESENT, "present")]);
+    const [tracePipe, measurePipe] = await Promise.all([trace, measure].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
     const presentPipe = await device.createRenderPipelineAsync({ layout: "auto", vertex: { module: shader, entryPoint: "vs" }, fragment: { module: shader, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return new Renderer(device, adapter.info?.description || adapter.info?.architecture || adapter.info?.vendor || "GPU", context, width, height, params, paramData, accum, counters, tiles, tileCount,
       tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params]) }),
@@ -63,6 +75,7 @@ export class Renderer {
 
   private writeParams(): void {
     new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
+    new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : 0, this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
     this.device.queue.writeBuffer(this.params, 0, this.paramData);
   }
 
@@ -130,6 +143,14 @@ export class Renderer {
     for (let i = 0; i < tiles.length; i += 2) { squared += tiles[i]; mean += tiles[i + 1]; }
     const pixels = this.width * this.height;
     return mean > 0 ? Math.sqrt(squared / pixels) / (mean / pixels) : 0;
+  }
+
+  /** One pixel's linear radiance as accumulated so far (both buffers together), or null before any sample. */
+  async readPixel(x: number, y: number): Promise<[number, number, number] | null> {
+    const pixel = y * this.width + x, half = this.width * this.height;
+    const [a, b] = await Promise.all([pixel, half + pixel].map(async (i) => { const staging = this.device.createBuffer({ size: 16, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST }), e = this.device.createCommandEncoder(); e.copyBufferToBuffer(this.accum, i * 16, staging, 0, 16); this.device.queue.submit([e.finish()]); await staging.mapAsync(GPUMapMode.READ); const v = new Float32Array(staging.getMappedRange().slice(0)); staging.unmap(); staging.destroy(); return v; }));
+    const n = a[3] + b[3];
+    return n ? [(a[0] + b[0]) / n, (a[1] + b[1]) / n, (a[2] + b[2]) / n] : null;
   }
 
   /** Both accumulation buffers as they are (rgb sums and sample counts): for tests, which compare numbers, not screenshots. */

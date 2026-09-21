@@ -6,4 +6,7 @@ import dynamic from "next/dynamic";
 const loading = typeof window === "undefined" ? null : import("./labs");
 const labs = () => loading ?? import("./labs");
 
+export const BouncesLab = dynamic(() => labs().then((m) => m.BouncesLab));
+export const BvhLab = dynamic(() => labs().then((m) => m.BvhLab));
 export const ConvergeLab = dynamic(() => labs().then((m) => m.ConvergeLab));
+export const PathLab = dynamic(() => labs().then((m) => m.PathLab));

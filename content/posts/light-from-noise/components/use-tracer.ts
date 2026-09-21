@@ -1,0 +1,96 @@
+"use client";
+
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "@/components/lab/use-reduced-motion";
+import type { Renderer } from "@/lib/rt/gpu";
+import type { BuildRequest, BuildResult } from "./scene.worker";
+
+/** "failed": there is a GPU, and starting the renderer on it threw (a driver that rejects the shader, a lost device). */
+export type TracerStatus = "building" | "running" | "paused" | "no-webgpu" | "no-adapter" | "failed";
+export interface Built { triangles: number; buildMs: number; nodeCount: number; depth: number }
+
+interface Options {
+  triangles: number;
+  size: number;
+  /** Called once the renderer exists and again after every restart: set bounce limits and modes here. */
+  configure(renderer: Renderer): void;
+  /**
+   * Called after each batch of samples with the renderer idle. Async work here (reading the GPU back) holds the next
+   * frame, which is the point: one reader of the GPU at a time.
+   */
+  afterFrame?(renderer: Renderer, built: Built, batch: { samples: number; gpuMs: number }): void | Promise<void>;
+  /** At the start the sample count may only double this often, so a fast GPU does not skip the part worth watching. */
+  doublingMs?: number;
+  /** GPU milliseconds a frame may spend on samples. */
+  budgetMs?: number;
+  /** Stop adding samples here (a figure that compares pictures wants them equally converged, not ever finer). */
+  maxSamples?: number;
+}
+
+/**
+ * What every figure of this article needs around the renderer: the scene and its BVH built in a worker, a GPU device
+ * (or the reason there is none), a frame loop that sizes its batches to a time budget, pauses off screen and in a
+ * hidden tab, and starts paused for readers who asked for less motion.
+ */
+export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject<HTMLCanvasElement | null>, options: Options) {
+  const still = useReducedMotion();
+  const [status, setStatus] = useState<TracerStatus>("building"), [built, setBuilt] = useState<Built | null>(null), [epoch, setEpoch] = useState(0);
+  const wantRunning = useRef(true), latest = useRef(options), renderer = useRef<Renderer | null>(null), restartRef = useRef<(() => void) | null>(null);
+  useEffect(() => { latest.current = options; });
+  useEffect(() => { wantRunning.current = !still; }, [still]);
+  const { triangles, size } = options;
+
+  useEffect(() => {
+    let alive = true, visible = false;
+    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting), { rootMargin: "200px" });
+    if (root.current) io.observe(root.current);
+    const worker = new Worker(new URL("./scene.worker.ts", import.meta.url), { type: "module" });
+    const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));
+
+    const run = async (result: BuildResult) => {
+      if (!canvas.current) return;
+      const { Renderer } = await import("@/lib/rt/gpu");
+      const scene = { positions: [], material: [], materials: result.materials, camera: result.camera }, bvh = { nodes: result.nodes, nodeCount: result.nodeCount, triangles: result.packed, triangleCount: result.triangles, order: new Uint32Array(0), depth: result.depth };
+      const made = await Renderer.create(canvas.current, scene, bvh, size, size);
+      if (!alive) { if (typeof made !== "string") made.destroy(); return; }
+      if (typeof made === "string") { setStatus(made); return; }
+      const r = (renderer.current = made), info: Built = { triangles: result.triangles, buildMs: result.buildMs, nodeCount: result.nodeCount, depth: result.depth };
+      let batch = 1, began = performance.now();
+      restartRef.current = () => { latest.current.configure(r); r.reset(); began = performance.now(); batch = 1; r.sample(1); r.present(); };
+      setBuilt(info);
+      latest.current.configure(r);
+      setStatus(wantRunning.current ? "running" : "paused");
+      r.sample(1); r.present(); // one sample at once, so even a paused figure shows something
+
+      while (alive) {
+        await frame();
+        if (!alive) break;
+        const o = latest.current, running = wantRunning.current && visible && !document.hidden;
+        if (!running) { began += 16; continue; }
+        const paced = o.doublingMs ? Math.ceil(2 ** ((performance.now() - began) / o.doublingMs)) - r.samples : Infinity;
+        const allowed = Math.min(paced, (o.maxSamples ?? Infinity) - r.samples);
+        if (allowed <= 0) continue;
+        const t0 = performance.now(), count = Math.min(batch, allowed);
+        r.sample(count); r.present();
+        await r.idle();
+        const gpuMs = performance.now() - t0; // submit to idle: the GPU's time for this batch, with nothing else queued
+        if (count === batch) batch = Math.max(1, Math.min(64, Math.round((batch * (o.budgetMs ?? 10)) / Math.max(gpuMs, 0.5))));
+        await o.afterFrame?.(r, info, { samples: count, gpuMs });
+      }
+    };
+
+    // Never leave the figure saying "building" for ever: whatever goes wrong becomes a state the reader is told about.
+    const failed = (error: unknown) => { console.error("[light] the renderer could not start", error); if (alive) setStatus("failed"); };
+    worker.onmessage = (event: MessageEvent<BuildResult>) => void run(event.data).catch(failed);
+    worker.onerror = failed;
+    worker.postMessage({ triangles } satisfies BuildRequest);
+    return () => { alive = false; io.disconnect(); worker.terminate(); renderer.current?.destroy(); renderer.current = null; restartRef.current = null; };
+  }, [triangles, size, epoch, root, canvas]);
+
+  const toggle = useCallback(() => { wantRunning.current = !wantRunning.current; setStatus((s) => (s === "running" || s === "paused" ? (wantRunning.current ? "running" : "paused") : s)); }, []);
+  /** Start the picture over with the current settings. */
+  const restart = useCallback(() => restartRef.current?.(), []);
+  /** A different scene (or another try at getting a GPU): back to "building", and the effect above does the rest. */
+  const rebuild = useCallback(() => { setStatus("building"); setBuilt(null); setEpoch((e) => e + 1); }, []);
+  return { status, built, renderer, toggle, restart, rebuild, live: status === "running" || status === "paused", unavailable: status === "no-webgpu" || status === "no-adapter" || status === "failed" };
+}
