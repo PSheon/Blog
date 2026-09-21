@@ -197,6 +197,31 @@ once).
 - aux is a fairness question for the article: it has been given only to closed + shaken. Open + shaken + aux is
   unmeasured.
 
+## Run 7 — a reader's seconds, and aux for look-once too
+
+**One model alone** (nothing else running; seed 11; the success rates here are 50 episodes and are not used):
+
+| | steps | seconds |
+| --- | --- | --- |
+| closed, shaken + aux | 10 000 | **174** |
+| closed, shaken | 15 000 | **264** |
+| open, shaken | 10 000 | **171** |
+
+So the two models that carry the story, trained one after the other in the page, take about 5 ¾ minutes at 10 000 steps
+(with aux on the closed one). The promise "under five minutes" does not hold for both; about three minutes a model does.
+
+**Open + shaken + aux** (10 000 steps, seeds 11–15, 200 episodes), beside run 6's rows:
+
+| | as trained | pitch 5° | 10° | 20° | yaw 5° | 10° | 20° | moved 3 cm | block moved |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| open, shaken | 75.7 (54–86) | 75.8 | 75.1 | 8.7 | 78.9 | 70.0 | 19.9 | 72.7 | 59.6 |
+| open, shaken + aux | 79.4 (71–85) | 77.4 | 74.5 | 13.2 | 80.0 | 71.8 | 14.2 | 71.3 | 61.4 |
+| closed, shaken + aux | 95.0 (92–97) | 95.2 | 94.0 | 72.4 | 94.2 | 93.2 | 73.3 | 94.6 | 98.2 |
+
+- aux gives look-once a few points and a tighter spread, as it did keep-looking, and the gap between them is unchanged:
+  14–21 points inside the range, 59 at 20° of pitch, 37 when the block moves. The comparison is fair with aux on both
+  sides. Per-seed logs: `run-7/`.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
@@ -212,9 +237,7 @@ once).
 ## Not done, and what I do not trust yet
 
 - Runs 1–3b are one training seed per cell and run 4 three; trust runs 5–6 (five seeds) over them.
-- Seconds in runs 5–6 were measured twelve models at a time. A reader trains one: time one model alone at 10 000 (+ aux)
-  and 15 000 steps before promising "under five minutes" (run 4 alone: 91 s per 5 000 steps, so ≈ 3 min and ≈ 4.5 min).
-- Open + shaken + aux, so the look-once side gets the same help.
+- Page seconds are measured in node (run 7), not yet in a browser tab.
 - No disturbance of the arm (a shove), no noise on the picture, no distractor objects, no second block colour. The
   "language" of a VLA is absent: one task, no instruction.
 - The hand moves in a plane. No grasp, no descent, no gripper.
