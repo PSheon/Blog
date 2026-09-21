@@ -1,6 +1,6 @@
 # 編輯意見：「最像的是 samwho.dev」這份定位提案（2026-09-21）
 
-Paul 的要求：深度分析這份提案，用本專案的方式寫。我把提案裡點名的站逐一打開查證（不是憑印象），Sam Rose 的三篇系統文章全部讀完，也對了 repo 裡十篇文章的標籤和首頁現在的自我介紹。下面照編輯意見的慣例：只寫問題和取捨，對的地方一句帶過。沒有改 repo 裡任何檔案。
+Paul 的要求：深度分析這份提案，用本專案的方式寫。我把提案裡點名的站逐一打開查證（不是憑印象），Sam Rose 的三篇系統文章全部讀完，也對了 repo 裡每一篇文章的標籤和首頁現在的自我介紹。下面照編輯意見的慣例：只寫問題和取捨，對的地方一句帶過。沒有改 repo 裡任何檔案。
 
 提案對的地方：譜系判斷（Sam Rose → Ciechanowski 這一支）是對的，「動筆前先讀他那三篇」是對的，「他沒有 DAG、沒有加權進度、沒有取消傳播」我逐篇確認過，也是對的。
 
@@ -16,7 +16,7 @@ Paul 的要求：深度分析這份提案，用本專案的方式寫。我把提
 | ConvNetJS（Karpathy） | 8 個 demo | — | **訓練** CNN、DQN、自編碼器 | 無 | 無 | 頁面本身 |
 | GAN Lab | 1 個工具（VIS 2018） | — | **訓練** GAN，用 TensorFlow.js | 無 | 無 | 頁面本身 |
 | Transformer Explainer | 1 個工具 | — | 跑真的 GPT-2（ONNX）；不訓練 | 無 | 無 | 頁面本身 |
-| **paul.notebook** | 10 篇（2 篇草稿） | 2026-09 | **從零寫、在頁面裡訓練**（5 篇：002–005、007；010 計畫中） | 4 篇（006–009） | **0 篇** | repo 的 frontmatter 與元件 |
+| **paul.notebook** | 9 篇已發佈（№ 010 是 dev 上的草稿） | 2026-09 | **從零寫、在頁面裡訓練**（5 篇：002–005、007；010 計畫中） | 4 篇（006–009） | **0 篇** | repo 的 frontmatter 與元件 |
 
 redblobgames、joshwcomeau、setosa 我這次沒有打開，提案對它們的描述我沒有查證，下面不引用。
 
@@ -40,7 +40,7 @@ Sam Rose 現在是 ngrok 的 developer educator，寫了 Prompt Caching 和 Quan
 
 ### 3. 「系統工程 ✓」是預支的
 
-我對了 repo：十篇的標籤是 computer-vision、llm、generative、ai-agent、robotics、neuroevolution，**沒有任何一篇是系統工程**。矩陣最後一列把它打了勾，是把還沒寫的排程器那篇算進去了。這個站的規矩是數字要量過才寫；定位表也一樣，還沒有的東西不能打勾。
+我對了 repo：九篇已發佈的文章加上 dev 上的 № 010 草稿，標籤是 computer-vision、llm、generative、ai-agent、robotics、neuroevolution，**沒有任何一篇是系統工程**。矩陣最後一列把它打了勾，是把還沒寫的排程器那篇算進去了。這個站的規矩是數字要量過才寫；定位表也一樣，還沒有的東西不能打勾。
 
 建議：那一格寫「計畫中」，或者等那篇發佈後再更新這張表。
 
@@ -67,10 +67,10 @@ Sam Rose 現在是 ngrok 的 developer educator，寫了 Prompt Caching 和 Quan
 
 ### 6. 提案沒提的那件事：產量
 
-這張表裡最刺眼的差別不是任何一格，而是節奏。Ciechanowski 十年 24 篇；Sam Rose 兩年半 11 篇。這個 repo 的第一個 commit 是 2026-09-18，三天後有十篇（002、003 的文字是舊站搬來的，儀器是新做的）。這是和 agent 一起寫才有的速度，它同時是最大的優勢和最大的風險：
+這張表裡最刺眼的差別不是任何一格，而是節奏。Ciechanowski 十年 24 篇；Sam Rose 兩年半 11 篇。這個 repo 的第一個 commit 是 2026-09-18，三天後有九篇已發佈、一篇草稿（002、003 的文字是舊站搬來的，儀器是新做的）。這是和 agent 一起寫才有的速度，它同時是最大的優勢和最大的風險：
 
 - 優勢：那兩個人做不到「一個系列、同一套引擎、前後呼應」（001 的 CNN 是 005、010 的零件；`lib/ml` 一路長大）。系列感是這個站有、他們沒有的。
-- 風險：他們每一篇都是打磨幾個月的單篇，會被轉貼好幾年。十篇三天，單篇的打磨度一定比不上；09-19 的編輯意見已經指出「004 之後每一篇都是同一個模板，連著讀會膩」。速度會放大模板化。
+- 風險：他們每一篇都是打磨幾個月的單篇，會被轉貼好幾年。三天十篇，單篇的打磨度一定比不上；09-19 的編輯意見已經指出「004 之後每一篇都是同一個模板，連著讀會膩」。速度會放大模板化。
 
 - 一個要 Paul 自己判斷的點：frontmatter 的日期在 3de3117 被重新產生過，現在從 2024-08 排到 2026-09，和 git 歷史不一致。站的招牌是「每個數字都量過」；會去翻 repo 的那種讀者，正是會轉貼這個站的讀者。日期怎麼標是作者的決定，我只是指出這兩件事放在一起會被看見。
 
@@ -128,4 +128,4 @@ Sam Rose 現在是 ngrok 的 developer educator，寫了 Prompt Caching 和 Quan
 - Simon Willison, *Sam Rose explains how LLMs work with a visual essay*, 2025-12-19
 - ciechanow.ski/archives；bbycroft.net；Distill, *Distill Hiatus*, 2021-07-02
 - playground.tensorflow.org；cs.stanford.edu/people/karpathy/convnetjs；poloclub.github.io/ganlab；poloclub.github.io/transformer-explainer
-- repo：十篇 `zh.mdx` 的 frontmatter、`lib/i18n/dictionaries/zh.ts` 的首頁文字、`docs/research/2026-09-19-editorial-review.md`、`docs/DESIGN.md` §6
+- repo：每一篇 `zh.mdx` 的 frontmatter（含 dev 上的 № 010 草稿）、`lib/i18n/dictionaries/zh.ts` 的首頁文字、`docs/research/2026-09-19-editorial-review.md`、`docs/DESIGN.md` §6
