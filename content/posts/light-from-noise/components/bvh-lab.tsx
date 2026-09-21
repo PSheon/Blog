@@ -24,7 +24,7 @@ export function BvhLab() {
   const burst = useRef({ gpuMs: 0, done: false });
   const off = brute && triangles <= BRUTE_LIMIT;
   const tracer = useTracer(root, canvas, {
-    triangles, size: 256, maxSamples: BURST, budgetMs: off ? 30 : 10,
+    triangles, size: 256, maxSamples: BURST, autostart: true, budgetMs: off ? 30 : 10,
     // White is 48 node visits with the hierarchy; without it the scale is the triangle count, or everything would be white.
     configure: (r) => { r.heat = true; r.brute = off; r.heatMax = off ? triangles : 48; },
     // A fixed burst, measured exactly: every ray and every visit of the 64 samples, over the GPU time they took.

@@ -13,7 +13,7 @@ import { useTracer } from "./use-tracer";
  */
 export function BouncesLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null), [spp, setSpp] = useState(0);
-  const tracer = useTracer(root, canvas, { triangles: 1_000, size: 512, maxSamples: 512, configure: (r) => { r.quad = true; r.bounces = 16; }, afterFrame: (r) => setSpp(r.samples) });
+  const tracer = useTracer(root, canvas, { triangles: 1_000, size: 512, maxSamples: 512, doublingMs: 450, configure: (r) => { r.quad = true; r.bounces = 16; }, afterFrame: (r) => setSpp(r.samples) });
   const tiles = [t.tile0, t.tile1, t.tile2, t.tileAll];
   return (
     <div ref={root} className="grid gap-4 text-sm">

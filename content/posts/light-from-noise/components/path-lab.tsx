@@ -30,7 +30,7 @@ export function PathLab() {
   const [pixel, setPixel] = useState(START), [shots, setShots] = useState<Shot[]>([]), [total, setTotal] = useState({ n: 0, lit: 0, sum: [0, 0, 0] as Vec3 }), [gpu, setGpu] = useState<Vec3 | null>(null);
   const cpu = useRef<{ tracer: Tracer; project(p: Vec3): [number, number, number] } | null>(null), asked = useRef(pixel);
   const tracer = useTracer(root, canvas, {
-    triangles: 1_000, size: SIZE, maxSamples: 1024, configure: (r) => { r.bounces = 16; },
+    triangles: 1_000, size: SIZE, maxSamples: 1024, autostart: true, configure: (r) => { r.bounces = 16; },
     afterFrame: async (r) => { if (r.samples === 1024 || r.samples % 32 === 0) setGpu(await r.readPixel(asked.current.x, asked.current.y)); },
   });
 

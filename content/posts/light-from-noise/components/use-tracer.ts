@@ -23,6 +23,8 @@ interface Options {
   doublingMs?: number;
   /** GPU milliseconds a frame may spend on samples. */
   budgetMs?: number;
+  /** Start at once instead of waiting for the reader to press Start: for a picture that is the backdrop of a figure, not its subject. */
+  autostart?: boolean;
   /** Stop adding samples here (a figure that compares pictures wants them equally converged, not ever finer). */
   maxSamples?: number;
 }
@@ -30,14 +32,15 @@ interface Options {
 /**
  * What every figure of this article needs around the renderer: the scene and its BVH built in a worker, a GPU device
  * (or the reason there is none), a frame loop that sizes its batches to a time budget, pauses off screen and in a
- * hidden tab, and starts paused for readers who asked for less motion.
+ * hidden tab, and waits for the reader to press Start (one sample is drawn at once, so there is something to look at).
  */
 export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject<HTMLCanvasElement | null>, options: Options) {
   const still = useReducedMotion();
   const [status, setStatus] = useState<TracerStatus>("building"), [built, setBuilt] = useState<Built | null>(null), [epoch, setEpoch] = useState(0);
-  const wantRunning = useRef(true), latest = useRef(options), renderer = useRef<Renderer | null>(null), restartRef = useRef<(() => void) | null>(null);
+  const wantRunning = useRef(false), latest = useRef(options), renderer = useRef<Renderer | null>(null), restartRef = useRef<(() => void) | null>(null);
   useEffect(() => { latest.current = options; });
-  useEffect(() => { wantRunning.current = !still; }, [still]);
+  const autostart = !!options.autostart;
+  useEffect(() => { wantRunning.current = autostart && !still; }, [autostart, still]);
   const { triangles, size } = options;
 
   useEffect(() => {
@@ -55,21 +58,28 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
       if (!alive) { if (typeof made !== "string") made.destroy(); return; }
       if (typeof made === "string") { setStatus(made); return; }
       const r = (renderer.current = made), info: Built = { triangles: result.triangles, buildMs: result.buildMs, nodeCount: result.nodeCount, depth: result.depth };
-      let batch = 1, began = performance.now();
-      restartRef.current = () => { latest.current.configure(r); r.reset(); began = performance.now(); batch = 1; r.sample(1); r.present(); };
+      let batch = 1, began = performance.now(), last = began;
+      // Starting over is something the reader asked for, so it runs: also after a finished picture paused itself.
+      restartRef.current = () => { latest.current.configure(r); r.reset(); began = performance.now(); batch = 1; r.sample(1); r.present(); wantRunning.current = true; setStatus("running"); };
       setBuilt(info);
       latest.current.configure(r);
       setStatus(wantRunning.current ? "running" : "paused");
-      r.sample(1); r.present(); // one sample at once, so even a paused figure shows something
+      const first = performance.now();
+      r.sample(1); r.present(); // one sample at once, so even a waiting figure shows something
+      await r.idle();
+      if (alive) await latest.current.afterFrame?.(r, info, { samples: 1, gpuMs: performance.now() - first }); // and its readouts say so
 
       while (alive) {
         await frame();
         if (!alive) break;
         const o = latest.current, running = wantRunning.current && visible && !document.hidden;
-        if (!running) { began += 16; continue; }
+        // Time spent not running does not count towards the pacing. Measured, not assumed: a 120 Hz display has 8 ms frames.
+        const now = performance.now(), waited = now - last;
+        last = now;
+        if (!running) { began += waited; continue; }
         const paced = o.doublingMs ? Math.ceil(2 ** ((performance.now() - began) / o.doublingMs)) - r.samples : Infinity;
         const allowed = Math.min(paced, (o.maxSamples ?? Infinity) - r.samples);
-        if (allowed <= 0) continue;
+        if (allowed <= 0) { if (paced > 0) { wantRunning.current = false; setStatus("paused"); } continue; } // the picture is finished: Start begins it again
         const t0 = performance.now(), count = Math.min(batch, allowed);
         r.sample(count); r.present();
         await r.idle();
@@ -87,7 +97,12 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
     return () => { alive = false; io.disconnect(); worker.terminate(); renderer.current?.destroy(); renderer.current = null; restartRef.current = null; };
   }, [triangles, size, epoch, root, canvas]);
 
-  const toggle = useCallback(() => { wantRunning.current = !wantRunning.current; setStatus((s) => (s === "running" || s === "paused" ? (wantRunning.current ? "running" : "paused") : s)); }, []);
+  const toggle = useCallback(() => {
+    wantRunning.current = !wantRunning.current;
+    const r = renderer.current;
+    if (wantRunning.current && r && r.samples >= (latest.current.maxSamples ?? Infinity)) restartRef.current?.(); 
+    setStatus((s) => (s === "running" || s === "paused" ? (wantRunning.current ? "running" : "paused") : s));
+  }, []);
   /** Start the picture over with the current settings. */
   const restart = useCallback(() => restartRef.current?.(), []);
   /** A different scene (or another try at getting a GPU): back to "building", and the effect above does the rest. */

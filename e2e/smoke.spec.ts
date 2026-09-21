@@ -720,6 +720,9 @@ test("a picture clears from noise on the reader's GPU, or the figure says why it
     return;
   }
   const spp = async () => Number((await figure.getByTestId("light-spp").textContent())!.replace(/\D/g, "") || 0);
+  await page.waitForTimeout(600);
+  expect(await spp()).toBe(1); // one sample to look at, then it waits for the reader
+  await figure.getByTestId("light-toggle").click();
   await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(64);
   await figure.getByTestId("light-toggle").click(); // pause: the count stops
   const held = await spp();

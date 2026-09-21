@@ -86,8 +86,8 @@ export function ConvergeLab() {
           <div className="grid grid-cols-2 gap-4">
             <Readout label={t.spp} value={<span data-testid="light-spp">{seen ? seen.spp.toLocaleString() : "–"}</span>} large />
             <Readout label={t.noise} value={seen?.error != null ? (seen.error * 100).toFixed(seen.error < 0.1 ? 1 : 0) : "–"} unit="%" tone="alt" large />
-            <Readout label={t.rays} value={seen ? seen.mrays.toFixed(0) : "–"} unit={t.million} tone="plain" />
-            <Readout label={t.steps} value={seen ? seen.steps.toFixed(1) : "–"} tone="plain" />
+            <Readout label={t.rays} value={seen?.mrays ? seen.mrays.toFixed(0) : "–"} unit={t.million} tone="plain" />
+            <Readout label={t.steps} value={seen?.steps ? seen.steps.toFixed(1) : "–"} tone="plain" />
             <Readout label={t.triangles} value={seen ? seen.triangles.toLocaleString() : "–"} tone="plain" />
             <Readout label={t.build} value={seen ? seen.buildMs.toFixed(0) : "–"} unit={t.ms} tone="plain" />
           </div>
