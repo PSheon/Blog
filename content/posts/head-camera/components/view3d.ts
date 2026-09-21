@@ -1,6 +1,6 @@
 import type { Vec3 } from "./model";
 import { AREA, HEAD } from "./model";
-import { BLOCK_AREA } from "./pick";
+import { BLOCK_AREA, blockFloor } from "./pick";
 
 type Three = typeof import("@/lib/three");
 export type Mode = "reach" | "pick";
@@ -107,7 +107,9 @@ export class BenchView {
     scene.add(bench);
     // Where training put blocks, the only place a block can be dropped: a dashed violet outline.
     const region = mode === "pick" ? BLOCK_AREA : AREA, [x0, x1] = region.x, [y0, y1] = region.y;
-    const area = new T.LineSegments(new T.BufferGeometry().setFromPoints([[x0, y0], [x1, y0], [x1, y0], [x1, y1], [x1, y1], [x0, y1], [x0, y1], [x0, y0]].map(([x, y]) => new T.Vector3(x, y, 0.001))), new T.LineDashedMaterial({ color: colours.think, dashSize: 0.012, gapSize: 0.008 }));
+    // In pick mode the far corner is cut (pick.ts, blockFloor): five corners, not four.
+    const outline = mode === "pick" ? [[x0, y0], [0.44, y0], [x1, blockFloor(x1)], [x1, y1], [x0, y1]] : [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    const area = new T.LineSegments(new T.BufferGeometry().setFromPoints(outline.flatMap((c, i) => [c, outline[(i + 1) % outline.length]]).map(([x, y]) => new T.Vector3(x, y, 0.001))), new T.LineDashedMaterial({ color: colours.think, dashSize: 0.012, gapSize: 0.008 }));
     area.computeLineDistances();
     scene.add(area);
 
@@ -155,14 +157,6 @@ export class BenchView {
     this.ghost.visible = false;
     scene.add(this.ghost);
     if (mode === "pick") {
-      // The arm's shadow, tinted: the part of the training area where the block may NOT go (pick.ts, BLOCK_AREA). An L: the
-      // side away from the head camera, and the row nearest the base.
-      const tint = new T.MeshBasicMaterial({ color: colours.act, transparent: true, opacity: 0.14, depthWrite: false });
-      for (const [x0, x1, y0, y1] of [[AREA.x[0], AREA.x[1], AREA.y[0], BLOCK_AREA.y[0]], [AREA.x[0], BLOCK_AREA.x[0], BLOCK_AREA.y[0], AREA.y[1]]]) {
-        const part = new T.Mesh(new T.PlaneGeometry(x1 - x0, y1 - y0), tint);
-        part.position.set((x0 + x1) / 2, (y0 + y1) / 2, 0.0012);
-        scene.add(part);
-      }
       this.padMaterial = mat(0x46be5a, 0.7);
       this.pad = shadowy(new T.Mesh(new T.BoxGeometry(0.07, 0.07, 0.003), this.padMaterial), false);
       scene.add(this.pad);

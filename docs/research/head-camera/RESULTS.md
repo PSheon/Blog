@@ -445,6 +445,14 @@ Per seed, closed + shaken at 20 000, as trained: 100 / 97 / 2.5 / 36.5 / 59. See
 (97–100 % everywhere inside the range); 13–15 need far more. The shape of the claim holds in every seed; its size depends
 on the seed until training is made dependable. Run 20 trains all five for 60 000 steps.
 
+## The block area's far corner, cut (2026-09-21, after Paul still found misses "too far out, where it is hidden")
+
+The 5-tries map was too coarse. `maps/boundary-*.json`: y from −0.22 to 0.00 at every x, 20 tries a cell. For 19–20 of 20 the
+limit is y ≥ −0.16 in the middle (x 0.28–0.40), −0.12 at x 0.42–0.48, **−0.06 at x 0.50**, and −0.04 at x 0.22. The rectangle's
+far corner (x ≥ 0.46, y −0.10…−0.06) was 14–18 of 20, all of them failures to grasp. `blockFloor(x)` now lifts the lower limit
+from −0.10 at x = 0.44 to −0.05 at x = 0.50. Over 600 random page layouts (seed 7): 600/600 untouched, 596/600 at 10° of
+pitch. The tint is gone (Paul: no need to draw the forbidden part); the dashed outline shows the allowed area.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

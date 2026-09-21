@@ -20,12 +20,17 @@ export const PICK_HOME: Vec3 = [0.36, 0, HIGH];
  * rectangle every cell placed 4–5 of 5. The pad may go anywhere in AREA: it is flat, large, and seen past the hand.
  */
 export const BLOCK_AREA = { x: [0.24, 0.5], y: [-0.1, 0.22] } as const;
-export const inBlockArea = (p: XY): XY => [Math.max(BLOCK_AREA.x[0], Math.min(BLOCK_AREA.x[1], p[0])), Math.max(BLOCK_AREA.y[0], Math.min(BLOCK_AREA.y[1], p[1]))];
+/**
+ * The far corner is cut: past x = 0.44 the shadow reaches further in, so the lowest y rises from −0.10 to −0.05 at
+ * x = 0.50 (maps/boundary-*.json, 20 tries a cell: every cell kept is 19–20 of 20; the corner cut off was 14–18).
+ */
+export const blockFloor = (x: number) => BLOCK_AREA.y[0] + 0.05 * Math.max(0, Math.min(1, (x - 0.44) / 0.06));
+export const inBlockArea = (p: XY): XY => { const x = Math.max(BLOCK_AREA.x[0], Math.min(BLOCK_AREA.x[1], p[0])); return [x, Math.max(blockFloor(x), Math.min(BLOCK_AREA.y[1], p[1]))]; };
 /** A layout for the page: the block inside BLOCK_AREA, the pad anywhere at least 12 cm from it. */
 export function layout(rng: () => number): { block: XY; pad: XY } {
   for (;;) {
     const block: XY = [BLOCK_AREA.x[0] + rng() * (BLOCK_AREA.x[1] - BLOCK_AREA.x[0]), BLOCK_AREA.y[0] + rng() * (BLOCK_AREA.y[1] - BLOCK_AREA.y[0])];
-    if (!usable(block)) continue;
+    if (!usable(block) || block[1] < blockFloor(block[0])) continue;
     for (let k = 0; k < 50; k++) { const pad = anywhere(rng); if (Math.hypot(pad[0] - block[0], pad[1] - block[1]) > 0.12) return { block, pad }; }
   }
 }
