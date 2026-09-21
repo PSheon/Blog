@@ -11,7 +11,7 @@ import { CYAN, PINK, VIOLET } from "./paint";
 import { PRESETS, type PresetId, onPreset } from "./presets";
 import { type Pose, compose } from "./se2";
 import { DEFAULTS, Slam } from "./slam";
-import { Stick } from "./stick";
+import { Stick } from "@/components/lab/stick";
 import { useVisible } from "./use-visible";
 import { RING } from "./world";
 

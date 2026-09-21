@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowDown, ArrowUp } from "lucide-react";
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
+import { Stick } from "@/components/lab/stick";
 import { Stage } from "@/components/rt/stage";
 import { useTracer } from "@/components/rt/use-tracer";
 import { Button } from "@/components/ui/button";
@@ -18,11 +18,6 @@ type Mode = (typeof MODES)[number];
 const VIEWS = { cars: { at: [-33, 18.4, -12], yaw: -2.266, pitch: -0.25 }, air: { at: [150, 105, 165], yaw: -0.684, pitch: -0.41 }, low: { at: [60, 30, 70], yaw: -0.675, pitch: -0.167 }, ground: { at: [9, 17.2, 9], yaw: -0.699, pitch: -0.082 } } as const;
 const KEYS: Record<string, [number, number, number]> = { w: [0, 0, 1], s: [0, 0, -1], a: [-1, 0, 0], d: [1, 0, 0], q: [0, -1, 0], e: [0, 1, 0], arrowup: [0, 0, 1], arrowdown: [0, 0, -1], arrowleft: [-1, 0, 0], arrowright: [1, 0, 0] };
 
-/** A button that acts for as long as it is held: a phone's W and S. */
-function Hold({ label, onHold, children }: { label: string; onHold(down: boolean): void; children: ReactNode }) {
-  return <Button size="icon" variant="secondary" aria-label={label} onPointerDown={(e) => { e.stopPropagation(); onHold(true); }} onPointerUp={() => onHold(false)} onPointerLeave={() => onHold(false)} onPointerCancel={() => onHold(false)}>{children}</Button>;
-}
-
 /**
  * The playground, flown through while it is being path traced. Nothing here is clever yet: every movement resets the
  * accumulation, so a moving camera sees one or two samples a frame. That is the problem the last article is about.
@@ -31,7 +26,7 @@ export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [view, setView] = useState<keyof typeof VIEWS>("low"), [seen, setSeen] = useState<{ spp: number; ms: number } | null>(null);
   const pose = useRef({ at: [...VIEWS.low.at] as Vec3, yaw: VIEWS.low.yaw as number, pitch: VIEWS.low.pitch as number }), settings = useRef({ mode, hour }), dirty = useRef(true);
-  const mine = useRef<Renderer | null>(null), pressed = useRef(new Set<string>()), drag = useRef<{ x: number; y: number } | null>(null), timing = useRef({ ms: 0 });
+  const mine = useRef<Renderer | null>(null), pressed = useRef(new Set<string>()), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), timing = useRef({ ms: 0 });
 
   const tracer = useTracer(root, canvas, {
     playground: PLAYGROUND_URL, dynamicTriangles: 8192, size: W, height: H, autostart: true, maxSamples: MAX_SAMPLES, budgetMs: 8,
@@ -75,6 +70,7 @@ export function PlaygroundLab() {
       if (!alive) return;
       const dt = Math.min(0.05, (now - last) / 1000); last = now;
       const move: Vec3 = [0, 0, 0];
+      move[0] += stick.current[0]; move[2] += stick.current[1];
       for (const key of pressed.current) { const k = KEYS[key]; if (k) { move[0] += k[0]; move[1] += k[1]; move[2] += k[2]; } }
       if (move[0] || move[1] || move[2]) {
         const p = pose.current, step = SPEED * (pressed.current.has("shift") ? 3 : 1) * dt, sin = Math.sin(p.yaw), cos = Math.cos(p.yaw);
@@ -109,9 +105,9 @@ export function PlaygroundLab() {
       <div tabIndex={0} role="application" aria-label={t.picture} className="relative touch-pan-y rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring" onKeyDown={(e) => key(e, true)} onKeyUp={(e) => key(e, false)} onBlur={() => pressed.current.clear()}
         onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); e.currentTarget.focus({ preventScroll: true }); }} onPointerMove={look} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)} data-testid="playground-stage">
         <Stage canvas={canvas} status={tracer.status} label={t.picture} t={t} testid="playground-canvas" wide>
-          <div className="absolute right-2 bottom-2 flex gap-2 md:hidden">
-            <Hold label={t.back} onHold={(down) => press("s", down)}><ArrowDown className="size-4" aria-hidden /></Hold>
-            <Hold label={t.forward} onHold={(down) => press("w", down)}><ArrowUp className="size-4" aria-hidden /></Hold>
+          {/* The site's thumb stick (components/lab/stick.tsx), laid over the corner: forward / back and sideways. */}
+          <div className="absolute bottom-2 left-2 opacity-80" onPointerDown={(e) => e.stopPropagation()}>
+            <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} className="size-24 bg-background/70 backdrop-blur-sm" testId="playground-stick" />
           </div>
         </Stage>
       </div>

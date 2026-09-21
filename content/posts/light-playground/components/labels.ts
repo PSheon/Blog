@@ -12,8 +12,8 @@ const zh = {
   mode: "怎麼畫", raster: "光柵", direct: "只有直接光", full: "完整光追",
   view: "視角", cars: "停車場", air: "空中", low: "低空", ground: "地面",
   hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", triangles: "三角形",
-  forward: "前進", back: "後退",
-  hint: "拖曳畫面轉動視角。先點一下畫面，再用 W A S D 移動、Q E 升降、Shift 加速；手機用右下角的按鈕。一動，累積的樣本就全部作廢，畫面會回到雜訊。",
+  stick: "移動：拖曳搖桿，或選取它之後用方向鍵、W A S D",
+  hint: "拖曳畫面轉動視角。先點一下畫面，再用 W A S D 移動、Q E 升降、Shift 加速；手機用左下角的搖桿。一動，累積的樣本就全部作廢，畫面會回到雜訊。",
 };
 
 const en: typeof zh = {
@@ -26,8 +26,8 @@ const en: typeof zh = {
   mode: "Drawn by", raster: "Raster", direct: "Direct light only", full: "Full path tracing",
   view: "View", cars: "Car park", air: "Air", low: "Low", ground: "Ground",
   hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", triangles: "Triangles",
-  forward: "Forward", back: "Back",
-  hint: "Drag the picture to look around. Click it first, then W A S D to move, Q E to rise and sink, Shift to go faster; on a phone use the buttons in the corner. Any movement throws away every sample so far, and the picture is noise again.",
+  stick: "Move: drag the stick, or focus it and use the arrow keys or W A S D",
+  hint: "Drag the picture to look around. Click it first, then W A S D to move, Q E to rise and sink, Shift to go faster; on a phone use the stick in the corner. Any movement throws away every sample so far, and the picture is noise again.",
 };
 
 export type Labels = typeof zh;

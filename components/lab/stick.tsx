@@ -1,6 +1,7 @@
 "use client";
 
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
 
 const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, 1], s: [0, -1], a: [-1, 0], d: [1, 0] };
 
@@ -10,10 +11,14 @@ interface Props {
   /** x: −1 (left) … 1 (right), y: −1 (back) … 1 (forward). Called with (0, 0) on release. */
   onChange(x: number, y: number): void;
   testId?: string;
+  className?: string;
 }
 
-/** A thumb stick: drag it, or focus it and use the arrow keys / WASD. Springs back to the centre when let go. */
-export function Stick({ label, hintId, onChange, testId }: Props) {
+/**
+ * A thumb stick: drag it, or focus it and use the arrow keys / WASD. Springs back to the centre when let go. The site's
+ * one control for steering something by hand (the SLAM car, the playground): do not build another.
+ */
+export function Stick({ label, hintId, onChange, testId, className }: Props) {
   const [at, setAt] = useState<[number, number]>([0, 0]);
   const held = useRef(new Set<string>());
   const move = (x: number, y: number) => { setAt([x, y]); onChange(x, y); };
@@ -44,7 +49,7 @@ export function Stick({ label, hintId, onChange, testId }: Props) {
       tabIndex={0}
       aria-label={label}
       aria-describedby={hintId}
-      className="relative size-32 shrink-0 touch-none rounded-full border border-border bg-background outline-none select-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn("relative size-32 shrink-0 touch-none rounded-full border border-border bg-background outline-none select-none focus-visible:ring-2 focus-visible:ring-ring", className)}
       onPointerDown={drag}
       onPointerMove={drag}
       onPointerUp={release}
