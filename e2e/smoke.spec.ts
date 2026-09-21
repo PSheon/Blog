@@ -643,3 +643,30 @@ for (const locale of ["zh", "en"] as const) {
     }
   });
 }
+
+test("three progress bars watch a job and disagree; a fourth learns", async ({ page }) => {
+  const response = await page.goto("/zh/posts/progress-bar");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "progress-bar is still a draft");
+  test.setTimeout(90_000);
+  const errors = watchErrors(page);
+  await expect(page.locator("[data-instrument]")).toHaveCount(4);
+
+  // The opener: the bars start at zero, and once the job is over all of them say 100.
+  await expect(page.getByTestId("race-count")).toContainText("0%");
+  await page.getByTestId("race-start").click();
+  await expect(page.getByTestId("race-time")).toContainText("100%", { timeout: 40_000 });
+  for (const bar of ["count", "work", "plan"]) await expect(page.getByTestId(`race-${bar}`)).toContainText("100%");
+
+  // The averaged figures finish their 150 jobs; learning makes the forecast more honest than the plan alone.
+  const learn = page.getByTestId("learn-lab");
+  await learn.scrollIntoViewIfNeeded();
+  await expect(learn.getByRole("status")).toContainText("150", { timeout: 40_000 });
+  await page.getByTestId("learn-toggle").check();
+  // Wait for the rerun that includes the learning bar to finish, then read the two averages.
+  const value = async (bar: string) => Number.parseFloat(await learn.locator(`[data-testid="off-${bar}"][data-done="true"] .tabular`).innerText({ timeout: 40_000 }));
+  const plan = await value("plan"), learned = await value("learn");
+  expect(plan).toBeGreaterThan(5);
+  expect(learned).toBeLessThan(plan * 0.7);
+  expect(errors).toEqual([]);
+});

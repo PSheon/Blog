@@ -238,6 +238,19 @@ function City() {
   );
 }
 
+/** № 011: a bar that says it is nearly done, above the few long tasks that say otherwise. */
+function Progress() {
+  const tasks: [number, number, number, string][] = [[14, 52, 18, S3], [34, 52, 8, DIM], [44, 52, 10, DIM], [56, 52, 90, S], [14, 64, 10, DIM], [26, 64, 6, DIM], [34, 64, 12, DIM], [48, 64, 70, S3], [14, 76, 8, DIM], [24, 76, 14, DIM], [40, 76, 9, DIM], [51, 76, 8, DIM]];
+  return (
+    <>
+      <rect x={14} y={22} width={132} height={10} rx={5} fill="none" stroke={DIM} strokeWidth={1} />
+      <rect x={15.5} y={23.5} width={124} height={7} rx={3.5} fill={S2} />
+      <path d="M96 40 V90" stroke={S} strokeWidth={1.2} strokeDasharray="2 3" />
+      {tasks.map(([x, y, w, c], i) => <rect key={i} x={x} y={y} width={w} height={7} rx={2} fill={c === DIM ? "none" : c} stroke={c} strokeWidth={1} opacity={c === DIM ? 1 : 0.85} />)}
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -248,6 +261,7 @@ const covers: Record<string, () => ReactNode> = {
   "diffusion-points": Diffusion,
   "slam-2d": Slam,
   "city-of-agents": City,
+  "progress-bar": Progress,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {

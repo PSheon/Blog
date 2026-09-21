@@ -1,0 +1,96 @@
+---
+title: Why the progress bar sits at 99%
+description: How many tasks are done, how much work is done and how much time has passed are three different quantities. Four workers take on a job whose tasks wait for one another; watch three progress bars mislead you in three ways, then build one that learns from the tasks that have finished.
+seoTitle: "Why the progress bar sits at 99%"
+seoDescription: "Tasks done, work done and time passed are three different things. Watch three progress bars mislead you on a job of dependent tasks, then build one that learns."
+date: 2026-09-21
+tags: [ai-agent, from-scratch]
+no: 11
+interactive: true
+draft: true
+---
+
+import { LearnLab, RaceLab, SkewLab, WorkersLab } from "./components";
+import { PARAMS } from "./components/sim/params";
+
+You have waited on a progress bar that stopped at 99%. Whoever wrote it was probably not lazy. They answered a question that was easier to answer.
+
+Here is a job: {PARAMS.tasks} tasks, some of which cannot start until others are done, handed to {PARAMS.workers} workers at once. Three progress bars watch the same job and compute progress three different ways. The white one at the bottom is what they are all trying to guess: how much time has really passed. Press Start.
+
+<Instrument fig="01" title="progress / race" size="wide" caption="Above, the timeline: a row is a worker, a block is a task, its colour the kind of task. The chart plots what each bar shows against the time that has really passed; the dashed line is an honest bar. 'Another job' gives you a different one; the default is the job, out of the first 300, whose three bars behave closest to the average.">
+  <RaceLab />
+</Instrument>
+
+Halfway through, the bar that counts tasks says 67%. At 76% of the time it crosses 90%, and it stays up there to the end: for almost a quarter of the job it has been telling you "nearly done".
+
+It did not miscount. It counts finished tasks, and in this job the six largest tasks are four tenths of the work. Small tasks finish in no time and the number races; the few big ones take minutes each and the number hardly moves.
+
+What this is not: a method for estimating projects, or interface design. How a single request queues, retries and gets routed, [Sam Rose has covered in three fine interactive essays](https://samwho.dev/load-balancing/); this one is about tasks that wait for each other, and how you can tell how long is left. The simulation is 131 lines of TypeScript with no library, and every chart below is worked out by your browser as you read.
+
+## Three different quantities
+
+A progress bar can answer three questions:
+
+- **How many tasks are done?** The easiest: count.
+- **How much work is done?** Needs an estimate for every task, then a sum.
+- **How much time has passed?** That is what the person waiting wants, and the answer only exists once the job is over.
+
+The first two are what a program has. The third is what it is asked for. A progress bar misleads when it passes one of the first two off as the third.
+
+How well that works depends on how unequal the tasks are. The next chart is not one job but the average of 150; every time you move the slider your browser runs them again in the background.
+
+<Instrument fig="02" title="progress / skew" caption="The slider is how unequal the task sizes are. The higher a curve bulges, the further the bar runs ahead of the clock; the thin pink dotted line is 90%. The estimates here are almost exactly right, so nothing you see is caused by bad estimates.">
+  <SkewLab />
+</Instrument>
+
+With tasks all about the same size, both lines hug the diagonal and counting is perfectly good. Move right and the counting bar bulges: measured offline over 200 jobs at the default setting, it is off by 10 points on average and spends 24% of the run above 90% (an honest bar: 10%). Weighting by estimated work halves that, to 6 points.
+
+It does not reach the diagonal either, and this time the estimates are not to blame, because here they are right.
+
+## The more workers, the less honest the bar
+
+Work done is not time passed, because the number of busy workers keeps changing. At the start many tasks can run at once, all four workers are busy and the work drains fast; at the tail one or two tasks are waiting on earlier results, the other workers idle, and the clock keeps running.
+
+<Instrument fig="03" title="progress / workers" caption="The slider is the number of workers. The third line (cyan) ignores how much has been done: it takes the tasks that are left, schedules them as planned on this many workers, and asks how long that will take. The estimates are right here too.">
+  <WorkersLab />
+</Instrument>
+
+Drag the slider from 1 to 32. Two things happen together.
+
+First, the job gets faster and then stops getting faster. On average: 122 minutes with one worker, 63 with two, 38 with four, 31.4 with eight, and 31.0 from there on however many you add. Those 31 minutes are the longest chain of tasks waiting on each other; more hands can only wait with it.
+
+Second, the counting bar gets less honest: 10 points off with 4 workers, 17 with 16, a third of the run spent above 90%. More hands make the head of the job go faster; the tail is as long as ever.
+
+The third line stays on the diagonal (under 1 point off). It does something different: it does not ask how much is done, it asks how long the rest will take on these workers in this order, and it reschedules what is left every time it is asked. To answer a question about time, the graph and the number of workers have to be in the calculation.
+
+## When the plan is wrong
+
+The third line assumes the estimates are right. Real estimates are wrong, and wrong in a regular way: uploads, say, always take twice what you thought.
+
+<Instrument fig="04" title="progress / learn" caption="The slider is how wrong the estimates are: every task of one kind is wrong in the same direction by the same factor. Some jobs come out over-estimated and some under, which would cancel in an average, so this chart plots how many points the bar is off by, either way: lower is more honest. Turn the switch on and the bar looks at how long finished tasks really took and corrects the estimates of the tasks of that kind still to come.">
+  <LearnLab />
+</Instrument>
+
+As soon as the estimates are off, the bar that replays the plan is off with them. Measured offline it is 8.2 points off on average — **worse than the bar that merely weighs by work (6.7)**. The better model, fed wrong numbers, loses to the cruder one.
+
+Turn the switch on. Each time a task finishes, this bar notes the real time over the estimated time for that kind of task, and applies it to the tasks of that kind that have not run yet. The average error goes from 8.2 points to 4.0. It is not a neural network, just one ratio per kind of task, but it is what this notebook keeps doing: a very small model that learns in your tab.
+
+Of the 4 points that remain, part is each task's own luck, which nothing can learn, and part is the beginning of the job, when nothing has finished and there is nothing to learn from.
+
+It has a price too: **it goes backwards.** When a task outruns its estimate, the bar has to admit that there is longer to go, and it steps back 2 or 3 points. The counting and weighting bars never do. A real progress bar usually chooses never to move back, so it stands still instead, which is one more way of not telling the truth.
+
+## What differs from the real thing, and how the numbers were measured
+
+**The task sizes are a distribution I chose** (log-normal) at a spread I chose. I have not checked it against a public workload; your build or your CI may be more unequal, or less. That is what the slider in figure 02 is for.
+
+**The scheduling is simple**: whichever task is ready goes first, no priorities, no pre-emption, no worker ever fails. What to do downstream when a task is cancelled, and who should go first, are other articles.
+
+**Real systems often do not even know how many tasks there are**: the work grows as it goes. All four bars here assume the list is complete from the start.
+
+Where the numbers come from: figures 02 to 04 and their read-outs are your browser's average of 150 jobs. What I say I measured was run offline on 200 jobs (seeds 1 to 200); the script and the full table are in this project's `docs/research/progress-bar/`. The opening job is number 77.
+
+## Sources
+
+- Queueing, retrying and routing single requests: Sam Rose, *Queueing* and *Retries* (encore.dev/blog), *Load Balancing* (samwho.dev).
+- How people perceive progress bars: Harrison, Amento, Kuznetsov, Bell, *Rethinking the Progress Bar*, UIST 2007.
+- The longest chain of dependencies sets the floor: Kelley, Walker, *Critical-Path Planning and Scheduling*, 1959.
