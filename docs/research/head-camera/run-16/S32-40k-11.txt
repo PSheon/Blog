@@ -1,0 +1,50 @@
+  closed seed 11 step 1000: loss 0.4354
+  closed seed 11 step 2000: loss 0.3985
+  closed seed 11 step 3000: loss 0.3354
+  closed seed 11 step 4000: loss 0.3019
+  closed seed 11 step 5000: loss 0.2714
+    diag @5000: mse dx 0.338 dy 0.223 dz 0.242 grip 0.094 | direction within 25°: fetching 28% carrying 59%
+  closed seed 11 step 6000: loss 0.2523
+  closed seed 11 step 7000: loss 0.2408
+  closed seed 11 step 8000: loss 0.2313
+  closed seed 11 step 9000: loss 0.2217
+  closed seed 11 step 10000: loss 0.2091
+    diag @10000: mse dx 0.285 dy 0.172 dz 0.174 grip 0.076 | direction within 25°: fetching 36% carrying 64%
+  closed seed 11 step 11000: loss 0.2004
+  closed seed 11 step 12000: loss 0.1953
+  closed seed 11 step 13000: loss 0.1924
+  closed seed 11 step 14000: loss 0.1857
+  closed seed 11 step 15000: loss 0.1852
+    diag @15000: mse dx 0.246 dy 0.135 dz 0.135 grip 0.071 | direction within 25°: fetching 41% carrying 69%
+  closed seed 11 step 16000: loss 0.1799
+  closed seed 11 step 17000: loss 0.1774
+  closed seed 11 step 18000: loss 0.1767
+  closed seed 11 step 19000: loss 0.1726
+  closed seed 11 step 20000: loss 0.1720
+    diag @20000: mse dx 0.256 dy 0.120 dz 0.127 grip 0.076 | direction within 25°: fetching 46% carrying 73%
+  closed seed 11 step 21000: loss 0.1696
+  closed seed 11 step 22000: loss 0.1704
+  closed seed 11 step 23000: loss 0.1699
+  closed seed 11 step 24000: loss 0.1707
+  closed seed 11 step 25000: loss 0.1674
+    diag @25000: mse dx 0.239 dy 0.132 dz 0.123 grip 0.069 | direction within 25°: fetching 45% carrying 71%
+  closed seed 11 step 26000: loss 0.1660
+  closed seed 11 step 27000: loss 0.1597
+  closed seed 11 step 28000: loss 0.1623
+  closed seed 11 step 29000: loss 0.1525
+  closed seed 11 step 30000: loss 0.1522
+    diag @30000: mse dx 0.221 dy 0.102 dz 0.097 grip 0.070 | direction within 25°: fetching 50% carrying 73%
+  closed seed 11 step 31000: loss 0.1517
+  closed seed 11 step 32000: loss 0.1506
+  closed seed 11 step 33000: loss 0.1496
+  closed seed 11 step 34000: loss 0.1493
+  closed seed 11 step 35000: loss 0.1482
+    diag @35000: mse dx 0.211 dy 0.099 dz 0.103 grip 0.067 | direction within 25°: fetching 52% carrying 76%
+  closed seed 11 step 36000: loss 0.1489
+  closed seed 11 step 37000: loss 0.1472
+  closed seed 11 step 38000: loss 0.1488
+  closed seed 11 step 39000: loss 0.1481
+  closed seed 11 step 40000: loss 0.1470
+    diag @40000: mse dx 0.204 dy 0.092 dz 0.098 grip 0.066 | direction within 25°: fetching 58% carrying 75%
+closed+shake seed 11: as trained 67.0 (grasped 78) | pitch 5° 67.0 (grasped 81) | pitch 10° 69.0 (grasped 84) | pitch 20° 10.0 (grasped 24) | yaw 10° 72.0 (grasped 79) | block moved early 62.0 (grasped 76) | pad moved while carrying 67.0 (grasped 78) | shoved 5 cm 70.0 (grasped 83)
+== closed+shake: 40000 steps, 778 s, size 32

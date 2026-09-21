@@ -359,6 +359,23 @@ success rates, said what was wrong.
   was at 5 000 steps. 20 000 steps cost 479 s (32 px) and 870 s (48 px) with six at once: outside a page's budget, so
   pick and place would ship as checkpoints. Look-once + shaken was 13.5–17.5 % in run 12 (1.5 cm grasp); not rerun at 3 cm.
 
+## Run 16 — shaken pick and place made dependable: 48 px (2 seeds, 100 episodes)
+
+| closed + shaken + photo | as trained | pitch 5° | pitch 10° | pitch 20° | yaw 10° | block moved early | pad moved while carrying | shoved 5 cm |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 32 px, 40 000 steps (seeds 11 / 12) | 67 / 69 | 67 / 64 | 69 / 62 | 10 / 1 | 72 / 54 | 62 / 59 | | |
+| **48 px, 20 000 steps** | **92 / 91** | 94 / 90 | 93 / 93 | 38 / 60 | 87 / 94 | 95 / 94 | 92 / 91 | 96 / 93 |
+
+- **It works at 48 × 48**: about 92 % and flat across the shaken range, follows a moved block and a moved pad, shrugs off a
+  shove. Beside run 15's never-shaken 48 px model (100 / 93 untouched, 31 / 34 at 5°, 0 at 10°) this is the reaching
+  article's thesis on a task worth the title.
+- More steps at 32 px steadies the seeds (63 / 35 → 67 / 69) but does not lift the ceiling: resolution, not training, was
+  the limit. A pixel at 32 px is 1–2 cm of bench, and the job needs 3 cm twice (grasp and place).
+- Cost: ≈ 820 s for 20 000 steps at 48 px (four models at once), so this ships as checkpoints; the reader can still train
+  the reaching model in the page.
+- Two seeds only. Owed before prose: five seeds, look-once at 48 px with the 3 cm grasp (for the first act), the
+  never-shaken row's remaining columns, and how long a single model takes alone.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
