@@ -70,6 +70,8 @@ const en: Dictionary = {
     updated: "Updated",
     readingTime: "Reading time",
     mathLabel: "Equation, scrolls sideways",
+    tableLabel: "Table, scrolls sideways",
+    codeLabel: "Code, scrolls sideways",
     toc: "On this page",
     backToTop: "Back to top",
     fallback: "This article is only available in 中文 for now.",

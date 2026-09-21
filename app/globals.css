@@ -608,6 +608,10 @@ html:not(.dark) {
   .prose-notebook .table-scroll {
     overflow-x: auto;
   }
+  /* More to the right than fits (set by ScrollableMath): the right edge fades until it has been scrolled to the end. */
+  .prose-notebook :where(.table-scroll, pre, .katex-display)[data-more] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 2.5rem), transparent);
+  }
   .prose-notebook table {
     width: 100%;
     border-collapse: collapse;

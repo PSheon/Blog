@@ -71,6 +71,8 @@ const zh = {
     updated: "更新",
     readingTime: "閱讀時間",
     mathLabel: "數學式，可左右捲動",
+    tableLabel: "表格，可左右捲動",
+    codeLabel: "程式碼，可左右捲動",
     toc: "本頁目錄",
     backToTop: "回到頂端",
     fallback: "這篇文章目前只有中文版。",

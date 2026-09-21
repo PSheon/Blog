@@ -83,7 +83,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
   return (
     <>
       <ReadingProgress />
-      <ScrollableMath label={t.post.mathLabel} />
+      <ScrollableMath label={t.post.mathLabel} tableLabel={t.post.tableLabel} codeLabel={t.post.codeLabel} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
