@@ -5,7 +5,7 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { Tracer, buildBvh, cornell, cross, streamFor, sub, unit, type PathVertex, type Vec3 } from "@/lib/rt";
 import { useLabels } from "./labels";
-import { Stage } from "./stage";
+import { FALLBACK, Stage } from "./stage";
 import { useTracer } from "./use-tracer";
 
 const SIZE = 512, KEEP = 24, START = { x: 196, y: 430 }; // the floor, left of centre: red from the wall reaches it
@@ -67,15 +67,17 @@ export function PathLab() {
     void tracer.renderer.current?.readPixel(at.x, at.y).then((c) => { if (asked.current === at) setGpu(c); });
   };
 
+  // The paths are the CPU's: they work over the fallback picture too.
+  const ready = tracer.live || tracer.unavailable;
   // The first path, so the figure never opens empty.
   const opened = useRef(false);
-  useEffect(() => { if (tracer.live && !opened.current) { opened.current = true; shoot(1); } }, [tracer.live, shoot]);
+  useEffect(() => { if (ready && !opened.current) { opened.current = true; shoot(1); } }, [ready, shoot]);
 
   const last = shots.at(-1), mean: Vec3 | null = total.n ? [total.sum[0] / total.n, total.sum[1] / total.n, total.sum[2] / total.n] : null;
   return (
     <div ref={root} className="grid gap-5 text-sm">
       <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
-        <Stage canvas={canvas} status={tracer.status} label={t.pathPicture} t={t} testid="light-path-canvas">
+        <Stage canvas={canvas} status={tracer.status} label={t.pathPicture} t={t} testid="light-path-canvas" fallback={FALLBACK}>
           <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="absolute inset-0 size-full cursor-crosshair touch-manipulation" onPointerDown={pick} data-testid="light-path-overlay" aria-hidden>
             {shots.slice(0, -1).map((s, i) => <polyline key={i} points={s.points.map((p) => p.join(",")).join(" ")} fill="none" stroke="white" strokeOpacity={0.3} strokeWidth={1.2} />)}
             {last && last.points.slice(1).map((p, i) => (
@@ -112,14 +114,14 @@ export function PathLab() {
           <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 border-t border-border pt-3">
             <dt><Swatch colour={last ? tone(last.rgb) : "transparent"} /></dt><dd>{t.colourOne}</dd>
             <dt><Swatch colour={mean ? tone(mean) : "transparent"} /></dt><dd>{t.colourMean.replace("{n}", total.n.toLocaleString())}</dd>
-            <dt><Swatch colour={gpu ? tone(gpu) : "transparent"} /></dt><dd>{t.colourGpu}</dd>
+            <dt><Swatch colour={gpu ? tone(gpu) : "transparent"} /></dt><dd>{tracer.unavailable ? t.gpuMissing : t.colourGpu}</dd>
           </dl>
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-        <Button size="sm" disabled={!tracer.live} onClick={() => shoot(1)} data-testid="light-shoot">{t.shootOne}</Button>
-        <Button size="sm" variant="outline" disabled={!tracer.live} onClick={() => shoot(100)} data-testid="light-shoot-100">{t.shootMany}</Button>
-        <Button size="sm" variant="ghost" disabled={!tracer.live} onClick={() => { setShots([]); setTotal({ n: 0, lit: 0, sum: [0, 0, 0] }); }}>{t.restart}</Button>
+        <Button size="sm" disabled={!ready} onClick={() => shoot(1)} data-testid="light-shoot">{t.shootOne}</Button>
+        <Button size="sm" variant="outline" disabled={!ready} onClick={() => shoot(100)} data-testid="light-shoot-100">{t.shootMany}</Button>
+        <Button size="sm" variant="ghost" disabled={!ready} onClick={() => { setShots([]); setTotal({ n: 0, lit: 0, sum: [0, 0, 0] }); }}>{t.restart}</Button>
         <p className="basis-full text-muted-foreground">{t.pathHint}</p>
       </div>
     </div>

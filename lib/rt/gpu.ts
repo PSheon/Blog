@@ -31,7 +31,7 @@ export class Renderer {
   ) {}
 
   static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number): Promise<Renderer | Unavailable> {
-    if (!("gpu" in navigator)) return "no-webgpu";
+    if (!navigator.gpu) return "no-webgpu"; // some browsers define the property and leave it undefined
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
     if (!adapter) return "no-adapter";
     // A million triangles are 48 MB of triangles and 20 MB of nodes: more than the 128 MiB a binding gets by default only

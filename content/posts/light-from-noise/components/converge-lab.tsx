@@ -5,7 +5,7 @@ import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLabels } from "./labels";
-import { Stage, Transport } from "./stage";
+import { FALLBACK, Stage, Transport } from "./stage";
 import { useTracer } from "./use-tracer";
 
 const SIZE = 512, SIZES = [1_000, 10_000, 100_000, 1_000_000] as const, BOUNCES = [0, 1, 2, 16] as const;
@@ -81,7 +81,7 @@ export function ConvergeLab() {
   return (
     <div ref={root} className="grid gap-5 text-sm">
       <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)]">
-        <Stage canvas={canvas} status={status} label={t.picture} t={t} />
+        <Stage canvas={canvas} status={status} label={t.picture} t={t} fallback={FALLBACK} />
         <div className="grid gap-4">
           <div className="grid grid-cols-2 gap-4">
             <Readout label={t.spp} value={<span data-testid="light-spp">{seen ? seen.spp.toLocaleString() : "–"}</span>} large />

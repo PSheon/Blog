@@ -708,13 +708,20 @@ test("a picture clears from noise on the reader's GPU, or the figure says why it
   const adapter = await page.evaluate(async () => ("gpu" in navigator ? Boolean(await (navigator as unknown as { gpu: { requestAdapter(): Promise<unknown> } }).gpu.requestAdapter()) : false));
   if (!adapter) {
     // CI has no GPU. Say so where a reader of the report will see it, and check what a reader without one is shown.
-    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "only the fallback message was checked; the path tracer did not run" });
-    await expect(page.getByTestId("light-status")).toContainText(/WebGPU/);
+    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the GPU path tracer did not run; checked the fallback picture, its message and the CPU paths" });
+    await expect(figure.getByTestId("light-status")).toContainText(/WebGPU/);
+    await expect(figure.getByTestId("light-canvas-fallback")).toBeVisible(); // the finished picture stands in
+    // The one-path figure is the CPU's: it has to work over the fallback picture.
+    const path = page.locator('[data-instrument="light / one path"]');
+    await path.scrollIntoViewIfNeeded();
+    await path.getByTestId("light-shoot-100").click();
+    await expect.poll(async () => Number((await path.getByTestId("light-paths").textContent())!.replace(/\D/g, ""))).toBeGreaterThan(100);
+    expect(errors).toEqual([]);
     return;
   }
-  const spp = async () => Number((await page.getByTestId("light-spp").textContent())!.replace(/\D/g, "") || 0);
+  const spp = async () => Number((await figure.getByTestId("light-spp").textContent())!.replace(/\D/g, "") || 0);
   await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(64);
-  await page.getByTestId("light-toggle").click(); // pause: the count stops
+  await figure.getByTestId("light-toggle").click(); // pause: the count stops
   const held = await spp();
   await page.waitForTimeout(600);
   expect(await spp()).toBe(held);
