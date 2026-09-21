@@ -8,7 +8,7 @@ import type { BuildRequest, BuildResult } from "./scene.worker";
 
 /** "failed": there is a GPU, and starting the renderer on it threw (a driver that rejects the shader, a lost device). */
 export type TracerStatus = "building" | "running" | "paused" | "no-webgpu" | "no-adapter" | "failed";
-export interface Built { triangles: number; buildMs: number; nodeCount: number; depth: number }
+export interface Built { triangles: number; buildMs: number; nodeCount: number; depth: number; playground?: BuildResult["playground"] }
 
 interface Options {
   /** The Cornell box with about this many triangles… */
@@ -17,6 +17,8 @@ interface Options {
   studio?: StudioOptions;
   /** …or a packed scene to fetch (lib/rt/playground.ts). */
   playground?: string;
+  /** Room for this many triangles that move (Renderer.setDynamic). */
+  dynamicTriangles?: number;
   /** Pixels across; the picture is square unless `height` says otherwise. */
   size: number;
   height?: number;
@@ -62,12 +64,12 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
       if (!canvas.current) return;
       const { Renderer } = await import("@/lib/rt/gpu");
       const scene = { positions: [], material: [], materials: result.materials, camera: result.camera, light: result.light }, bvh = { nodes: result.nodes, nodeCount: result.nodeCount, triangles: result.packed, triangleCount: result.triangles, order: new Uint32Array(0), depth: result.depth, normals: result.normals };
-      const made = await Renderer.create(canvas.current, scene, bvh, size, height);
+      const made = await Renderer.create(canvas.current, scene, bvh, size, height, latest.current.dynamicTriangles ?? 0);
       if (!alive) { if (typeof made !== "string") made.destroy(); return; }
       if (typeof made === "string") { setStatus(made); return; }
       // In development the renderers are reachable from the console (`__lights[<the canvas's test id>]`, `__light` = the last built): measurements for docs/research are taken through it.
       if (process.env.NODE_ENV !== "production") { const w = window as unknown as { __light?: Renderer; __lights?: Record<string, Renderer> }; w.__light = made; (w.__lights ??= {})[canvas.current.dataset.testid ?? ""] = made; }
-      const r = (renderer.current = made), info: Built = { triangles: result.triangles, buildMs: result.buildMs, nodeCount: result.nodeCount, depth: result.depth };
+      const r = (renderer.current = made), info: Built = { triangles: result.triangles, buildMs: result.buildMs, nodeCount: result.nodeCount, depth: result.depth, playground: result.playground };
       let batch = 1, began = performance.now(), last = began;
       // Starting over is something the reader asked for, so it runs: also after a finished picture paused itself.
       restartRef.current = () => { latest.current.configure(r); r.reset(); began = performance.now(); batch = 1; r.sample(1); r.present(); wantRunning.current = true; setStatus("running"); };

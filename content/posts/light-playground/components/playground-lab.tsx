@@ -7,7 +7,7 @@ import { Stage } from "@/components/rt/stage";
 import { useTracer } from "@/components/rt/use-tracer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { PLAYGROUND_CREDIT, PLAYGROUND_URL, sunAt, type Vec3 } from "@/lib/rt";
+import { MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, buildDynamicBvh, parseModels, sunAt, writeModel, type Mat34, type ModelName, type Models, type Vec3 } from "@/lib/rt";
 import type { Renderer } from "@/lib/rt/gpu";
 import { useLabels } from "./labels";
 
@@ -15,7 +15,7 @@ const W = 960, H = 540, SPEED = 18, EXPOSURE = 0.18, MAX_SAMPLES = 1024;
 const MODES = ["raster", "direct", "full"] as const;
 type Mode = (typeof MODES)[number];
 /** Where to stand: position, yaw (about y, 0 = looking down −z) and pitch, radians. */
-const VIEWS = { air: { at: [150, 105, 165], yaw: -0.684, pitch: -0.41 }, low: { at: [60, 30, 70], yaw: -0.675, pitch: -0.167 }, ground: { at: [9, 17.2, 9], yaw: -0.699, pitch: -0.082 } } as const;
+const VIEWS = { cars: { at: [-33, 18.4, -12], yaw: -2.266, pitch: -0.25 }, air: { at: [150, 105, 165], yaw: -0.684, pitch: -0.41 }, low: { at: [60, 30, 70], yaw: -0.675, pitch: -0.167 }, ground: { at: [9, 17.2, 9], yaw: -0.699, pitch: -0.082 } } as const;
 const KEYS: Record<string, [number, number, number]> = { w: [0, 0, 1], s: [0, 0, -1], a: [-1, 0, 0], d: [1, 0, 0], q: [0, -1, 0], e: [0, 1, 0], arrowup: [0, 0, 1], arrowdown: [0, 0, -1], arrowleft: [-1, 0, 0], arrowright: [1, 0, 0] };
 
 /** A button that acts for as long as it is held: a phone's W and S. */
@@ -34,11 +34,27 @@ export function PlaygroundLab() {
   const mine = useRef<Renderer | null>(null), pressed = useRef(new Set<string>()), drag = useRef<{ x: number; y: number } | null>(null), timing = useRef({ ms: 0 });
 
   const tracer = useTracer(root, canvas, {
-    playground: PLAYGROUND_URL, size: W, height: H, autostart: true, maxSamples: MAX_SAMPLES, budgetMs: 8,
+    playground: PLAYGROUND_URL, dynamicTriangles: 8192, size: W, height: H, autostart: true, maxSamples: MAX_SAMPLES, budgetMs: 8,
     configure: (r) => { mine.current = r; dirty.current = true; },
     afterFrame: (r, _built, batch) => { timing.current.ms = timing.current.ms ? timing.current.ms * 0.9 + (batch.gpuMs / batch.samples) * 0.1 : batch.gpuMs / batch.samples; setSeen({ spp: r.samples, ms: timing.current.ms }); },
   });
-  const { resume } = tracer;
+  const { resume, built } = tracer;
+
+  // The vehicles, parked where Sketchbook parks them. They do not move yet; the tree they are in is the per-frame one.
+  const [models, setModels] = useState<Models | null>(null);
+  useEffect(() => { let alive = true; void fetch(MODELS_URL).then((r) => r.arrayBuffer()).then((b) => { if (alive) setModels(parseModels(b)); }); return () => { alive = false; }; }, []);
+  useEffect(() => {
+    const r = mine.current, park = built?.playground;
+    if (!r || !models || !park) return;
+    const out = { positions: new Float32Array(models.kinds.length * 9 * 2), materials: new Uint32Array(models.kinds.length * 2) };
+    let cursor = 0;
+    for (const name of ["car", "heli", "airplane"] as ModelName[]) for (const spawn of park.spawns.filter((s) => s.type === name && s.at[1] < 100).slice(0, name === "car" ? 2 : 1)) {
+      const pose: Mat34 = [...spawn.basis, ...spawn.at];
+      cursor = writeModel(models, name, park.vehicleMaterials[name], pose, () => null, out, cursor);
+    }
+    r.setDynamic(buildDynamicBvh(out.positions, out.materials, cursor, r.nodeBase, r.triangleBase));
+    dirty.current = true;
+  }, [models, built]);
 
   /** Hand the pose and the settings to the renderer and throw away what it has: the picture is of something else now. */
   const apply = useCallback(() => {

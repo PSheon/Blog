@@ -1,3 +1,4 @@
+import { VEHICLE_MATERIALS, type ModelName } from "./models";
 import type { Material, Scene, Vec3 } from "./scene";
 
 /**
@@ -17,7 +18,7 @@ const PALETTE: Record<string, Vec3> = {
   helipad: [0.9, 0.55, 0.05], arrow_down: [0.9, 0.8, 0.1], ocean: [0.01, 0.05, 0.08],
 };
 
-export interface Playground extends Scene { spawns: { type: string; at: Vec3 }[] }
+export interface Playground extends Scene { spawns: { type: string; at: Vec3; /** the spawn's three axes, column by column */ basis: number[] }[]; /** where each vehicle's three materials (paint, window, tyre) start in `materials` */ vehicleMaterials: Record<ModelName, number> }
 
 export function parsePlayground(file: ArrayBuffer): Playground {
   const view = new DataView(file), jsonBytes = view.getUint32(0, true), header = JSON.parse(new TextDecoder().decode(new Uint8Array(file, 4, jsonBytes))) as { vertices: number; triangles: number; indexBytes: 2 | 4; materials: string[]; spawns: Playground["spawns"] };
@@ -28,7 +29,9 @@ export function parsePlayground(file: ArrayBuffer): Playground {
   const positions = new Array<number>(header.triangles * 9);
   for (let i = 0; i < header.triangles * 3; i++) { const v = indices[i] * 3; positions[i * 3] = vertices[v]; positions[i * 3 + 1] = vertices[v + 1]; positions[i * 3 + 2] = vertices[v + 2]; }
   const materials: Material[] = header.materials.map((name) => ({ albedo: PALETTE[name] ?? [0.6, 0.6, 0.6], emit: [0, 0, 0], mirror: name === "ocean" }));
-  return { positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
+  const vehicleMaterials = {} as Record<ModelName, number>;
+  for (const name of Object.keys(VEHICLE_MATERIALS) as ModelName[]) { vehicleMaterials[name] = materials.length; materials.push(...VEHICLE_MATERIALS[name]); }
+  return { vehicleMaterials, positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
 }
 
 /** Where the sun is at `hour` (0–24) and how strong: direction towards it, strength 0.05…1, and the sky's level. */

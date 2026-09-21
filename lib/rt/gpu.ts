@@ -41,9 +41,12 @@ export class Renderer {
     private readonly params: GPUBuffer, private readonly paramData: ArrayBuffer, private readonly accum: GPUBuffer, private readonly counters: GPUBuffer, private readonly tiles: GPUBuffer, private readonly tileCount: number,
     private readonly tracePipe: GPUComputePipeline, private readonly traceBind: GPUBindGroup, private readonly measurePipe: GPUComputePipeline, private readonly measureBind: GPUBindGroup,
     private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[], private readonly mats: GPUBuffer,
+    private readonly nodes: GPUBuffer, private readonly tris: GPUBuffer, /** where a dynamic tree starts: pass these to buildDynamicBvh */ readonly nodeBase: number, readonly triangleBase: number, readonly dynamicCapacity: number,
   ) {}
+  private dynamicRoot = 0;
 
-  static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number): Promise<Renderer | Unavailable> {
+  /** `dynamicTriangles`: room to keep after the world's tree for a second one that is rebuilt every frame (`setDynamic`). */
+  static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number, dynamicTriangles = 0): Promise<Renderer | Unavailable> {
     if (!navigator.gpu) return "no-webgpu"; // some browsers define the property and leave it undefined
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
     if (!adapter) return "no-adapter";
@@ -61,9 +64,9 @@ export class Renderer {
     const materials = new Float32Array(scene.materials.length * MATERIAL_FLOATS);
     scene.materials.forEach((m, i) => materials.set(packMaterial(m), i * MATERIAL_FLOATS));
     const across = Math.ceil(width / WORKGROUP), down = Math.ceil(height / WORKGROUP), tileCount = across * down;
-    const nodes = make(bvh.nodes.byteLength, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials), smooth = make(Math.max(48, bvh.normals?.byteLength ?? 0), STORAGE, bvh.normals?.byteLength ? bvh.normals : undefined);
+    const nodes = make(bvh.nodes.byteLength + dynamicTriangles * 2 * 32, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength + dynamicTriangles * 48, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials), smooth = make(Math.max(48, bvh.normals?.byteLength ?? 0), STORAGE, bvh.normals?.byteLength ? bvh.normals : undefined);
     const accum = make(width * height * 16 * 2, STORAGE), counters = make(16, STORAGE), tiles = make(tileCount * 8, STORAGE);
-    const paramData = new ArrayBuffer(176), params = make(176, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    const paramData = new ArrayBuffer(192), params = make(192, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
     new Uint32Array(paramData, 0, 4).set([width, height, 0, 16]);
     Renderer.writeCamera(paramData, scene.camera, width / height);
@@ -83,7 +86,7 @@ export class Renderer {
     return new Renderer(device, adapter.info?.description || adapter.info?.architecture || adapter.info?.vendor || "GPU", context, width, height, params, paramData, accum, counters, tiles, tileCount,
       tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth]) }),
       measurePipe, device.createBindGroup({ layout: measurePipe.getBindGroupLayout(0), entries: entries([accum, tiles, params]) }),
-      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params]) }), owned, mats);
+      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params]) }), owned, mats, nodes, tris, bvh.nodeCount, bvh.triangleCount, dynamicTriangles);
   }
 
   private static writeCamera(paramData: ArrayBuffer, camera: Scene["camera"], aspect: number): void {
@@ -93,6 +96,13 @@ export class Renderer {
   /** Change one material in place (a slider moved). What has been accumulated is of the old one: the caller resets. */
   setMaterial(index: number, material: Material): void { this.device.queue.writeBuffer(this.mats, index * MATERIAL_FLOATS * 4, new Float32Array(packMaterial(material))); }
 
+  /** This frame's tree of moving things (built with this renderer's `nodeBase` and `triangleBase`). The picture so far is of the old one: the caller resets. */
+  setDynamic(tree: { nodes: ArrayBuffer; triangles: ArrayBuffer; triangleCount: number }): void {
+    if (tree.triangleCount > this.dynamicCapacity) throw new Error(`${tree.triangleCount} moving triangles, room for ${this.dynamicCapacity}`);
+    this.device.queue.writeBuffer(this.nodes, this.nodeBase * 32, tree.nodes); this.device.queue.writeBuffer(this.tris, this.triangleBase * 48, tree.triangles);
+    this.dynamicRoot = tree.triangleCount > 0 ? this.nodeBase : 0;
+  }
+
   /** Look from somewhere else. What has been accumulated is of the old view: the caller resets. */
   setCamera(camera: Scene["camera"]): void { Renderer.writeCamera(this.paramData, camera, this.width / this.height); }
 
@@ -100,6 +110,7 @@ export class Renderer {
     new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
     new Float32Array(this.paramData, 96, 6).set([...this.sun, this.exposure, this.skyLevel]);
     new Uint32Array(this.paramData, 120, 2).set([this.strategy, this.furnace ? 1 : 0]);
+    new Uint32Array(this.paramData, 176, 1).set([this.dynamicRoot]);
     new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : this.raster ? 2 : 0, this.quad === "strategies" ? 2 : this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
     this.device.queue.writeBuffer(this.params, 0, this.paramData);
   }

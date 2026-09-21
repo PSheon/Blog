@@ -25,6 +25,8 @@
  * ray that leaves sees white 1 and nothing else shines; a surface that returns more than it was given shows at once.
  * cpu.ts has matte only.
  *
+ * `dynamicRoot` > 0: a second tree, for what moves, stored after the world's in the same buffers.
+ *
  * Outdoors (`sun.w` > 0; the Cornell box never sets it, and cpu.ts does not have it): a ray that leaves sees a sky
  * gradient, every hit asks the sun directly with one shadow ray (next-event estimation, a 1.5° disc), a material with
  * `mirror` reflects by Fresnel's share (the sea), and view 2 is what a plain rasteriser would draw of the same scene:
@@ -36,7 +38,7 @@ export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
 struct Tri { v0: vec3f, m: u32, v1: vec3f, p1: u32, v2: vec3f, p2: u32 };
 struct Material { albedo: vec3f, mirror: f32, emit: vec3f, roughness: f32, metallic: f32, ior: f32, glass: f32, p3: f32 };
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, q0: u32, q1: u32, q2: u32 };
 
 @group(0) @binding(0) var<storage, read> nodes: array<Node>;
 @group(0) @binding(1) var<storage, read> tris: array<Tri>;
@@ -62,10 +64,11 @@ struct Hit { t: f32, tri: u32, steps: u32, overflow: u32, u: f32, v: f32 };
 const MISS = 0xffffffffu;
 const INNER = 0x80000000u;
 
-fn trace(o: vec3f, d: vec3f, eps: f32) -> Hit {
+// Walks the tree whose root is node root, looking for a hit nearer than within.
+fn trace(root: u32, o: vec3f, d: vec3f, eps: f32, within: f32) -> Hit {
   let inv = 1.0 / d;
-  var h = Hit(1e30, MISS, 0u, 0u, 0.0, 0.0);
-  var stack: array<u32, 32>; var sp = 0u; var cur = 0u;
+  var h = Hit(within, MISS, 0u, 0u, 0.0, 0.0);
+  var stack: array<u32, 32>; var sp = 0u; var cur = root;
   loop {
     h.steps++;
     let n = nodes[cur];
@@ -138,7 +141,13 @@ fn schlick(f0: vec3f, c: f32) -> vec3f { let k = 1.0 - c; return f0 + (vec3f(1.0
 
 fn nearest(o: vec3f, d: vec3f, eps: f32) -> Hit {
   if (params.brute == 1u) { return traceBrute(o, d, eps); }
-  return trace(o, d, eps);
+  var h = trace(0u, o, d, eps, 1e30);
+  if (params.dynamicRoot > 0u) { // the things that move have a tree of their own, rebuilt every frame (lib/rt/dynamic.ts)
+    let moving = trace(params.dynamicRoot, o, d, eps, h.t); let steps = h.steps + moving.steps; let overflow = h.overflow | moving.overflow;
+    if (moving.tri != MISS) { h = moving; }
+    h.steps = steps; h.overflow = overflow;
+  }
+  return h;
 }
 
 @compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
@@ -222,7 +231,12 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
       let metal = m.metallic > 0.5; let alpha = max(m.roughness * m.roughness, 1e-3); let frame = basis(ns); let v = transpose(frame) * (-d);
       if (outdoors) { // ask the sun directly: one shadow ray towards a point on its disc
         let l = towardsSun(); let cosine = dot(n, l);
-        if (cosine > 0.0) { rays++; let shadow = nearest(at + n * (1e-4 * scale), l, 1e-5 * scale); steps += shadow.steps; if (shadow.tri == MISS) { rgb += through * m.albedo / 3.14159 * sunRadiance() * SUN_SOLID * cosine; } }
+        if (cosine > 0.0 && v.z > 0.0) {
+          var response = m.albedo / 3.14159265;
+          if (metal) { let lv = transpose(frame) * l; let hv = normalize(v + lv); response = schlick(m.albedo, max(dot(v, hv), 0.0)) * ggxD(alpha, hv.z) * ggxG1(alpha, v.z) * ggxG1(alpha, max(lv.z, 0.0)) / (4.0 * v.z * max(lv.z, 1e-6)); }
+          rays++; let shadow = nearest(at + n * (1e-4 * scale), l, 1e-5 * scale); steps += shadow.steps;
+          if (shadow.tri == MISS) { rgb += through * response * sunRadiance() * SUN_SOLID * cosine; }
+        }
       }
       if (lamp) { // ask the lamp directly: a random point on it, one shadow ray
         let aim = params.lightO.xyz + params.lightU.xyz * rnd() + params.lightV.xyz * rnd(); let to = aim - at; let distance = length(to); let l = to / distance;
@@ -277,7 +291,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
  * samples most pixels are black in both pictures and agree by accident, and the clamp hides every bright hit.
  */
 export const MEASURE = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, q0: u32, q1: u32, q2: u32 };
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> tiles: array<vec2f>;
 @group(0) @binding(2) var<uniform> params: Params;
@@ -307,7 +321,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
 
 /** A full-screen triangle that shows A + B, tone-mapped (Narkowicz's ACES fit) and gamma-encoded. */
 export const PRESENT = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f };
+struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, q0: u32, q1: u32, q2: u32 };
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<uniform> params: Params;
 struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };

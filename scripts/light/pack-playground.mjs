@@ -38,7 +38,7 @@ const vertex = (x, y, z) => {
 };
 const visit = (index, parent) => {
   const node = gltf.nodes[index], m = mul(parent, trs(node));
-  if (node.extras?.data === "spawn") spawns.push({ type: node.extras.type, at: [m[12], m[13], m[14]].map((v) => +v.toFixed(2)) });
+  if (node.extras?.data === "spawn") spawns.push({ type: node.extras.type, at: [m[12], m[13], m[14]].map((v) => +v.toFixed(2)), basis: [m[0], m[1], m[2], m[4], m[5], m[6], m[8], m[9], m[10]].map((v) => +v.toFixed(4)) });
   if (node.mesh != null && node.extras?.data !== "physics") for (const primitive of gltf.meshes[node.mesh].primitives) {
     const p = accessor(primitive.attributes.POSITION), ix = primitive.indices != null ? accessor(primitive.indices) : null, count = ix ? ix.count : p.count;
     const world = Array.from({ length: p.count }, (_, k) => { const x = p.get(k, 0), y = p.get(k, 1), z = p.get(k, 2); return vertex(m[0] * x + m[4] * y + m[8] * z + m[12], m[1] * x + m[5] * y + m[9] * z + m[13], m[2] * x + m[6] * y + m[10] * z + m[14]); });
