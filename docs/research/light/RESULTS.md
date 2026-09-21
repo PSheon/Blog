@@ -194,3 +194,14 @@ with neither. Frame rate the same either way (85 and 88 while the measuring loop
 without it). Edge stops: same material, normal (cosine^32), distance from the pixel's plane (2% of the distance to the
 eye + 1 cm), log-luminance (0.9). A pixel listens to its neighbours fully up to 8 samples of its own and not at all
 from 64. Known: the character's thin shadow softens and fades a little; highlights in car paint are smoothed.
+
+## Flight, ported from Sketchbook (2026-09-21)
+
+The helicopter and the aeroplane now use Sketchbook's per-step velocity edits (`vehicles/Helicopter.ts`, `Airplane.ts`)
+instead of my own force model. Measured in Chrome on the playground's runway, full throttle from rest, nothing else
+pressed, read through `window.__world` every 2 s: 1.6, 6.3, 9.7 m/s on the ground, airborne between 6 s and 8 s at
+11.6 m/s, then 12.7, 13.2, 13.5 m/s while climbing 15.5 → 18.8 m. The same run in `tests/rt/aircraft.test.ts` on a flat
+plane: on the ground at 7 s (10.75 m/s), airborne at 8 s. A 0.25 s tap of S at 13.5 m/s raised the nose and bled the
+speed to 3 m/s within 6 s (it fell): under throttle Sketchbook switches its nose-follows-velocity correction off on two
+axes so that loops are possible, so nothing lowers the nose again. Helicopter: Shift for 3 s after spin-up climbed
+17.1 → 40.7 m; Q for 1.5 s turned it 2.2 rad; D for 1.5 s rolled it to 59° (up·y 0.51).

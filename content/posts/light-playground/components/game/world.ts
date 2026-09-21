@@ -10,7 +10,7 @@ import { Character, type Keys, type Side, type Surroundings } from "./character"
  * Sketchbook's state machine (character.ts); this file gives it a body, a ground to feel, vehicles with doors and
  * seats, and turns its wishes (a speed, a facing, a jump) into movement. Nothing here draws.
  */
-export interface Input { /** the stick: x right, y forward, each −1…1 */ move: [number, number]; /** where the camera looks, radians about y */ yaw: number; jump: boolean; sprint: boolean; /** get in or out (pressed this frame) */ interact: boolean }
+export interface Input { /** the stick: x right, y forward, each −1…1 */ move: [number, number]; /** where the camera looks, radians about y */ yaw: number; jump: boolean; sprint: boolean; /** get in or out (pressed this frame) */ interact: boolean; /** flying: Q −1 … E 1 (yaw), Shift (climb, throttle), Space (sink, air brake), B (the aeroplane's wheel brake) */ turn?: number; up?: boolean; down?: boolean; wheelBrake?: boolean }
 export interface Person { /** where its feet are and how it stands, ready for the skinner */ place: Mat34; at: Vec3; clip: ClipName; clipTime: number; fade: number; loop: boolean; moving: boolean; state: string }
 /** Something parked in the playground that can be got into: a car, the helicopter, the aeroplane. */
 export interface Vehicle { name: ModelName; pose(): Mat34; /** a wheel's, a rotor's or a door's own movement */ part(part: Part): Mat34 | null; car: Car | null; craft: Helicopter | Aeroplane | null; body: RAPIER.RigidBody; moving(): boolean; seat: Seat; doors: Map<string, Door> }
@@ -129,7 +129,7 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     const driven = inside?.seated ? inside.vehicle : null;
     for (const v of vehicles) {
       if (v.car && (v === driven || v.car.moving())) v.car.drive(v === driven ? { throttle: input.move[1], steer: -input.move[0], brake: input.jump || input.sprint } : { throttle: 0, steer: 0, brake: false }, STEP);
-      if (v.craft && (v === driven || v.craft.moving())) v.craft.drive(v === driven ? { x: input.move[0], y: input.move[1], up: input.jump, down: input.sprint } : null, STEP);
+      if (v.craft && (v === driven || v.craft.moving())) v.craft.drive(v === driven ? { x: Math.max(-1, Math.min(1, input.move[0])), y: Math.max(-1, Math.min(1, input.move[1])), yaw: Math.max(-1, Math.min(1, input.turn ?? 0)), up: !!input.up, down: !!input.down, wheelBrake: !!input.wheelBrake } : null, STEP);
       for (const d of v.doors.values()) if (d.rotation !== d.target) { doorsMoving = true; d.rotation = d.rotation < d.target ? Math.min(d.target, d.rotation + 5 * STEP) : Math.max(d.target, d.rotation - 5 * STEP); }
     }
 

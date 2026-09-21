@@ -71,7 +71,7 @@ for (const name of ["car", "heli", "airplane"]) {
     if (data === "camera") anchors.camera = [world[12], world[13], world[14]].map(round);
     let target = part;
     const door = /^door/.test(node.name);
-    if (data === "wheel" || data === "rotor" || door) movers.push(target = { name: node.name, role: door ? "door" : data, steering: node.extras?.steering === "true", drive: node.extras?.drive ?? null, rest: world, inverse: invert(world), triangles: [] });
+    if (data === "wheel" || data === "rotor" || data === "aileron" || data === "elevator" || data === "rudder" || door) movers.push(target = { name: node.name, role: door ? "door" : data, side: node.extras?.side ?? null, steering: node.extras?.steering === "true", drive: node.extras?.drive ?? null, rest: world, inverse: invert(world), triangles: [] });
     if (node.mesh != null) for (const primitive of gltf.meshes[node.mesh].primitives) {
       const p = accessor(primitive.attributes.POSITION), uv = primitive.attributes.TEXCOORD_0 != null ? accessor(primitive.attributes.TEXCOORD_0) : null, ix = primitive.indices != null ? accessor(primitive.indices) : null, count = ix ? ix.count : p.count, tex = grey[primitive.material ?? 0];
       for (let t = 0; t + 2 < count; t += 3) {
@@ -100,7 +100,7 @@ for (const name of ["car", "heli", "airplane"]) {
   for (const m of movers) { // a mover's triangles go about its own origin
     const first = positions.length / 9;
     for (const { tri, kind } of m.triangles) { for (let k = 0; k < 3; k++) positions.push(...apply(m.inverse, tri.slice(k * 3, k * 3 + 3))); kinds.push(m.role === "rotor" ? 2 : kind); } // rotor blades are dark, like tyres
-    parts.push({ name: m.name, role: m.role, steering: m.steering, drive: m.drive, rest: m.rest.slice(0, 3).concat(m.rest.slice(4, 7), m.rest.slice(8, 11), m.rest.slice(12, 15)).map(round), first, count: m.triangles.length });
+    parts.push({ name: m.name, role: m.role, side: m.side, steering: m.steering, drive: m.drive, rest: m.rest.slice(0, 3).concat(m.rest.slice(4, 7), m.rest.slice(8, 11), m.rest.slice(12, 15)).map(round), first, count: m.triangles.length });
   }
   const windows = kinds.slice(parts[0].first, parts[0].first + parts[0].count).filter((k) => k === 1).length;
   for (const seat of seats) seat.entries = seat.entries.map((e) => ({ name: e, at: entries[e] })).filter((e) => e.at);

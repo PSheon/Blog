@@ -149,7 +149,11 @@ export function PlaygroundLab() {
       if (a && mine.current) {
         const move: [number, number] = [stick.current[0], stick.current[1]];
         for (const key of held.current) { const k = KEYS[key]; if (k) { move[0] += k[0]; move[1] += k[1]; } }
-        const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current });
+        // Flying, the keys are Sketchbook's: W S pitch, A D roll, Q E yaw, Shift up or throttle, Space down or air brake, B the wheel brake.
+        // A thumb has no Q and E, so in the helicopter the stick's sideways half is the yaw: pitch and yaw fly it anywhere, pitch and roll do not.
+        let turn = (held.current.has("KeyE") ? 1 : 0) - (held.current.has("KeyQ") ? 1 : 0);
+        if (seatNow.current === "flying" && a.world.driving()?.name === "heli") { turn += stick.current[0]; move[0] -= stick.current[0]; }
+        const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current, turn, up: held.current.has("shift") || hover.current, down: held.current.has("space") || down.current, wheelBrake: held.current.has("KeyB") });
         jump.current = false; interact.current = false;
         const inside = a.world.seated() ? a.world.driving() : null, now = inside ? (inside.craft ? "flying" : "driving") : a.world.nearby() ? "near" : "foot";
         if (now !== seatNow.current) { seatNow.current = now; setSeat(now); setCraft(inside?.name ?? null); dirty.current = true; }
@@ -196,7 +200,7 @@ export function PlaygroundLab() {
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift" : event.code === "Space" ? "space" : event.code;
     if (event.code === "Escape") return; // the window's listener decides (it knows whether this Escape only released the pointer)
-    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF") return;
+    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF" && k !== "KeyQ" && k !== "KeyE" && k !== "KeyB") return;
     if (k !== "shift") event.preventDefault(); // the arrows and the space bar would scroll the page
     if (k === "KeyF") { if (down && !event.repeat) interact.current = true; return; }
     if (k === "space" && down && !event.repeat) jump.current = true; // held, it is the car's brake

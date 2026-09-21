@@ -3,19 +3,22 @@ import { compose, fromPose, rotationX, rotationY, type Mat34, type Model, type P
 import { quaternionOf } from "./car";
 
 /**
- * A helicopter and an aeroplane, as games fly them rather than as aircraft do. Both are rigid bodies shaped by their
- * models' boxes; what holds them up is a force computed here every step.
+ * Sketchbook's helicopter and aeroplane, ported step for step (vehicles/Helicopter.ts and Airplane.ts, MIT, Jan Blaha).
+ * Both are rigid bodies shaped by their models' boxes. Sketchbook flies them by editing the body's velocities before
+ * every 60 Hz physics step, in metres per second per step; the numbers below are its numbers, and `k` stretches them
+ * if a step is ever not 1/60 s.
  *
- * Helicopter: the rotor pushes along the body's own up. With the engine on it carries the weight by itself, so letting
- * go of everything hovers; `up`/`down` add or take away lift, the stick tilts (forward/back) and turns (left/right),
- * and a spring pulls the body level again. It moves because tilted lift has a sideways part.
+ * Helicopter: the engine takes five seconds to come up. With power it cancels 98 % of gravity along its own up (less
+ * as it tilts), W/S pitch, A/D roll, Q/E yaw, Shift and Space climb and sink, and while someone is in it a correction
+ * turns its up towards the sky.
  *
- * Aeroplane: `up` is the throttle, `down` the brake. Lift grows with the square of the forward speed; the stick pitches
- * and rolls with an authority that also grows with speed (no air, no control); and the velocity is bent towards where
- * the nose points, which is what wings do and what makes it fly like a plane and not like a thrown brick. On the ground
- * it is a three-wheeled car.
+ * Aeroplane: Shift is the throttle, Space the air brake, B the wheel brake. The controls only bite with forward speed
+ * (all of them at 10 m/s). Drag is taken from the whole velocity and given back along the nose, which is what bends the
+ * flight path to where the nose points; lift is small and capped. On the ground Q/E or A/D steer the nose wheel.
+ * Not ported: Sketchbook lightens the body by up to 60 % with speed; here the mass stays, since the landing gear's
+ * springs are tuned for it.
  */
-export interface Fly { /** stick: x right, y forward */ x: number; y: number; up: boolean; down: boolean }
+export interface Fly { /** roll: −1 left (A) … 1 right (D) */ x: number; /** pitch: 1 nose down (W) … −1 nose up (S) */ y: number; /** −1 left (Q) … 1 right (E) */ yaw: number; /** Shift: climb, or throttle */ up: boolean; /** Space: sink, or air brake */ down: boolean; /** B */ wheelBrake: boolean }
 type V = { x: number; y: number; z: number };
 
 const axes = (q: { x: number; y: number; z: number; w: number }) => ({
@@ -25,8 +28,26 @@ const axes = (q: { x: number; y: number; z: number; w: number }) => ({
 });
 const dot = (a: V, b: V) => a.x * b.x + a.y * b.y + a.z * b.z, scaled = (a: V, s: number): V => ({ x: a.x * s, y: a.y * s, z: a.z * s }), plus = (...v: V[]): V => v.reduce((a, b) => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z }));
 
-function chassis(R: typeof RAPIER, world: RAPIER.World, model: Model, pose: Mat34, mass: number, lift: number, angularDamping: number) {
-  const body = world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pose[9], pose[10] + lift, pose[11]).setRotation(quaternionOf(pose)).setLinearDamping(0.1).setAngularDamping(angularDamping));
+const cross = (a: V, b: V): V => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x }), clamp = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x)), length = (a: V) => Math.hypot(a.x, a.y, a.z);
+
+/**
+ * Sketchbook's stabiliser: three.js' `Quaternion.setFromUnitVectors(from, to)`, all four components times 0.3, read
+ * back as XYZ Euler angles and added to the angular velocity. A quaternion scaled like that is no longer a rotation,
+ * so the angles are not 0.3 of the way; they are what three.js makes of it, and the feel depends on it. Same arithmetic here.
+ */
+function correction(from: V, to: V): V {
+  let w = dot(from, to) + 1, v: V;
+  if (w < 1e-6) { w = 0; v = Math.abs(from.x) > Math.abs(from.z) ? { x: -from.y, y: from.x, z: 0 } : { x: 0, y: -from.z, z: from.y }; } else v = cross(from, to);
+  const n = 0.3 / (Math.hypot(v.x, v.y, v.z, w) || 1), x = v.x * n, y = v.y * n, z = v.z * n; w *= n;
+  const m11 = 1 - 2 * (y * y + z * z), m12 = 2 * (x * y - w * z), m13 = 2 * (x * z + w * y), m22 = 1 - 2 * (x * x + z * z), m23 = 2 * (y * z - w * x), m32 = 2 * (y * z + w * x), m33 = 1 - 2 * (x * x + y * y);
+  return Math.abs(m13) < 0.9999999 ? { x: Math.atan2(-m23, m33), y: Math.asin(clamp(m13, -1, 1)), z: Math.atan2(-m12, m11) } : { x: Math.atan2(m32, m22), y: Math.asin(clamp(m13, -1, 1)), z: 0 };
+}
+
+/** Sketchbook's SpringSimulator at its 60 frames a second: one call is one frame. */
+class Spring { position = 0; velocity = 0; target = 0; constructor(private mass: number, private damping: number) {} step(): number { this.velocity += (this.target - this.position) / this.mass; this.velocity *= this.damping; return (this.position += this.velocity); } }
+
+function chassis(R: typeof RAPIER, world: RAPIER.World, model: Model, pose: Mat34, mass: number, lift: number) {
+  const body = world.createRigidBody(R.RigidBodyDesc.dynamic().setTranslation(pose[9], pose[10] + lift, pose[11]).setRotation(quaternionOf(pose)).setLinearDamping(0.01).setAngularDamping(0.01)); // cannon-es' defaults, which Sketchbook leaves alone
   const boxes = model.colliders.filter((c) => c.shape === "box"), volume = boxes.reduce((v, c) => v + (c.shape === "box" ? 8 * c.half[0] * c.half[1] * c.half[2] : 0), 0);
   for (const c of boxes) if (c.shape === "box") world.createCollider(R.ColliderDesc.cuboid(c.half[0], c.half[1], c.half[2]).setTranslation(c.at[0], c.at[1], c.at[2]).setDensity(mass / volume).setFriction(0.6), body);
   // The spheres are what it stands on (a helicopter's skid ends are four of them): weightless, but without them it sits down on its tail.
@@ -34,71 +55,91 @@ function chassis(R: typeof RAPIER, world: RAPIER.World, model: Model, pose: Mat3
   return body;
 }
 const stirring = (body: RAPIER.RigidBody) => !body.isSleeping() && (Math.hypot(body.linvel().x, body.linvel().y, body.linvel().z) > 0.03 || Math.hypot(body.angvel().x, body.angvel().y, body.angvel().z) > 0.03);
+const UP: V = { x: 0, y: 1, z: 0 };
 
 export function createHelicopter(R: typeof RAPIER, world: RAPIER.World, model: Model, pose: Mat34) {
-  const MASS = 700, body = chassis(R, world, model, pose, MASS, 0.3, 2.5);
-  let spin = 0, power = 0; // power: the rotor takes a moment to spin up and down
+  const body = chassis(R, world, model, pose, 700, 0.3);
+  let spin = 0, power = 0;
   return {
     body, kind: "heli" as const,
     drive(input: Fly | null, dt: number): void {
-      power += ((input ? 1 : 0) - power) * Math.min(1, dt * (input ? 1.2 : 0.6));
-      spin += power * 38 * dt;
-      if (power < 0.02) return;
-      body.wakeUp();
-      const mass = body.mass(), a = axes(body.rotation()), g = 9.81, climb = input ? (input.up ? 7 : 0) - (input.down ? 6 : 0) : -2;
-      body.resetForces(true); body.resetTorques(true);
-      body.addForce(scaled(a.up, mass * (g + climb) * power / Math.max(0.5, a.up.y)), true); // divided by the tilt: tilting does not sink it
-      const w = body.angvel(), level = { x: a.up.z, y: 0, z: -a.up.x }, want = input ?? { x: 0, y: 0, up: false, down: false };
-      // tilt by the stick, turn by the stick, spring back level, and damp what is left
-      const torque = plus(scaled(a.right, want.y * 9), scaled({ x: 0, y: 1, z: 0 }, -want.x * 6), scaled(level, -14), scaled(w, -3));
-      body.addTorque(scaled(torque, mass * 0.35 * power), true);
-      const v = body.linvel(); body.addForce({ x: -v.x * mass * 0.35, y: -v.y * mass * 1.3, z: -v.z * mass * 0.35 }, true); // air
+      power = input ? Math.min(1, power + dt * 0.2) : Math.max(0, power - dt * 0.06);
+      spin += power * dt * 30;
+      if (power === 0) return;
+      const k = dt * 60, a = axes(body.rotation());
+      let v: V = body.linvel(), w: V = body.angvel();
+      if (input?.up) v = plus(v, scaled(a.up, 0.15 * power * k));
+      if (input?.down) v = plus(v, scaled(a.up, -0.15 * power * k));
+      // vertical stabilisation: 98 % of gravity, along its own up, less as it tilts; and a little damping of the climb
+      const hold = 9.81 * dt * 0.98 * Math.sqrt(clamp(a.up.y, 0, 1));
+      v = plus(v, scaled(plus(scaled(a.up, hold), { x: 0, y: v.y * -0.01 * k, z: 0 }), power));
+      const slow = 1 + (0.995 - 1) * power; v = { x: v.x * slow ** k, y: v.y, z: v.z * slow ** k };
+      if (input) {
+        w = plus(w, scaled(correction(a.up, UP), power * k)); // only while someone flies it
+        w = plus(w, scaled(a.right, 0.07 * power * k * input.y), scaled(a.up, -0.07 * power * k * input.yaw), scaled(a.forward, 0.07 * power * k * input.x));
+      }
+      w = scaled(w, 0.97 ** k);
+      body.setLinvel(v, true); body.setAngvel(w, true);
     },
-    moving: () => power > 0.02 || stirring(body),
+    moving: () => power > 0 || stirring(body),
     pose: (): Mat34 => fromPose(body.translation(), body.rotation()),
     part: (p: Part): Mat34 | null => (p.role === "rotor" ? rotationX(spin * (p.name === "Cube.002" ? 1.7 : 1)) : null),
+    power: () => power,
   };
 }
 
 export function createAeroplane(R: typeof RAPIER, world: RAPIER.World, model: Model, pose: Mat34) {
-  const MASS = 520, REST = 0.16, RADIUS = 0.11, body = chassis(R, world, model, pose, MASS, 0.35, 1.2), gear = world.createVehicleController(body);
+  const REST = 0.16, RADIUS = 0.11, body = chassis(R, world, model, pose, 520, 0.35), gear = world.createVehicleController(body);
   const wheels = model.parts.filter((p): p is Part & { rest: Mat34 } => p.role === "wheel" && !!p.rest);
   gear.indexUpAxis = 1; gear.setIndexForwardAxis = 2;
   wheels.forEach((w, i) => { gear.addWheel({ x: w.rest[9], y: w.rest[10] + REST, z: w.rest[11] }, { x: 0, y: -1, z: 0 }, { x: -1, y: 0, z: 0 }, REST, RADIUS); gear.setWheelSuspensionStiffness(i, 60); gear.setWheelSuspensionCompression(i, 4); gear.setWheelSuspensionRelaxation(i, 5); gear.setWheelMaxSuspensionTravel(i, 0.12); gear.setWheelMaxSuspensionForce(i, 40_000); gear.setWheelFrictionSlip(i, 1.6); });
-  let spin = 0, throttle = 0;
+  const steering = new Spring(10, 0.6), aileron = new Spring(5, 0.6), elevator = new Spring(7, 0.6), rudder = new Spring(10, 0.6), SURFACE = 0.7;
+  let spin = 0, power = 0, lastDrag = 0, grounded = 0;
   return {
     body, kind: "airplane" as const,
     drive(input: Fly | null, dt: number): void {
-      throttle += ((input?.up ? 1 : 0) - throttle) * Math.min(1, dt * 0.9);
-      spin += (4 + throttle * 60) * (input ? 1 : throttle) * dt;
-      const a = axes(body.rotation()), v = body.linvel(), mass = body.mass(), forwardSpeed = dot(v, a.forward), air = Math.min(1, Math.abs(forwardSpeed) / 22);
-      wheels.forEach((w, i) => { if (w.steering) gear.setWheelSteering(i, -(input?.x ?? 0) * 0.5); gear.setWheelBrake(i, input?.down ? 12 : input ? 0.05 : 2); });
-      gear.updateVehicle(dt);
+      power = input ? Math.min(1, power + dt * 0.4) : Math.max(0, power - dt * 0.12);
+      spin += power * dt * 60;
+      const left = !!input && (input.yaw < 0 || input.x < 0) && !(input.yaw > 0 || input.x > 0), right = !!input && (input.yaw > 0 || input.x > 0) && !(input.yaw < 0 || input.x < 0);
+      steering.target = grounded > 0 ? (left ? 0.8 : right ? -0.8 : 0) : 0;
+      aileron.target = -SURFACE * Math.sign(input?.x ?? 0); elevator.target = -SURFACE * Math.sign(input?.y ?? 0); rudder.target = -SURFACE * Math.sign(input?.yaw ?? 0);
+      for (const s of [steering, aileron, elevator, rudder]) s.step();
+      wheels.forEach((w, i) => { if (w.steering) gear.setWheelSteering(i, steering.position); gear.setWheelBrake(i, input ? (input.wheelBrake ? 12 : 0) : 2); });
       // Parked on three springs it never quite stops trembling, and a thing that trembles redraws the whole picture every
-      // frame. With nobody in it and next to no speed, it is put to sleep.
-      if (!input && throttle < 0.02 && Math.hypot(v.x, v.y, v.z) < 0.25 && Math.hypot(body.angvel().x, body.angvel().y, body.angvel().z) < 0.25) { body.sleep(); return; }
-      if (!input && throttle < 0.02 && !stirring(body)) return;
-      body.wakeUp(); body.resetForces(true); body.resetTorques(true);
-      body.addForce(scaled(a.forward, mass * 13 * throttle), true); // the propeller
-      body.addForce(scaled(a.up, mass * Math.min(14, 0.034 * forwardSpeed * forwardSpeed)), true); // the wings: level flight at about 17 m/s
-      body.addForce(scaled(v, -mass * (0.02 + 0.004 * Math.hypot(v.x, v.y, v.z))), true); // drag
-      const side = dot(v, a.right), sink = dot(v, a.up); // the wings and the tail refuse to be pushed sideways or flat through the air
-      body.addForce(plus(scaled(a.right, -side * mass * 1.6 * air), scaled(a.up, -sink * mass * 1.2 * air)), true);
-      const w = body.angvel(), want = input ?? { x: 0, y: 0, up: false, down: false };
-      // stick back (y < 0) lifts the nose; stick right rolls right and, with it, turns
-      const torque = plus(scaled(a.right, want.y * 2.2 * air), scaled(a.forward, want.x * 3 * air), scaled(a.up, -want.x * 0.9 * air), scaled({ x: a.up.z, y: 0, z: -a.up.x }, -1.6 * air * (want.x === 0 ? 1 : 0.2)), scaled(w, -1.4 * (0.3 + air)));
-      body.addTorque(scaled(torque, mass * 0.8), true);
+      // frame. With nobody in it and next to no speed, it is put to sleep. (Ours, not Sketchbook's: its picture is free.)
+      if (!input && power === 0 && length(body.linvel()) < 0.25 && length(body.angvel()) < 0.25) { gear.updateVehicle(dt); body.sleep(); return; }
+      const k = dt * 60, a = axes(body.rotation());
+      let v: V = body.linvel(), w: V = body.angvel();
+      const speed1 = length(v), forwardSpeed = dot(v, a.forward), flight = clamp(forwardSpeed / 10, 0, 1); // the controls bite with speed
+      // the nose is turned towards where it is going; not backwards on the ground, and not against a pilot pulling a loop
+      if (speed1 > 1e-6) {
+        const turn = correction(a.forward, scaled(v, 1 / speed1)), influence = clamp(speed1 - 1, 0, 0.1) * (grounded > 0 && forwardSpeed < 0 ? 0 : 1) * k, loopFix = input?.up && forwardSpeed > 0 ? 0 : 1;
+        w = plus(w, { x: turn.x * influence * loopFix, y: turn.y * influence, z: turn.z * influence * loopFix });
+      }
+      if (input) w = plus(w, scaled(a.right, 0.04 * flight * power * k * input.y), scaled(a.up, -0.02 * flight * power * k * input.yaw), scaled(a.forward, 0.055 * flight * power * k * input.x));
+      const push = input?.up && !input.down ? 0.06 : input?.down && !input.up ? -0.05 : grounded > 0 ? 0 : 0.02;
+      v = plus(v, scaled(a.forward, (speed1 * lastDrag + push * k) * power)); // last step's drag comes back along the nose
+      const speed2 = length(v), drag = speed2 * 0.003 * power * k; v = scaled(v, 1 - drag); lastDrag = drag;
+      v = plus(v, scaled(a.up, clamp(speed2 * 0.005 * power, 0, 0.05) * k)); // lift
+      w = scaled(w, 1 + (0.98 ** k - 1) * flight);
+      body.setLinvel(v, true); body.setAngvel(w, true);
+      gear.updateVehicle(dt);
+      grounded = wheels.reduce((n, _, i) => n + (gear.wheelIsInContact(i) ? 1 : 0), 0);
     },
-    moving: () => throttle > 0.02 || stirring(body),
+    moving: () => power > 0 || stirring(body),
     pose: (): Mat34 => fromPose(body.translation(), body.rotation()),
     part(p: Part): Mat34 | null {
       if (p.role === "rotor") return rotationX(spin);
+      if (p.role === "aileron") return rotationY(p.side === "right" ? -aileron.position : aileron.position);
+      if (p.role === "elevator") return rotationY(elevator.position);
+      if (p.role === "rudder") return rotationY(rudder.position);
       const i = wheels.indexOf(p as Part & { rest: Mat34 });
       if (i < 0) return null;
       return compose([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, REST - (gear.wheelSuspensionLength(i) ?? REST), 0], compose(rotationY(gear.wheelSteering(i) ?? 0), rotationX(gear.wheelRotation(i) ?? 0)));
     },
     speed: () => dot(body.linvel(), axes(body.rotation()).forward),
-    throttle: () => throttle,
+    throttle: () => power,
+    grounded: () => grounded,
   };
 }
 export type Helicopter = ReturnType<typeof createHelicopter>;
