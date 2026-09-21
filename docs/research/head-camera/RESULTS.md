@@ -110,8 +110,43 @@ on the bench's edges, which move with the camera. An architecture alone did not 
   in the picture, a shaken camera teaches the network to steer by the gap, and the gap is right whatever the camera
   does. Without it, the same shaking has to teach camera calibration from a glance.
 
+## Run 4 — three training seeds, and what the keypoints follow (5 000 steps, 200 episodes; mean, min–max)
+
+| | as trained | pitch 5° | 10° | 20° | yaw 5° | 10° | 20° | moved 3 cm | block moved |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| open | 79.3 (75.0–87.5) | 2.3 | 0.3 | 0.8 | 4.0 | 1.2 | 0.8 | 10.3 | 63.2 |
+| closed | 87.0 (70.5–97.5) | 28.8 (10.0–48.0) | 17.2 | 4.5 | 37.0 (16.5–73.5) | 19.2 | 12.5 | 56.5 | 90.3 |
+| open, shaken | 66.5 (65.5–68.0) | 69.5 (63.5–77.0) | 67.8 | 9.3 | 68.0 | 56.2 (27.5–74.0) | 17.3 | 65.5 | 55.8 |
+| closed, shaken | 75.5 (**43.0**–92.0) | 75.3 (40.0–93.5) | 71.3 | 51.5 | 78.3 (47.5–96.5) | 72.2 | 41.3 | 72.8 | 80.7 (49.5–96.5) |
+
+**Run 3b's 99 % was one lucky seed.** Same code, same data recipe, three initialisations: 92.0, 91.5 and 43.0 % with the
+camera untouched. What survives three seeds:
+
+- The ORDER survives everywhere. Look once with a fixed camera is dead at 5° (2.3 %). Shaking the camera makes both
+  robust inside the range; keep-looking is ahead of look-once on every column, by a little inside the range (75 vs 69 at
+  5° of pitch) and by a lot outside it (51.5 vs 9.3 at 20° of pitch, 41.3 vs 17.3 at 20° of yaw) and when the block moves
+  (80.7 vs 55.8).
+- The SIZE does not. "96–99.5 % at no cost" is not a finding; "about 75 %, with one seed in three failing to learn the
+  job properly" is. Training this network for 5 000 steps is not reliable, and look-once pays for shaking too
+  (79.3 → 66.5 untouched). The article cannot be written from these numbers; the training has to be made dependable
+  first (more steps, a learning-rate schedule, a larger trunk, 48 × 48: all unmeasured).
+
+What the keypoints follow (R² of a keypoint's position against the hand's pixel and against the block's, 300 random
+scenes, camera as trained; seed 11; the full lists for every seed are in `run-4.log.txt`):
+
+- closed, never shaken: one keypoint follows the hand (R² 0.77). **None follows the block** (best 0.38); four are a
+  mixture of both (0.4 / 0.3).
+- closed, shaken: **two follow the hand (0.85, 0.61) and three follow the block (0.86, 0.81, 0.60)**, each with R² ≤ 0.06
+  on the other. Pictures with the keypoints drawn: `vla-work/keypoints-closed-shake-*.ppm`.
+
+So run 3a's explanation holds, measured: with a camera that never moves the network does not bother to find the block
+as a thing; shaking the camera is what makes it separate "my hand" from "the block", which is what steering by the gap
+needs. That is the figure for "what it learned to look at".
+
 ## What this means for the article
 
+0. **Read run 4 first: the sizes below were one seed.** The order of the three acts holds over three seeds; the
+   headline numbers do not, and training is not yet dependable.
 1. The thesis survives in a better form than I proposed. Three acts, all measured: look once breaks at 2–5°; keep
    looking is not enough on its own (run 2, 3a); keep looking + shake is (3b). The learning-free controller (run 0) is
    the explanation, and it is worth a figure of its own: it can be drawn.
@@ -122,10 +157,10 @@ on the bench's edges, which move with the camera. An architecture alone did not 
 
 ## Not done, and what I do not trust yet
 
-- One training seed per cell. Rerun the 3b table with three seeds before any number goes into prose.
+- Runs 1–3b are one training seed per cell; run 4 has three and they disagree by up to 49 points. Make training
+  dependable, then measure again with at least five seeds.
 - No disturbance of the arm (a shove), no noise on the picture, no distractor objects, no second block colour. The
   "language" of a VLA is absent: one task, no instruction.
 - The hand moves in a plane. No grasp, no descent, no gripper.
 - 32 × 32 only. Whether 48 × 48 buys the last few points, and what it costs in seconds, is unmeasured.
-- The keypoints have not been looked at. If they land on the hand and the block after shaking and on the bench's edges
-  before, that is the figure for "what it learned to look at"; if they do not, run 3a's explanation is wrong.
+- The keypoints have been measured (run 4) but not yet looked at as pictures under a turned camera.
