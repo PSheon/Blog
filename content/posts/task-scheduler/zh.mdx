@@ -1,8 +1,8 @@
 ---
 title: 從零打造一個任務排程器
-description: 60 個互相等待的任務、4 個 worker、152 行 TypeScript。排程器本身只有四條規則，連任務失敗後重新排進去都算在內；難的是回答「還要多久」。看三條進度條各自怎麼騙你，再用排程器自己去預測，最後讓它從做完的任務裡學。
+description: 60 個互相等待的任務、4 個 worker、215 行 TypeScript。排程器本身只有四條規則，連任務失敗後重新排進去都算在內；難的是回答「還要多久」。看三條進度條各自怎麼騙你，再用排程器自己去預測，最後讓它從做完的任務裡學。
 seoTitle: 從零打造一個任務排程器
-seoDescription: 60 個互相等待的任務、4 個 worker、152 行 TypeScript。排程器只有四條規則（含失敗重排），難的是回答「還要多久」：看三條進度條怎麼騙你，再做一條會學的。
+seoDescription: 60 個互相等待的任務、4 個 worker、215 行 TypeScript。排程器只有四條規則（含失敗重排），難的是回答「還要多久」：看三條進度條怎麼騙你，再做一條會學的。
 date: 2026-09-21
 tags: [ai-agent, from-scratch]
 no: 11
@@ -10,7 +10,7 @@ interactive: true
 draft: true
 ---
 
-import { FailLab, LearnLab, RaceLab, SkewLab, WorkersLab } from "./components";
+import { FailLab, GraphLab, LearnLab, RaceLab, SkewLab, WorkersLab } from "./components";
 import { PARAMS } from "./components/sim/params";
 
 下面是一個任務排程器在工作。{PARAMS.tasks} 個任務，有些要等別的任務做完才能開始，交給 {PARAMS.workers} 個 worker 同時做。按「開始」。
@@ -23,7 +23,7 @@ import { PARAMS } from "./components/sim/params";
 
 這篇文章做兩件事：先把這個排程器從零寫出來，它只有四條規則，包括任務失敗之後怎麼重新排進去；然後回答任何排程器都會被問的那個問題：**還要多久？** 第二件比第一件難得多，而且最好的答案，是把排程器自己再叫一次。
 
-整個排程器加上後面的四條進度條，一共 152 行 TypeScript，沒有用任何函式庫；下面每一張圖都是你的瀏覽器現場跑出來的。它是看得完的大小：任務會失敗、會被重新排進去，但沒有優先順序，也沒有人跟你搶機器。少掉的那些東西，文章最後會一項一項說。
+整個排程器加上後面的四條進度條，一共 215 行 TypeScript，沒有用任何函式庫；下面每一張圖都是你的瀏覽器現場跑出來的。它是看得完的大小：任務會失敗、會被重新排進去，但沒有優先順序，也沒有人跟你搶機器。少掉的那些東西，文章最後會一項一項說。
 
 ## 排程器只有四條規則
 
@@ -34,34 +34,45 @@ import { PARAMS } from "./components/sim/params";
 3. **把時間快轉到下一次嘗試結束的那一刻**，把那個 worker 放回來。
 4. **那一次如果失敗了，任務不算做完**：它回到「可以開始」的那一堆，等下一個有空的 worker 再試一次；等它的任務繼續等。然後回到第 1 步。
 
-沒有時鐘在滴答走。時間只在「有一次嘗試結束」的時候往前跳，所以一份要跑兩個多小時的工作，排一次只要大約 8 微秒（我的機器上量的）。核心就是這個迴圈：
+沒有時鐘在滴答走。時間只在「有一次嘗試結束」的時候往前跳，所以一份要跑兩個多小時的工作，排一次只要大約 8 微秒（我的機器上量的）。核心是兩個函式和一個迴圈（`sim/job.ts` 裡的 `Scheduler`，這裡只省略了記錄用的幾行）：
 
 ```ts
-while (left > 0) {
-  for (const t of tasks) {                                   // 規則 1 和 2
-    if (!freeWorkers.length) break;
-    const ready = !finished[t.id] && !busy[t.id] && t.deps.every((d) => finished[d]);
-    if (ready) begin(t.id, now);                             // 記下開始時間、拿走一個 worker
+assign() {                                                     // 規則 1 和 2
+  for (const t of this.tasks) {
+    if (!this.freeWorkers.length) break;
+    const ready = !this.finished[t.id] && !this.busy[t.id] && t.deps.every((d) => this.finished[d]);
+    if (ready) this.begin(t.id, this.now);                     // 記下開始時間、拿走一個 worker
   }
-  const id = earliestToEnd(running);                         // 規則 3
-  now = ends[id]; busy[id] = 0; freeWorkers.push(worker[id]);
-  const wentThrough = tried[id] === attempts[id].length - 1;
-  if (wentThrough) { finished[id] = 1; left--; }
-  else tried[id]++;                                          // 規則 4：沒做完，下一輪它又是「可以開始」的
 }
+
+advance() {                                                    // 規則 3 和 4
+  const id = earliest(this.running, this.ends);
+  const ok = this.tried[id] === this.attempts[id].length - 1;
+  this.now = this.ends[id]; this.busy[id] = 0; this.freeWorkers.push(this.worker[id]);
+  if (ok) { this.finished[id] = 1; this.left--; }
+  else this.tried[id]++;                                       // 沒做完，所以規則 1 會再看到它
+}
+
+while (s.left > 0) { s.assign(); s.advance(); }                // 整個排程器
 ```
 
 規則 4 只有一行，因為失敗的任務不需要特別的「重試佇列」：它只是沒有被標成做完，所以下一輪的規則 1 自然會再看到它。
 
-注意 `attempts`（每個任務每一次嘗試要多久）是從外面傳進來的。傳「實際發生的」，得到的是真正的時間軸；傳「我以為每個任務一次就成功、要這麼久」，得到的就是一個預測。這件事後面會用到。
+下面是同一個排程器，換成一份小到可以整張看完的工作：14 個任務、3 個 worker。箭頭從被等的任務指向等它的任務。一直按「下一步」，看規則 2 和規則 3 輪流發生；然後按「重來」，在某個任務跑到一半的時候**點它**，讓它當場失敗，看規則 4 怎麼把它排回去。
 
-<Sidenote>真的程式還多了一小段：可以從「跑到一半」的狀態接著排，已經做完的不重做，正在做的保留它這一次嘗試的開始時間。預測的時候需要這個。完整的函式是 `sim/job.ts` 裡的 `schedule`。</Sidenote>
+<Instrument fig="02" title="scheduler / step" caption="虛線圈是「可以開始」，青色粗圈是正在做（圈裡寫的是哪個 worker），填滿的是做完了；紫色外圈標出這一步動到的任務。正在做的任務可以點，也可以用鍵盤選到之後按 Enter：它會當場失敗，沒有被標成做完，所以馬上又是「可以開始」的。下面的時間軸是到目前為止排出來的結果。">
+  <GraphLab />
+</Instrument>
+
+最後一件事：`attempts`（每個任務每一次嘗試要多久）是從外面傳進來的。傳「實際發生的」，得到的是真正的時間軸；傳「我以為每個任務一次就成功、要這麼久」，得到的就是一個預測。這件事後面會用到。
+
+<Sidenote>真的程式還多了一小段：可以從「跑到一半」的狀態接著排，已經做完的不重做，正在做的保留它這一次嘗試的開始時間。預測的時候需要這個。</Sidenote>
 
 ## 任務失敗了怎麼辦
 
-下面是開場那一份工作，同樣的任務、同樣的先後順序，只是現在每一次嘗試都有機率做到一半失敗。粉紅色的空框是失敗的那一次；往右找，同一個任務會再出現一次。
+剛才是你親手弄壞任務。現在讓它們自己壞：下面是開場那一份工作，同樣的任務、同樣的先後順序，只是每一次嘗試都有機率做到一半失敗。粉紅色的空框是失敗的那一次；往右找，同一個任務會再出現一次。
 
-<Instrument fig="02" title="scheduler / failures" caption="滑桿是每一次嘗試失敗的機率（一個任務最多失敗 3 次，失敗的那一次會做到 20% 到 100% 之間的某一點才死掉）。上面是第 77 號工作的時間軸；下面的讀數和圖是 150 份工作的平均，這裡的預估是準的，所以你看到的誤差全部來自失敗。圖畫的是進度條和實際「差了幾點」，越低越誠實。">
+<Instrument fig="03" title="scheduler / failures" caption="滑桿是每一次嘗試失敗的機率（一個任務最多失敗 3 次，失敗的那一次會做到 20% 到 100% 之間的某一點才死掉）。上面是第 77 號工作的時間軸；下面的讀數和圖是 150 份工作的平均，這裡的預估是準的，所以你看到的誤差全部來自失敗。圖畫的是進度條和實際「差了幾點」，越低越誠實。">
   <FailLab />
 </Instrument>
 
@@ -87,7 +98,7 @@ while (left > 0) {
 
 冒充得像不像，要看任務的大小有多懸殊。下面這張圖不是一份工作，是 150 份工作的平均，每移一次滑桿，你的瀏覽器就在背景重跑一次。
 
-<Instrument fig="03" title="scheduler / sizes" caption="滑桿是任務大小的懸殊程度。曲線鼓得越高，代表進度條跑得比時間越快；粉紅色的細虛線是 90%。這裡的預估幾乎完全準確，所以你看到的差距和「估得不準」無關。">
+<Instrument fig="04" title="scheduler / sizes" caption="滑桿是任務大小的懸殊程度。曲線鼓得越高，代表進度條跑得比時間越快；粉紅色的細虛線是 90%。這裡的預估幾乎完全準確，所以你看到的差距和「估得不準」無關。">
   <SkewLab />
 </Instrument>
 
@@ -99,13 +110,13 @@ while (left > 0) {
 
 「做完了多少工」不等於「過了多少時間」，因為同時在做事的 worker 數量一直在變。開頭有一堆任務可以同時做，四個 worker 全開，工作量掉得很快；到了尾巴，只剩一兩個任務在等前面的結果，其他 worker 沒事做，時間照樣在走。
 
-<Instrument fig="04" title="scheduler / workers" caption="滑桿是 worker 的數量。第三條線（青色）不看做完了多少，而是把還沒做的任務照計畫、在這麼多 worker 上排一次，算出還要多久。預估同樣是準的。">
+<Instrument fig="05" title="scheduler / workers" caption="滑桿是 worker 的數量。上面那張圖是整份工作平均要多久（100 份工作），紫色虛線是最長的那條相依鏈；下面是三條進度條在這個 worker 數下有多誠實。第三條線（青色）不看做完了多少，而是把還沒做的任務照計畫、在這麼多 worker 上排一次，算出還要多久。預估同樣是準的。">
   <WorkersLab />
 </Instrument>
 
 把滑桿從 1 拉到 32。有兩件事同時發生。
 
-第一，整份工作先是變快，然後就不再變快。我量的平均是：1 個 worker 122 分鐘，2 個 63，4 個 38，8 個 31.4，之後不管加到幾個都是 31.0。那個 31 分鐘是工作裡最長的一條「你等我、我等他」的鏈子，再多人手也只能等。
+第一，整份工作先是變快，然後撞到一條水平線就不再變快（上面那張圖）。我量的平均是：1 個 worker 122 分鐘，2 個 63，4 個 38，8 個 31.4，之後不管加到幾個都是 31.0。那個 31 分鐘是工作裡最長的一條「你等我、我等他」的鏈子，再多人手也只能等。
 
 第二，數件數的進度條越來越不誠實：4 個 worker 時平均差 10 點，16 個時差 17 點，有三分之一的時間待在 90% 以上。人手越多，開頭衝得越快，尾巴還是一樣長。
 
@@ -117,7 +128,7 @@ while (left > 0) {
 
 照計畫預測的那一條還有一個前提：預估是準的。現實裡的預估通常是錯的，而且錯得很有規律，例如「上傳」這種任務永遠比你以為的慢一倍。
 
-<Instrument fig="05" title="scheduler / learn" caption="滑桿是預估有多不準：同一種任務會錯同一個方向、同一個倍數。有的工作被高估、有的被低估，平均起來會互相抵銷，所以這張圖畫的是「差了幾點」，不分方向，越低越誠實。打開開關，進度條會看已經做完的任務實際花了多久，修正還沒做的同種任務的預估。">
+<Instrument fig="06" title="scheduler / learn" caption="滑桿是預估有多不準：同一種任務會錯同一個方向、同一個倍數。有的工作被高估、有的被低估，平均起來會互相抵銷，所以這張圖畫的是「差了幾點」，不分方向，越低越誠實。打開開關，進度條會看已經做完的任務實際花了多久，修正還沒做的同種任務的預估。">
   <LearnLab />
 </Instrument>
 
@@ -131,19 +142,21 @@ while (left > 0) {
 
 ## 和真的不一樣的地方、數字怎麼量的
 
-**任務的大小是我選的分佈**（對數常態），懸殊程度是我調的。真的工作負載長什麼樣，我沒有拿公開資料來對；你的編譯、你的 CI 可能更懸殊，也可能更平均。圖 03 的滑桿就是為了這個。
+**任務的大小是我選的分佈**（對數常態），懸殊程度是我調的。真的工作負載長什麼樣，我沒有拿公開資料來對；你的編譯、你的 CI 可能更懸殊，也可能更平均。圖 04 的滑桿就是為了這個。
 
 **排程的規則是最單純的那一種**：哪個任務先好就先做，失敗了立刻重試、不等待；沒有優先順序，沒有搶先，worker 自己不會壞，也沒有「這個工作要四個 worker 同時開始」這種限制。這些正是 Kubernetes、Airflow 這一類真的排程器要處理的事。訓練大模型的叢集更是如此：OpenAI 在 2021 年寫過，他們的工作必須整組一起排上去，排不齊就整組等。取消一個任務之後下游怎麼辦、誰該先做，也是另外的題目。
 
 **單位是一整份互相等待的工作，不是一個個請求。** 一個請求怎麼排隊、怎麼分流、重試要等多久，Sam Rose 寫過三篇很好的互動文章（見來源），這篇沒有重講。
 
+**worker 在這裡只是一個號碼。** 它可以是一台機器、一個行程，也可以是[第 9 篇](/zh/posts/city-of-agents)那座城市裡的一個小人：那三百個人各自決定下一件事要做什麼，這裡反過來，由排程器替他們決定。兩種做法遇到的是同一個問題：事情互相等，而且沒有人知道還要多久。
+
 **真的系統裡，連「有幾個任務」都常常不知道**：工作會邊做邊長出來。這裡的四條進度條都假設任務清單一開始就是完整的。
 
-數字的來源：圖 02 到 05 和上面的讀數，是你的瀏覽器跑 150 份工作的平均。文中寫「我量過」的，是離線用 200 份工作（種子 1 到 200）跑的，腳本和完整的表在這個專案的 `docs/research/task-scheduler/`。開場那份工作是第 77 號。
+數字的來源：圖 03 到 06 和上面的讀數，是你的瀏覽器跑 150 份工作的平均。文中寫「我量過」的，是離線用 200 份工作（種子 1 到 200）跑的，腳本和完整的表在這個專案的 `docs/research/task-scheduler/`。開場那份工作是第 77 號。
 
 ## 來源
 
 - 真實叢集上的排程（整組一起排、依團隊分配節點）：OpenAI, *Scaling Kubernetes to 7,500 nodes*, 2021。
 - 單一請求的排隊、重試與分流：Sam Rose, *Queueing*、*Retries*（encore.dev/blog）、*Load Balancing*（samwho.dev）。
-- 人怎麼感受進度條：Harrison, Amento, Kuznetsov, Bell, *Rethinking the Progress Bar*, UIST 2007。
-- 最長的相依鏈決定下限：Kelley, Walker, *Critical-Path Planning and Scheduling*, 1959。
+- 人怎麼感受進度條：Harrison, Amento, Kuznetsov, Bell, *Rethinking the Progress Bar*, UIST 2007, 115–118 頁。
+- 最長的相依鏈決定下限：Kelley, Walker, *Critical-Path Planning and Scheduling*, Eastern Joint Computer Conference, 1959, 160–173 頁。

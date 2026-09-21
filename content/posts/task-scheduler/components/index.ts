@@ -7,6 +7,7 @@ const loading = typeof window === "undefined" ? null : import("./labs");
 const labs = () => loading ?? import("./labs");
 
 export const FailLab = dynamic(() => labs().then((m) => m.FailLab));
+export const GraphLab = dynamic(() => labs().then((m) => m.GraphLab));
 export const LearnLab = dynamic(() => labs().then((m) => m.LearnLab));
 export const RaceLab = dynamic(() => labs().then((m) => m.RaceLab));
 export const SkewLab = dynamic(() => labs().then((m) => m.SkewLab));

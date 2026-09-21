@@ -53,4 +53,18 @@ default (biased) estimates, fail 0.3: job 58.7 min, 25.0 failed attempts a job, 
 - One attempt in five failing: 15 failed attempts a job, 13 % of worker time wasted, the job 15 % longer (38.1 → 43.9 min with good estimates).
 - The forecast bar assumes what is left will go through first time, so it turns optimistic: 0.7 → 2.7 points with good estimates. Counting and weighting by work hardly move (10.1 → 10.6, 5.8 → 6.2): they were wrong already, for other reasons.
 - Learning per-kind factors does **not** help here (3.2 against the plan's 2.7 with good estimates): which attempt fails is luck, not a habit of a kind of task, and the learner reads that luck as if it were one. With biased estimates it still halves the error (9.4 → 5.2), because there it is learning the bias.
-- The simulation is now 152 lines (it was 131 before failures).
+
+## Things tried that did not help, and things pinned
+
+- **A learner that also learns failures.** On top of the per-kind factors, one pooled factor for time lost to failed
+  attempts (all attempt time of finished tasks over their successful time, with a prior of 8 minutes). With good estimates
+  and 20 % of attempts failing: 3.2 → 3.1 points, against 2.7 for the plain plan bar. With biased estimates: 5.2 → 5.1.
+  Which attempt fails is luck; sixty tasks are not enough to estimate even one rate well enough to beat assuming none.
+  Not kept in the code; the article's sentence that learning does not help here stands.
+- **`tests/scheduler/prose.test.ts`** measures again every number the prose states (the opening job's 67 % and 76 %, the
+  six largest tasks at 40 %, 122 / 63 / 38 / 31.4 / 31.0 minutes by workers, the honesty figures, what failures cost,
+  the line count of the simulation) and checks that the sentences are in the articles. It failed on its first run: the
+  text said 207 lines and the code had just become 212.
+- The scheduler is a class (`Scheduler`: `assign`, `advance`, `kill`) so that the step-through figure and the forecast run
+  the same code; `schedule()` is `while (s.left > 0) { s.assign(); s.advance(); }`. Every number above was re-measured
+  after that change and is identical.

@@ -33,7 +33,7 @@ export function useCurves(root: RefObject<HTMLElement | null>, options: JobOptio
         honesty: Object.fromEntries(BARS.map((b) => [b, { error: honesty[b].error / n, above90: honesty[b].above90 / n, backwards: honesty[b].backwards }])) as Record<Bar, Honesty> });
       if (seed <= runs) timer = window.setTimeout(work, 0);
     };
-    timer = window.setTimeout(work, 0);
+    timer = window.setTimeout(work, 150); // a dragged slider asks again many times a second: wait for it to settle
     return () => { cancelled = true; clearTimeout(timer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` stands for the settings
   }, [key, visible]);

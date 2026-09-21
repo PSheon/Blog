@@ -60,7 +60,16 @@ test("locale switch keeps you on the same article", async ({ page }) => {
 test("article has an outline and five working instruments", async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto("/en/posts/cnn-from-scratch");
-  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+
+  // The step-through: rule 2 hands tasks to workers; a running task can be made to fail and is ready again at once.
+  const graph = page.getByTestId("graph-lab");
+  await graph.scrollIntoViewIfNeeded();
+  await graph.getByTestId("graph-step").click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 2");
+  const running = graph.locator('[data-testid^="node-running-"]').first();
+  await running.click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 4");
   await expect(page.locator('a[href="#what-the-network-sees"]').first()).toBeAttached();
   await expect(page.getByTestId("prediction")).toHaveText("7");
   expect(errors).toEqual([]);
@@ -368,7 +377,16 @@ test("the Lite3 walks in the page and falls over when its joint angles are blind
   await page.getByTestId("lite3-push-away").click();
   await expect(page.getByTestId("lite3-push-log")).toContainText("400 N", { timeout: 5_000 });
   await expect(page.getByTestId("lite3-push-log")).toContainText("倒了", { timeout: 15_000 });
-  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+
+  // The step-through: rule 2 hands tasks to workers; a running task can be made to fail and is ready again at once.
+  const graph = page.getByTestId("graph-lab");
+  await graph.scrollIntoViewIfNeeded();
+  await graph.getByTestId("graph-step").click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 2");
+  const running = graph.locator('[data-testid^="node-running-"]').first();
+  await running.click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 4");
   expect(errors).toEqual([]);
 });
 
@@ -378,7 +396,16 @@ test("a diffusion model trains in the page and its instruments share it", async 
   test.setTimeout(120_000);
   const errors = watchErrors(page);
 
-  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+
+  // The step-through: rule 2 hands tasks to workers; a running task can be made to fail and is ready again at once.
+  const graph = page.getByTestId("graph-lab");
+  await graph.scrollIntoViewIfNeeded();
+  await graph.getByTestId("graph-step").click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 2");
+  const running = graph.locator('[data-testid^="node-running-"]').first();
+  await running.click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 4");
   await expect(page.getByTestId("diffusion-steps")).toHaveText("0");
   await page.getByTestId("diffusion-train").click();
   await expect.poll(async () => Number((await page.getByTestId("diffusion-steps").textContent())!.replace(/,/g, "")), { timeout: 90_000 }).toBeGreaterThan(200);
@@ -554,7 +581,16 @@ test("a city of people runs in the page: the clock moves, the three heads differ
   expect(response?.status()).toBe(200);
   test.setTimeout(120_000);
   const errors = watchErrors(page);
-  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+
+  // The step-through: rule 2 hands tasks to workers; a running task can be made to fail and is ready again at once.
+  const graph = page.getByTestId("graph-lab");
+  await graph.scrollIntoViewIfNeeded();
+  await graph.getByTestId("graph-step").click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 2");
+  const running = graph.locator('[data-testid^="node-running-"]').first();
+  await running.click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 4");
 
   // The two 2-D figures work the simulation out in the page. A fixed timetable sends everyone out in the same ten minutes.
   await page.getByTestId("modes-fsm").scrollIntoViewIfNeeded();
@@ -650,7 +686,16 @@ test("three progress bars watch a job and disagree; a fourth learns", async ({ p
   test.skip(response?.status() === 404, "task-scheduler is still a draft");
   test.setTimeout(90_000);
   const errors = watchErrors(page);
-  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+  await expect(page.locator("[data-instrument]")).toHaveCount(6);
+
+  // The step-through: rule 2 hands tasks to workers; a running task can be made to fail and is ready again at once.
+  const graph = page.getByTestId("graph-lab");
+  await graph.scrollIntoViewIfNeeded();
+  await graph.getByTestId("graph-step").click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 2");
+  const running = graph.locator('[data-testid^="node-running-"]').first();
+  await running.click();
+  await expect(graph.getByTestId("graph-status")).toContainText("規則 4");
 
   // Failures: with one attempt in five failing, the averaged jobs report failed attempts and wasted time.
   const fail = page.getByTestId("fail-lab");

@@ -32,35 +32,98 @@ export function makeJob(seed: number, o: JobOptions): Job {
   return { seed, tasks, kindFactor };
 }
 
+/** The running task whose attempt ends first. */
+function earliest(running: number[], ends: Float64Array): number {
+  let first = running[0];
+  for (const id of running) if (ends[id] < ends[first]) first = id;
+  return first;
+}
+
+export type Step = { rule: 2; task: number; worker: number } | { rule: 3; task: number; worker: number; at: number; ok: boolean };
+
 /**
- * Runs the job on `workers` workers. Four rules: a task is ready once everything it waits for has gone through; a free
- * worker takes the ready task with the lowest id; time jumps to the moment the next attempt ends; an attempt that failed
- * puts its task back among the ready ones, and whatever waits for it keeps waiting.
- * `attempts` says how long each attempt at each task takes — the true ones for what really happens, a single believed
- * duration each for a forecast. `done` and `begun` carry on from a job that is half way: finished tasks stay finished,
- * tasks under way keep the start of their current attempt (`begun`: task → that start).
+ * The scheduler, one step at a time. Four rules: a task is ready once everything it waits for has gone through (1); a
+ * free worker takes the ready task with the lowest id (2); time jumps to the moment the next attempt ends (3); an attempt
+ * that failed leaves its task unfinished, so it is ready again and whatever waits for it keeps waiting (4).
+ * `attempts` says how long each attempt at each task takes: the true ones for what really happens, one believed duration
+ * each for a forecast. `done` and `begun` carry on from a job that is half way: finished tasks stay finished, tasks under
+ * way keep the start of their current attempt.
  */
-export function schedule(tasks: Task[], workers: number, attempts: ArrayLike<ArrayLike<number>>, from = 0, done?: ArrayLike<number>, begun?: Map<number, number>): Schedule {
-  const n = tasks.length, start = new Float64Array(n).fill(-1), finish = new Float64Array(n).fill(-1), worker = new Int32Array(n).fill(-1), finished = new Uint8Array(n);
-  const tried = new Int32Array(n), since = new Float64Array(n), ends = new Float64Array(n), busy = new Uint8Array(n), log: Attempt[] = [];
-  const running: number[] = [], lanes = Array.from({ length: workers }, (_, k) => workers - 1 - k); // free workers; the lowest number is taken first
-  let left = n, now = from;
-  const begin = (id: number, at: number) => { if (start[id] < 0) start[id] = at; since[id] = at; ends[id] = Math.max(now, at + attempts[id][tried[id]]); worker[id] = lanes.pop() ?? -1; busy[id] = 1; running.push(id); };
-  if (done) for (let i = 0; i < n; i++) if (done[i] >= 0) { finished[i] = 1; finish[i] = done[i]; left--; }
-  if (begun) for (const [id, at] of begun) begin(id, at);
-  while (left > 0) {
-    for (const t of tasks) {
-      if (!lanes.length) break;
-      if (!finished[t.id] && !busy[t.id] && t.deps.every((d) => finished[d])) begin(t.id, now);
-    }
-    if (!running.length) throw new Error("the job has a task that can never start");
-    let next = 0;
-    for (let k = 1; k < running.length; k++) if (ends[running[k]] < ends[running[next]]) next = k;
-    const id = running.splice(next, 1)[0], ok = tried[id] === attempts[id].length - 1;
-    now = ends[id]; busy[id] = 0;
-    log.push({ task: id, worker: worker[id], from: since[id], to: now, ok });
-    if (ok) { finished[id] = 1; finish[id] = now; left--; } else tried[id]++; // failed: back among the ready, to be tried again
-    lanes.push(worker[id]); lanes.sort((a, b) => b - a);
+export class Scheduler {
+  readonly start: Float64Array;
+  readonly finish: Float64Array;
+  readonly worker: Int32Array;
+  readonly finished: Uint8Array;
+  readonly busy: Uint8Array;
+  readonly log: Attempt[] = [];
+  readonly running: number[] = [];
+  readonly freeWorkers: number[];
+  now: number;
+  left: number;
+  private readonly tried: Int32Array;
+  private readonly since: Float64Array;
+  private readonly ends: Float64Array;
+
+  constructor(readonly tasks: Task[], workers: number, private readonly attempts: ArrayLike<ArrayLike<number>>, from = 0, done?: ArrayLike<number>, begun?: Map<number, number>) {
+    const n = tasks.length;
+    this.start = new Float64Array(n).fill(-1); this.finish = new Float64Array(n).fill(-1); this.worker = new Int32Array(n).fill(-1);
+    this.finished = new Uint8Array(n); this.busy = new Uint8Array(n); this.tried = new Int32Array(n); this.since = new Float64Array(n); this.ends = new Float64Array(n);
+    this.freeWorkers = Array.from({ length: workers }, (_, k) => workers - 1 - k); // the lowest number is taken first
+    this.now = from; this.left = n;
+    if (done) for (let i = 0; i < n; i++) if (done[i] >= 0) { this.finished[i] = 1; this.finish[i] = done[i]; this.left--; }
+    if (begun) for (const [id, at] of begun) this.begin(id, at);
   }
-  return { start, finish, worker, total: now, attempts: log };
+
+  /** Rule 1. */
+  ready(): number[] { return this.tasks.filter((t) => !this.finished[t.id] && !this.busy[t.id] && t.deps.every((d) => this.finished[d])).map((t) => t.id); }
+
+  private begin(id: number, at: number): number {
+    if (this.start[id] < 0) this.start[id] = at;
+    this.since[id] = at; this.ends[id] = Math.max(this.now, at + this.attempts[id][this.tried[id]]);
+    this.worker[id] = this.freeWorkers.pop() ?? -1; this.busy[id] = 1; this.running.push(id);
+    return this.worker[id];
+  }
+
+  /** Rule 2: every free worker takes a ready task, lowest id first. */
+  assign(): Step[] {
+    const steps: Step[] = [];
+    for (const t of this.tasks) {
+      if (!this.freeWorkers.length) break;
+      const ready = !this.finished[t.id] && !this.busy[t.id] && t.deps.every((d) => this.finished[d]);
+      if (ready) steps.push({ rule: 2, task: t.id, worker: this.begin(t.id, this.now) });
+    }
+    return steps;
+  }
+
+  /** Rules 3 and 4: jump to the end of the attempt that ends first; if it failed, its task is simply not finished. */
+  advance(): Step {
+    if (!this.running.length) throw new Error("the job has a task that can never start");
+    const id = earliest(this.running, this.ends);
+    return this.end(id, this.ends[id], this.tried[id] === this.attempts[id].length - 1);
+  }
+
+  /** Someone pulls the plug on a running task, now: the attempt fails where it stands, and rule 4 takes it from there. */
+  kill(id: number): Step | null { return this.busy[id] ? this.end(id, this.now, false, true) : null; }
+
+  /** When the current attempt at a running task began. */
+  sinceOf(id: number): number { return this.since[id]; }
+
+  /** Where a running attempt stands, 0–1. */
+  progressOf(id: number): number { return this.busy[id] ? Math.min(1, (this.now - this.since[id]) / Math.max(1e-9, this.ends[id] - this.since[id])) : this.finished[id]; }
+
+  private end(id: number, at: number, ok: boolean, killed = false): Step {
+    this.running.splice(this.running.indexOf(id), 1);
+    this.now = at; this.busy[id] = 0;
+    this.log.push({ task: id, worker: this.worker[id], from: this.since[id], to: at, ok });
+    if (ok) { this.finished[id] = 1; this.finish[id] = at; this.left--; } else if (!killed) this.tried[id]++; // failed: not finished, so rule 1 will find it again
+    this.freeWorkers.push(this.worker[id]); this.freeWorkers.sort((a, b) => b - a);
+    return { rule: 3, task: id, worker: this.worker[id], at, ok };
+  }
+}
+
+/** Runs the whole job: assign, advance, until nothing is left. */
+export function schedule(tasks: Task[], workers: number, attempts: ArrayLike<ArrayLike<number>>, from = 0, done?: ArrayLike<number>, begun?: Map<number, number>): Schedule {
+  const s = new Scheduler(tasks, workers, attempts, from, done, begun);
+  while (s.left > 0) { s.assign(); s.advance(); }
+  return { start: s.start, finish: s.finish, worker: s.worker, total: s.now, attempts: s.log };
 }
