@@ -38,8 +38,9 @@
 export const WORKGROUP = 8;
 
 /** The one uniform block every shader here reads (272 bytes; gpu.ts writes it). */
-export const PARAMS_BYTES = 272;
-const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, movingBase: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f, filterOn: u32, filterStep: u32, f2: u32, f3: u32 };`;
+export const MAX_SPOTS = 12;
+export const PARAMS_BYTES = 272 + MAX_SPOTS * 32; // the spot lamps come last: a position and a strength, a direction and the cosine of the cone's edge
+const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, movingBase: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f, filterOn: u32, filterStep: u32, spotCount: u32, f3: u32, spots: array<vec4f, 24> };`;
 
 export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
@@ -210,6 +211,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
           if (strategy == 2u) { weight = 0.0; }
           else { let direct = h.t * h.t / (max(-dot(n, d), 1e-6) * lampArea); weight = lastPdf * lastPdf / (lastPdf * lastPdf + direct * direct); }
         }
+        if (m.p3 > 0.5 && !sharp) { weight = 0.0; } // a lamp's lens: its light is asked for directly (the spot lamps below); a diffuse bounce that ran into the tiny lens would count it twice, as a firefly
         rgb += through * m.emit * weight;
       }
       if (params.view == 2u) { // a rasteriser's answer: the sun by N·L, the sky as a constant, nothing in the way of either
@@ -261,6 +263,28 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
             if (metal) { let lv = transpose(frame) * l; let hv = normalize(v + lv); let dist = ggxD(alpha, hv.z); scattered = dist * ggxG1(alpha, v.z) / (4.0 * v.z); response = schlick(m.albedo, max(dot(v, hv), 0.0)) * dist * ggxG1(alpha, v.z) * ggxG1(alpha, lv.z) / (4.0 * v.z * max(lv.z, 1e-6)); }
             let weight = select(1.0, direct * direct / (direct * direct + scattered * scattered), strategy == 3u);
             rgb += through * response * materials[u32(params.lightO.w) - 1u].emit * cosine / direct * weight;
+          }
+        }
+      }
+      if (params.spotCount > 0u && v.z > 0.0) { // ask the head lamps: one of them, chosen in proportion to what it can give this point, and one shadow ray
+        var total = 0.0; var share: array<f32, 12>;
+        for (var i = 0u; i < params.spotCount; i++) {
+          let to = params.spots[i * 2u].xyz - at; let d2 = max(dot(to, to), 1e-4); let l = to / sqrt(d2);
+          let cone = smoothstep(params.spots[i * 2u + 1u].w, params.spots[i * 2u + 1u].w + 0.12, dot(-l, params.spots[i * 2u + 1u].xyz));
+          share[i] = params.spots[i * 2u].w * cone * max(dot(n, l), 0.0) / d2; total += share[i];
+        }
+        if (total > 0.0) {
+          var pick = rnd() * total; var chosen = 0u;
+          for (var i = 0u; i < params.spotCount; i++) { chosen = i; pick -= share[i]; if (pick <= 0.0 && share[i] > 0.0) { break; } }
+          let to = params.spots[chosen * 2u].xyz - at; let distance = length(to); let l = to / distance; let cosine = dot(ns, l);
+          if (cosine > 0.0 && share[chosen] > 0.0) {
+            rays++; let shadow = nearest(at + n * (1e-4 * scale), l, 1e-5 * scale); steps += shadow.steps;
+            if (shadow.t >= distance * 0.999) {
+              var response = m.albedo / 3.14159265;
+              if (metal) { let lv = transpose(frame) * l; let hv = normalize(v + lv); response = schlick(m.albedo, max(dot(v, hv), 0.0)) * ggxD(alpha, hv.z) * ggxG1(alpha, v.z) * ggxG1(alpha, max(lv.z, 0.0)) / (4.0 * v.z * max(lv.z, 1e-6)); }
+              // what that lamp gives, over the chance it was the one asked: share / total, and share holds everything but the surface's response
+              rgb += through * response * vec3f(1.0, 0.93, 0.82) * total * cosine / max(dot(n, l), 1e-4);
+            }
           }
         }
       }

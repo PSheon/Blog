@@ -86,6 +86,8 @@ The scene's geometry, the character, the vehicles and all 34 animation clips are
 
 The character behaves by Sketchbook's state machine, ported state by state: a start-walk clip chosen by the angle to turn, a stop, turning on the spot, sprinting, two jumps, three landings chosen by how hard the ground was hit; after F it walks to the nearer door by itself, opens it, sits down, closes it from inside (and from the passenger's side, slides over to the wheel), and closes it again after getting out. G gets in as a passenger instead, who stays put; X slides over to the connected seat, and V is first person. The physics is Rapier: the ground is one triangle mesh, the person a capsule, a car four rays on springs (five gears that shift by themselves, a steering wheel that turns, and keys that spin it while it is in the air), the helicopter and the aeroplane rigid bodies, flown by Sketchbook's own arithmetic and keys: W S pitch, A D roll, Q E yaw, Shift to climb or for throttle. The helicopter's engine takes five seconds to come up and it levels itself when you let go; the aeroplane leaves the ground after about eight seconds of full throttle, and its ailerons, elevators and rudder move with the keys.
 
+Drag the time of day past the evening and it gets dark; the cars' head lamps and the helicopter's searchlight come on by themselves (L switches them by hand). The models have no lamps of their own, so the packer adds them: a ray from straight ahead, and a glowing lens where it first meets the body. What lights the road is not that lens but a spot lamp, asked the way the sun is asked: at every bounce one of up to twelve lamps is picked in proportion to what it could give that point, and one shadow ray goes to it. It costs 2 ms a sample (I measured 8.4 → 10.4 ms), and for that a car's lamps fall on the next car and a person standing in the beam casts a shadow, with nothing written for either. A door left open while driving is swung by the car's acceleration, and shuts itself if it swings hard enough.
+
 The character's skeleton (14 bones, 186 triangles) is evaluated on the CPU every frame and goes straight into the moving tree.
 
 ## What is different from the real thing, and how the numbers were measured
@@ -93,6 +95,8 @@ The character's skeleton (14 bones, 186 triangles) is evaluated on the CPU every
 **The denoising is the most basic kind.** A real system measures how noisy each pixel is (its variance) and borrows more where the noise is large and less where it is small; here the thresholds are fixed. Games today mostly hand this step to a neural network.
 
 **A carried picture is wrong when the light changes.** Moving the time of day simply throws the history away. A real system detects where the light changed and drops only that.
+
+**At night the pool of light trails.** The lamps move with the car, but the frame that is carried over remembers where the pool was, so a short fading patch is left on the ground behind it. While lamps are lit the history is capped at 6 samples instead of 12, for a shorter tail.
 
 **Reflections and the sea trail.** What a mirror shows moves with the camera, but the past is looked up by where the surface itself was, so reflections in car paint and on the sea are half a beat late.
 

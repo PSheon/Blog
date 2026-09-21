@@ -214,3 +214,13 @@ playground a car reached 8.5 m/s in second gear after 3 s. Engine force: Sketchb
 scaled by 900/50 to this body's mass; all four wheels driven, the brake on the rear pair. Seats: G from beside the rear
 door put the character in seat_3, and X moved it to seat_4 and back (the rear seats connect only to each other, the
 front pair to each other), as the model's `connected_seats` say.
+
+## Head lamps and night (2026-09-21)
+
+Spot lamps asked directly (one of up to 12 per bounce, picked in proportion to strength × cone × cosine / distance²,
+one shadow ray). Read from the figure's own "one sample" readout in Chrome on the M4 Pro, 960×540, full path tracing,
+standing still at the spawn point with all five cars' lamps and the searchlight lit (11 lamps): 10.4 ms and 10.5 ms;
+the same night with the lamps switched off (L): 8.4 ms; by day (16:00): 8.0 ms. (This browser session was busier than
+the one the article's 6.8 ms came from; compare the three with each other, not with that.) Strength 220 in the sun's
+units: the sun gives 18000 × 2.14e-3 ≈ 38.5 on a facing surface, the night exposure is 6×, so 220/d² × 6 is a third of
+that at 10 m.

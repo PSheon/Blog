@@ -96,6 +96,27 @@ for (const name of ["car", "heli", "airplane"]) {
     for (const d of [N, [1, 0.12, 0.07], [-1, 0.12, 0.07], [0.07, 0.12, 1], [0.07, 0.12, -1], [0.05, 1, 0.08]]) { const dl = Math.hypot(...d); if (hits(from, d.map((x) => x / dl), r)) blocked++; }
     if (blocked >= (name === "heli" ? 4 : 5) && name !== "airplane") { r.kind = 3; interior++; } // the helicopter's cabin is a bubble with no glass in it: more of the sky gets in // (the aeroplane's cockpit is open to the sky and small; its wings would fool this)
   }
+  // Lamps. The models have none of their own (theirs are painted into the texture, which is not used), so a lens is set on the body
+  // where a ray from straight ahead (or behind) first meets it: kind 4 a head lamp, kind 5 a tail lamp. Each head lamp is also a spot
+  // lamp for the renderer: where it is and which way it points, in the model's frame.
+  const lamps = [];
+  if (name !== "airplane") {
+    const box = [[Infinity, Infinity, Infinity], [-Infinity, -Infinity, -Infinity]];
+    for (const r of bodyTriangles) for (let k = 0; k < 9; k++) { box[0][k % 3] = Math.min(box[0][k % 3], r.tri[k]); box[1][k % 3] = Math.max(box[1][k % 3], r.tri[k]); }
+    const firstHit = (o, d) => { let best = Infinity; for (const r of bodyTriangles) { const t = r.tri, e1 = [t[3] - t[0], t[4] - t[1], t[5] - t[2]], e2 = [t[6] - t[0], t[7] - t[1], t[8] - t[2]], q = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]], det = e1[0] * q[0] + e1[1] * q[1] + e1[2] * q[2]; if (Math.abs(det) < 1e-12) continue; const s0 = [o[0] - t[0], o[1] - t[1], o[2] - t[2]], u = (s0[0] * q[0] + s0[1] * q[1] + s0[2] * q[2]) / det; if (u < 0 || u > 1) continue; const c = [s0[1] * e1[2] - s0[2] * e1[1], s0[2] * e1[0] - s0[0] * e1[2], s0[0] * e1[1] - s0[1] * e1[0]], v = (d[0] * c[0] + d[1] * c[1] + d[2] * c[2]) / det; if (v < 0 || u + v > 1) continue; const dist = (e2[0] * c[0] + e2[1] * c[1] + e2[2] * c[2]) / det; if (dist > 1e-6 && dist < best) best = dist; } return best; };
+    const W = Math.max(Math.abs(box[0][0]), Math.abs(box[1][0])), H = box[1][1] - box[0][1], added = [];
+    const lens = (x, y, facing, kind, hw, hh) => { // facing: 1 looks along +z (the front), −1 along −z
+      const far = facing > 0 ? box[1][2] + 1 : box[0][2] - 1, t = firstHit([x, y, far], [0, 0, -facing]); if (!Number.isFinite(t)) return null;
+      const z = far - facing * t + facing * 0.012, a = [x - hw, y - hh, z], b = [x + hw, y - hh, z], c = [x + hw, y + hh, z], d = [x - hw, y + hh, z];
+      for (const tri of facing > 0 ? [[a, b, c], [a, c, d]] : [[a, c, b], [a, d, c]]) added.push({ tri: tri.flat(), kind });
+      return [x, y, z].map(round);
+    };
+    if (name === "car") for (const side of [-1, 1]) {
+      const at = lens(side * W * 0.62, box[0][1] + H * 0.4, 1, 4, 0.13, 0.06); if (at) lamps.push({ at, direction: [0, -0.12, 1], halfAngle: 0.5 });
+      lens(side * W * 0.62, box[0][1] + H * 0.45, -1, 5, 0.13, 0.05);
+    } else { const at = lens(0, box[0][1] + H * 0.22, 1, 4, 0.1, 0.07); if (at) lamps.push({ at, direction: [0, -0.5, 0.87], halfAngle: 0.42 }); } // the helicopter's searchlight looks down ahead of it
+    bodyTriangles.push(...added); parts[0].count += added.length;
+  }
   for (const r of bodyTriangles) { positions.push(...r.tri); kinds.push(r.kind); }
   for (const m of movers) { // a mover's triangles go about its own origin
     const first = positions.length / 9;
@@ -104,7 +125,8 @@ for (const name of ["car", "heli", "airplane"]) {
   }
   const windows = kinds.slice(parts[0].first, parts[0].first + parts[0].count).filter((k) => k === 1).length;
   for (const seat of seats) seat.entries = seat.entries.map((e) => ({ name: e, at: entries[e] })).filter((e) => e.at);
-  models[name] = { parts, colliders, seats, anchors };
+  models[name] = { parts, colliders, seats, anchors, lamps };
+  console.log(`  lamps: ${JSON.stringify(lamps)}`);
   console.log(`  ${interior} interior triangles`);
   console.log(`${name}: ${parts.map((p) => `${p.name}(${p.role}) ${p.count}`).join(", ")}; ${windows} window triangles; ${colliders.length} colliders; seats ${seats.map((s) => s.type).join("/")}`);
 }

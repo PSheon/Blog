@@ -8,7 +8,7 @@ import { Stage } from "@/components/rt/stage";
 import { useTracer } from "@/components/rt/use-tracer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, assembleDynamicBvh, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, prepareObject, sunAt, writeModel, type Mat34, type ModelName, type Models, type Prepared, type Vec3 } from "@/lib/rt";
+import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, assembleDynamicBvh, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, prepareObject, sunAt, writeModel, HEAD_LAMP_STRENGTH, LAMPS, type Mat34, type ModelName, type Models, type Prepared, type Vec3 } from "@/lib/rt";
 import type { Renderer } from "@/lib/rt/gpu";
 import { createWorld, type World } from "./game/world";
 import { cn } from "@/lib/utils";
@@ -58,9 +58,14 @@ export function PlaygroundLab() {
   /** Some browsers hand the page the very Escape that released the pointer: that one must not also collapse the view. */
   const justReleased = () => lockedNow.current || performance.now() - releasedAt.current < 400;
   useEffect(() => { lockedNow.current = locked; }, [locked]);
+  const words = useRef(t); useEffect(() => { words.current = t; }, [t]); // the frame loop reads the labels without restarting when the language changes
+  useEffect(() => { calm.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; }, []);
   const turnedNow = useRef(false);
   const [help, setHelp] = useState(false);
-  const passenger = useRef(false), switchSeat = useRef(false), firstPerson = useRef(false), heading = useRef<number | null>(null); // G, X (one press each) and V (Sketchbook's first-person view, in a vehicle)
+  // The speedometer is written straight into its element (ten times a second is too often for React state), and a crash shakes the camera:
+  // `shake` is 0…1, set from how much the vehicle's velocity changed in one frame, and dies away by elapsed time.
+  const hud = useRef<HTMLSpanElement>(null), hudAt = useRef(0), shake = useRef(0), lastVelocity = useRef<Vec3 | null>(null), clock = useRef(0), calm = useRef(false);
+  const passenger = useRef(false), switchSeat = useRef(false), firstPerson = useRef(false), lamps = useRef<boolean | null>(null), litNow = useRef(false), heading = useRef<number | null>(null); // G, X (one press each) and V (Sketchbook's first-person view, in a vehicle)
   useEffect(() => { turnedNow.current = turned; }, [turned]);
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 }), quality = useRef({ level: 0, frame: 16, slow: 0, fast: 0, since: 0 }), [level, setLevel] = useState(0);
 
@@ -104,11 +109,18 @@ export function PlaygroundLab() {
     const started = performance.now(), person = a.world.person, out = a.scratch;
     let cursor = 0;
     let cars = 0;
+    // The lamps come on with the dusk, or when L says so. Their lenses are two materials, rewritten when that changes.
+    const dark = sunAt(settings.current.hour).night > 0.35, lit = lamps.current ?? dark, spots: Renderer["spots"] = [];
+    if (lit !== litNow.current) { litNow.current = lit; r.setMaterial(park.headLamp, lit ? LAMPS.head.on : LAMPS.head.off); r.setMaterial(park.tailLamp, lit ? LAMPS.tail.on : LAMPS.tail.off); }
     const objects: { prepared: Prepared; first: number }[] = [];
     for (const v of a.world.vehicles) {
       objects.push({ prepared: a.prepared[v.name], first: cursor });
       const base = park.vehicleMaterials[v.name], paint = v.name === "car" && cars++ > 0 ? park.carPaints + ((cars - 2) % 4) : base; // the first car keeps the red
-      cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2, base + 3], v.pose(), (part) => v.part(part), out, cursor);
+      cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2, base + 3, park.headLamp, park.tailLamp], v.pose(), (part) => v.part(part), out, cursor);
+      if (lit) for (const lamp of a.models.models[v.name].lamps) { // a head lamp is a spot lamp where the vehicle is now
+        const m = v.pose(), c = lamp.at, d = lamp.direction, dl = Math.hypot(d[0], d[1], d[2]);
+        spots.push({ at: [m[0] * c[0] + m[3] * c[1] + m[6] * c[2] + m[9], m[1] * c[0] + m[4] * c[1] + m[7] * c[2] + m[10], m[2] * c[0] + m[5] * c[1] + m[8] * c[2] + m[11]], direction: [(m[0] * d[0] + m[3] * d[1] + m[6] * d[2]) / dl, (m[1] * d[0] + m[4] * d[1] + m[7] * d[2]) / dl, (m[2] * d[0] + m[5] * d[1] + m[8] * d[2]) / dl], strength: HEAD_LAMP_STRENGTH * (v.name === "heli" ? 2.5 : 1), halfAngle: lamp.halfAngle });
+      }
     }
     // the character is always there to be seen: walking, opening a door, sitting at the wheel
     const driven = a.world.seated() ? a.world.driving() : null;
@@ -126,8 +138,12 @@ export function PlaygroundLab() {
     if (eyes) { // the camera sits on the model's own camera point (or over the seat) and looks where the mouse says
       const m = eyes.pose(), c = a.models.models[eyes.name].anchors.camera ?? [eyes.seat.at[0], eyes.seat.at[1] + 0.75, eyes.seat.at[2]], eye: Vec3 = [m[0] * c[0] + m[3] * c[1] + m[6] * c[2] + m[9], m[1] * c[0] + m[4] * c[1] + m[7] * c[2] + m[10], m[2] * c[0] + m[5] * c[1] + m[8] * c[2] + m[11]];
       r.setCamera({ eye, target: [eye[0] - back[0], eye[1] - back[1], eye[2] - back[2]], fov: 70 });
-    } else r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
-    r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? LEVELS[quality.current.level].bounces : 1; r.historyCap = s.carry ? 12 : 0; r.denoise = s.denoise;
+    } else {
+      const k = shake.current * 0.22, across: Vec3 = [Math.cos(o.yaw), 0, Math.sin(o.yaw)], jx = k * Math.sin(clock.current * 61), jy = k * Math.sin(clock.current * 47 + 1.3), aim: Vec3 = [head[0] + across[0] * jx, head[1] + jy, head[2] + across[2] * jx];
+      r.setCamera({ eye: [aim[0] + back[0] * distance, aim[1] + back[1] * distance, aim[2] + back[2] * distance], target: aim, fov: 55 });
+    }
+    r.spots = spots;
+    r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE * (1 + 5 * light.night); r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? LEVELS[quality.current.level].bounces : 1; r.historyCap = s.carry ? (spots.length ? 6 : 12) : 0; // with lamps lit the light itself moves, and a long memory trails it across the ground r.denoise = s.denoise;
     r.sample(1); r.present();
     resume();
   }, [built, resume]);
@@ -153,7 +169,7 @@ export function PlaygroundLab() {
       if (!a && r0 && (dirty.current || relit.current)) { // not entered yet: the playground from above, standing still, clearing
         dirty.current = false; relit.current = false;
         const s0 = settings.current, light = sunAt(s0.hour);
-        r0.setCamera({ eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }); r0.sun = light.sun; r0.skyLevel = light.skyLevel; r0.exposure = EXPOSURE; r0.raster = s0.mode === "raster"; r0.bounces = s0.mode === "full" ? 8 : 1; r0.denoise = s0.denoise;
+        r0.setCamera({ eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }); r0.sun = light.sun; r0.skyLevel = light.skyLevel; r0.exposure = EXPOSURE * (1 + 5 * light.night); r0.raster = s0.mode === "raster"; r0.bounces = s0.mode === "full" ? 8 : 1; r0.denoise = s0.denoise;
         r0.reset(); r0.sample(1); r0.present(); resume();
       }
       if (a && mine.current) {
@@ -167,6 +183,20 @@ export function PlaygroundLab() {
         jump.current = false; interact.current = false; passenger.current = false; switchSeat.current = false;
         if (!a.world.driving() && firstPerson.current) { firstPerson.current = false; dirty.current = true; }
         const inside = a.world.seated() ? a.world.driving() : null, now = inside ? (inside.craft ? "flying" : "driving") : a.world.driving() && a.world.riding() ? "riding" : a.world.nearby() ? "near" : "foot";
+        // what the driver sees of the machine: speed, gear or height; and how hard it was just hit
+        clock.current += dt;
+        const ride = inside, lv = ride?.body.linvel();
+        if (ride && lv) {
+          const before = lastVelocity.current, jolt = before ? Math.hypot(lv.x - before[0], lv.y - before[1], lv.z - before[2]) : 0;
+          if (jolt > 2.5 && !calm.current) shake.current = Math.min(1, Math.max(shake.current, jolt / 10));
+          lastVelocity.current = [lv.x, lv.y, lv.z];
+          if (clock.current - hudAt.current > 0.1 && hud.current) {
+            hudAt.current = clock.current;
+            const kmh = Math.round(Math.abs(ride.car ? ride.car.speed() : Math.hypot(lv.x, lv.y, lv.z)) * 3.6);
+            hud.current.textContent = ride.car ? `${kmh} km/h · ${words.current.gear(ride.car.speed() < -0.5 ? "R" : String(ride.car.gear()))}` : `${kmh} km/h · ${words.current.height(Math.round(ride.body.translation().y))}`;
+          }
+        } else lastVelocity.current = null;
+        if (shake.current > 0.01) { shake.current *= Math.exp(-dt * 5); dirty.current = true; } else shake.current = 0;
         if (now !== seatNow.current) { seatNow.current = now; setSeat(now); setCraft(inside?.name ?? null); dirty.current = true; }
         if (changed || dirty.current || relit.current) { const relight = relit.current; dirty.current = false; relit.current = false; draw(1 - Math.exp(-dt * 14), relight); }
       }
@@ -207,13 +237,14 @@ export function PlaygroundLab() {
 
   /** Stand the character next to the first vehicle of a kind, on its driver's side. */
   const go = (name: ModelName) => { const a = assets.current, v = a?.world.vehicles.find((x) => x.name === name); if (!a || !v) return; const m = v.pose(); a.world.teleport([m[9] + m[0] * 2.4, m[10] + 0.5, m[11] + m[2] * 2.4]); relit.current = true; };
-  const change = (next: Partial<{ mode: Mode; hour: number; carry: boolean; denoise: boolean }>) => { settings.current = { ...settings.current, ...next }; if ("mode" in next || "hour" in next) relit.current = true; else dirty.current = true; }; // new light makes the old picture wrong; how it is carried and filtered does not
+  const change = (next: Partial<{ mode: Mode; hour: number; carry: boolean; denoise: boolean }>) => { settings.current = { ...settings.current, ...next }; if ("hour" in next) lamps.current = null; if ("mode" in next || "hour" in next) relit.current = true; else dirty.current = true; }; // new light makes the old picture wrong; how it is carried and filtered does not
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift" : event.code === "Space" ? "space" : event.code;
     if (event.code === "Escape") return; // the window's listener decides (it knows whether this Escape only released the pointer)
-    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF" && k !== "KeyQ" && k !== "KeyE" && k !== "KeyB" && k !== "KeyG" && k !== "KeyX" && k !== "KeyV") return;
+    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF" && k !== "KeyQ" && k !== "KeyE" && k !== "KeyB" && k !== "KeyG" && k !== "KeyX" && k !== "KeyV" && k !== "KeyL") return;
     if (k !== "shift") event.preventDefault(); // the arrows and the space bar would scroll the page
     if (k === "KeyF") { if (down && !event.repeat) interact.current = true; return; }
+    if (k === "KeyL") { if (down && !event.repeat) { lamps.current = !litNow.current; relit.current = true; } return; } // the lamps, against what the hour would do; a new hour hands them back to it
     if (k === "KeyG") { if (down && !event.repeat) passenger.current = true; return; }
     if (k === "KeyX") { if (down && !event.repeat) switchSeat.current = true; return; }
     if (k === "KeyV") { if (down && !event.repeat && assets.current?.world.driving()) { firstPerson.current = !firstPerson.current; dirty.current = true; } return; }
@@ -246,7 +277,7 @@ export function PlaygroundLab() {
       </div>
       <label className="flex min-w-44 flex-1 items-center gap-3">
         <span className="label shrink-0">{t.hour} {String(Math.floor(hour)).padStart(2, "0")}:{String(Math.round((hour % 1) * 60)).padStart(2, "0")}</span>
-        <Slider value={[hour]} min={6.5} max={17.5} step={0.25} aria-label={t.hour} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
+        <Slider value={[hour]} min={6.5} max={21} step={0.25} aria-label={t.hour} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
       </label>
     </>
   );
@@ -281,6 +312,7 @@ export function PlaygroundLab() {
             </div>
           )}
           {/* top right: what the renderer is doing, and the way out */}
+          {(seat === "driving" || seat === "flying") && <span ref={hud} className={cn("pointer-events-none absolute rounded-md bg-black/55 px-2 py-1 font-mono text-xs text-white/90 backdrop-blur-sm tabular", expanded ? "bottom-14 left-1/2 -translate-x-1/2" : "top-2 left-2")} data-testid="playground-hud" aria-live="off" />}
           <div className="absolute top-2 right-2 flex items-center gap-2" {...stop}>
             {expanded && seen && <span className="rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] text-white/85 backdrop-blur-sm tabular">{seen.spp.toLocaleString()} {t.sppShort} · {seen.ms.toFixed(1)} {t.ms}{level > 0 && ` · ${LEVELS[level].size.join("×")}`}</span>}
             <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { if (!expanded) setTools(!window.matchMedia("(pointer: coarse)").matches); setExpanded(!expanded); }} aria-pressed={expanded} data-testid="playground-expand">{expanded ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}{expanded ? t.collapse : t.expand}</Button>

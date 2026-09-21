@@ -14,7 +14,8 @@ export interface Input { /** the stick: x right, y forward, each −1…1 */ mov
 export interface Person { /** where its feet are and how it stands, ready for the skinner */ place: Mat34; at: Vec3; clip: ClipName; clipTime: number; fade: number; loop: boolean; moving: boolean; state: string }
 /** Something parked in the playground that can be got into: a car, the helicopter, the aeroplane. */
 export interface Vehicle { name: ModelName; pose(): Mat34; /** a wheel's, a rotor's or a door's own movement */ part(part: Part): Mat34 | null; car: Car | null; craft: Helicopter | Aeroplane | null; body: RAPIER.RigidBody; moving(): boolean; seat: Seat; doors: Map<string, Door> }
-interface Door { rotation: number; target: number; side: number }
+/** A door as Sketchbook's VehicleDoor: told to open or close it swings at 5 rad/s; once open it is loose, and the vehicle's accelerations swing it. */
+interface Door { rotation: number; target: number; side: number; achieving: boolean; loose: boolean; velocity: number; last: { x: number; y: number; z: number } | null }
 
 const STEP = 1 / 60, MOVE_SPEED = 4, JUMP = 6.2, GRAVITY = 18, HALF = 0.25, RADIUS = 0.25, LOOPS = new Set<ClipName>(["idle", "run", "sprint", "falling", "driving", "sitting"]);
 /** Sketchbook keeps a character's position at its capsule's middle, 0.57 above its feet, and gives door and seat heights for that point. */
@@ -52,7 +53,7 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
   };
   const vehicles: Vehicle[] = parked.map(({ name, pose }) => {
     const model = models.models[name], seat = model.seats.find((s) => s.type === "driver") ?? model.seats[0], doors = new Map<string, Door>();
-    for (const s of model.seats) { const part = model.parts.find((p) => p.name === s.door); if (part?.rest) doors.set(part.name, { rotation: 0, target: 0, side: sideOf(s.at, [part.rest[9], part.rest[10], part.rest[11]]) === "left" ? -1 : 1 }); }
+    for (const s of model.seats) { const part = model.parts.find((p) => p.name === s.door); if (part?.rest) doors.set(part.name, { rotation: 0, target: 0, achieving: false, loose: false, velocity: 0, last: null, side: sideOf(s.at, [part.rest[9], part.rest[10], part.rest[11]]) === "left" ? -1 : 1 }); }
     const door = (p: Part): Mat34 | null => { const d = doors.get(p.name); return d ? rotationY(d.side * d.rotation) : null; };
     if (name === "car") { const car = createCar(R, world, model, pose); return { name, car, craft: null, body: car.body, pose: () => shownPose(car.body), part: (p) => car.wheel(p) ?? door(p), moving: car.moving, seat, doors }; }
     const craft = name === "heli" ? createHelicopter(R, world, model, pose) : createAeroplane(R, world, model, pose);
@@ -80,7 +81,7 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
       const v = inside?.vehicle ?? target?.vehicle;
       if (!v) return null;
       const seat = inside?.seat ?? target?.seat ?? v.seat, entry = inside?.entry ?? target?.entry ?? seat.at, door = doorOf(v, seat), part = models.models[v.name].parts.find((p) => p.name === seat.door), lv = v.body.linvel();
-      return { airplane: v.name === "airplane", hasDoor: !!door, doorOpen: !!door && door.rotation > 0 && door.target === door.rotation, side: sideOf(entry, seat.at), exitSide: sideOf(seat.at, entry), doorSide: part?.rest ? sideOf(seat.at, [part.rest[9], part.rest[10], part.rest[11]]) : "left", driverSeat: seat === v.seat, shiftSide: sideOf(seat.at, (inside?.to ?? v.seat).at), wantsToDrive: !!inside?.wantsToDrive, canSwitch: seat.connected.length > 0, speed: Math.hypot(lv.x, lv.y, lv.z), open: () => { if (door) door.target = 1; }, close: () => { if (door) door.target = 0; }, noDirection: Math.hypot(stick[0], stick[1]) < 0.05 };
+      return { airplane: v.name === "airplane", hasDoor: !!door, doorOpen: !!door && door.rotation > 0 && !door.achieving, side: sideOf(entry, seat.at), exitSide: sideOf(seat.at, entry), doorSide: part?.rest ? sideOf(seat.at, [part.rest[9], part.rest[10], part.rest[11]]) : "left", driverSeat: seat === v.seat, shiftSide: sideOf(seat.at, (inside?.to ?? v.seat).at), wantsToDrive: !!inside?.wantsToDrive, canSwitch: seat.connected.length > 0, speed: Math.hypot(lv.x, lv.y, lv.z), open: () => { if (door) { door.target = 1; door.achieving = true; } }, close: () => { if (door) { door.target = 0; door.achieving = true; } }, noDirection: Math.hypot(stick[0], stick[1]) < 0.05 };
     },
     jump: (speed) => { vy = speed > 0 ? Math.max(JUMP * 0.85, speed) : JUMP; grounded = false; },
     seated: () => { if (inside) inside.seated = true; },
@@ -135,7 +136,26 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     for (const v of vehicles) {
       if (v.car && (v === driven || v.car.moving())) v.car.drive(v === driven ? { throttle: input.move[1], steer: -input.move[0], brake: input.jump || input.sprint || wantsOut } : { throttle: 0, steer: 0, brake: false }, STEP);
       if (v.craft && (v === driven || v.craft.moving())) v.craft.drive(v === driven ? { x: Math.max(-1, Math.min(1, input.move[0])), y: Math.max(-1, Math.min(1, input.move[1])), yaw: Math.max(-1, Math.min(1, input.turn ?? 0)), up: !!input.up, down: !!input.down, wheelBrake: !!input.wheelBrake } : null, STEP);
-      for (const d of v.doors.values()) if (d.rotation !== d.target) { doorsMoving = true; d.rotation = d.rotation < d.target ? Math.min(d.target, d.rotation + 5 * STEP) : Math.max(d.target, d.rotation - 5 * STEP); }
+      const lv = v.body.linvel();
+      for (const d of v.doors.values()) {
+        if (d.achieving) { // told to open or close
+          doorsMoving = true; d.rotation = d.rotation < d.target ? Math.min(d.target, d.rotation + 5 * STEP) : Math.max(d.target, d.rotation - 5 * STEP);
+          if (d.rotation === d.target) { d.achieving = false; d.loose = d.target > 0; d.velocity = 0; }
+        } else if (d.loose && d.last) { // Sketchbook's trailer: a point one metre behind the hinge, pushed back by what the vehicle's velocity just gained
+          const q = v.body.rotation(), up = { x: 2 * (q.x * q.y - q.z * q.w), y: 1 - 2 * (q.x * q.x + q.z * q.z), z: 2 * (q.y * q.z + q.x * q.w) }, back = { x: -2 * (q.x * q.z + q.y * q.w), y: -2 * (q.y * q.z - q.x * q.w), z: -(1 - 2 * (q.x * q.x + q.y * q.y)) };
+          const a = d.side * d.rotation, c = Math.cos(a), sn = Math.sin(a), ub = up.x * back.x + up.y * back.y + up.z * back.z, ux = { x: up.y * back.z - up.z * back.y, y: up.z * back.x - up.x * back.z, z: up.x * back.y - up.y * back.x };
+          const v1 = { x: back.x * c + ux.x * sn + up.x * ub * (1 - c), y: back.y * c + ux.y * sn + up.y * ub * (1 - c), z: back.z * c + ux.z * sn + up.z * ub * (1 - c) }; // `back` turned about `up` by the door's angle
+          const p = { x: v1.x - (lv.x - d.last.x), y: v1.y - (lv.y - d.last.y), z: v1.z - (lv.z - d.last.z) }, n = Math.hypot(p.x, p.y, p.z) || 1, v2 = { x: p.x / n, y: p.y / n, z: p.z / n };
+          const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z, turn = { x: v1.y * v2.z - v1.z * v2.y, y: v1.z * v2.x - v1.x * v2.z, z: v1.x * v2.y - v1.y * v2.x };
+          let angle = dot > 1 - 0.0005 ? 0 : Math.acos(Math.max(-1, dot)); if (up.x * turn.x + up.y * turn.y + up.z * turn.z < 0) angle = -angle;
+          const was = d.rotation; d.velocity += d.side * angle * 0.05; d.rotation += d.velocity;
+          if (d.rotation < 0) { d.rotation = 0; if (d.velocity < -0.08) { d.loose = false; d.target = 0; d.velocity = 0; } else d.velocity = -d.velocity / 2; } // slammed hard enough, it latches
+          if (d.rotation > 1) { d.rotation = 1; d.velocity = -d.velocity / 2; }
+          d.velocity *= 0.98; if (Math.abs(d.velocity) < 1e-5) d.velocity = 0;
+          if (Math.abs(d.rotation - was) > 1e-5) doorsMoving = true;
+        }
+        d.last = { x: lv.x, y: lv.y, z: lv.z }; // (always kept: Sketchbook keeps it only while loose, and the first loose step then gets the whole velocity as a jolt)
+      }
     }
 
     // ---- attached to a vehicle: the states move the character between the door and the seat, in the vehicle's own frame

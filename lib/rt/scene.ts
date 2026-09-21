@@ -17,6 +17,8 @@ export interface Material {
   /** Smooth glass of this index of refraction; `albedo` tints what passes through. GPU only. */
   glass?: boolean;
   ior?: number;
+  /** A lamp's lens: it glows to the eye and in mirrors, but lights nothing by itself (a spot lamp, asked directly, does that). GPU only. */
+  lens?: boolean;
 }
 
 export interface Scene {

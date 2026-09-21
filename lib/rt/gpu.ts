@@ -1,12 +1,12 @@
 /// <reference types="@webgpu/types" />
 import type { Bvh } from "./bvh";
 import { cross, sub, unit } from "./cpu";
-import { COMMIT, FILTER, KERNEL, MEASURE, MERGE, PARAMS_BYTES, PRESENT, REPROJECT, WORKGROUP } from "./kernel";
-import type { Material, Scene } from "./scene";
+import { COMMIT, FILTER, KERNEL, MAX_SPOTS, MEASURE, MERGE, PARAMS_BYTES, PRESENT, REPROJECT, WORKGROUP } from "./kernel";
+import type { Material, Scene, Vec3 } from "./scene";
 
 const MATERIAL_FLOATS = 12;
 /** albedo.xyz mirror | emit.xyz roughness | metallic ior glass – : the kernel's `Material`. */
-function packMaterial(m: Material): number[] { return [...m.albedo, m.mirror ? 1 : 0, ...m.emit, m.roughness ?? 1, m.metallic ? 1 : 0, m.ior ?? 1.5, m.glass ? 1 : 0, 0]; }
+function packMaterial(m: Material): number[] { return [...m.albedo, m.mirror ? 1 : 0, ...m.emit, m.roughness ?? 1, m.metallic ? 1 : 0, m.ior ?? 1.5, m.glass ? 1 : 0, m.lens ? 1 : 0]; }
 
 export interface Counters { rays: number; steps: number; overflow: number }
 
@@ -30,6 +30,8 @@ export class Renderer {
   /** Outdoors. `sun`: unit direction towards it and its strength (0 = indoors: no sky, no sun). `raster`: draw what a rasteriser would. */
   sun: [number, number, number, number] = [0, 1, 0, 0];
   skyLevel = 1;
+  /** Spot lamps (head lamps, a searchlight), asked directly at every bounce: where, which way, how strong (W/sr, in the sun's units), and the cone's half angle. At most MAX_SPOTS; the nearest to the camera are kept. */
+  spots: { at: Vec3; direction: Vec3; strength: number; halfAngle: number }[] = [];
   exposure = 1;
   raster = false;
   /** Every ray that leaves sees white 1 and no lamp shines: a test of what materials give back. */
@@ -134,6 +136,9 @@ export class Renderer {
     new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
     new Float32Array(this.paramData, 96, 6).set([...this.sun, this.exposure, this.skyLevel]);
     new Uint32Array(this.paramData, 120, 2).set([this.strategy, this.furnace ? 1 : 0]);
+    const spots = this.spots.slice(0, MAX_SPOTS), lamps = new Float32Array(this.paramData, 272, MAX_SPOTS * 8);
+    spots.forEach((s, i) => lamps.set([...s.at, s.strength, ...s.direction, Math.cos(s.halfAngle)], i * 8));
+    new Uint32Array(this.paramData, 264, 1).set([spots.length]);
     new Uint32Array(this.paramData, 176, 2).set([this.dynamicRoot, this.temporal ? 1 : 0]);
     new Uint32Array(this.paramData, 188, 1).set([this.triangleBase]);
     new Float32Array(this.paramData, 184, 1).set([this.historyCap]);

@@ -34,6 +34,7 @@ describe("the playground asset", () => {
   });
 
   it("puts the sun above the horizon all day, as a unit vector", () => {
-    for (const hour of [6.5, 9, 12, 16, 17.5]) { const { sun } = sunAt(hour); expect(Math.hypot(sun[0], sun[1], sun[2])).toBeCloseTo(1, 6); expect(sun[1]).toBeGreaterThan(0); expect(sun[3]).toBeGreaterThan(0); }
+    expect(sunAt(12).night).toBe(0); expect(sunAt(21).night).toBe(1); expect(sunAt(21).skyLevel).toBeLessThan(0.05); expect(sunAt(21).sun[3]).toBeGreaterThan(0); // night: a weak moon, so the scene stays outdoors
+    for (const hour of [6.5, 9, 12, 16, 17.5, 18, 21]) { const { sun } = sunAt(hour); expect(Math.hypot(sun[0], sun[1], sun[2])).toBeCloseTo(1, 6); expect(sun[1]).toBeGreaterThan(0); expect(sun[3]).toBeGreaterThan(0); }
   });
 });

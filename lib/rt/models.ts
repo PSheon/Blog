@@ -13,7 +13,7 @@ export type Mat34 = number[];
 /** Where someone sits, which door is theirs, and where they stand to get in (all in the model's frame; all facing +z, as the models do). */
 export interface Seat { name: string; type: string; at: Vec3; door: string | null; /** seats one can slide over to from here */ connected: string[]; entries: { name: string; at: Vec3 }[] }
 export interface Part { name: string; role: "body" | "wheel" | "rotor" | "door" | "aileron" | "elevator" | "rudder" | "steering_wheel"; /** an aileron's wing */ side?: "left" | "right" | null; steering?: boolean; drive?: string | null; rest: Mat34 | null; first: number; count: number }
-export interface Model { parts: Part[]; colliders: ({ shape: "sphere"; at: Vec3; radius: number } | { shape: "box"; at: Vec3; half: Vec3; rest: number[] })[]; seats: Seat[]; anchors: { camera?: Vec3 } }
+export interface Model { parts: Part[]; colliders: ({ shape: "sphere"; at: Vec3; radius: number } | { shape: "box"; at: Vec3; half: Vec3; rest: number[] })[]; seats: Seat[]; anchors: { camera?: Vec3 }; /** head lamps and searchlights, in the model's frame: the renderer's spot lamps. Triangle kinds 4 and 5 are their lenses and the tail lamps'. */ lamps: { at: Vec3; direction: Vec3; halfAngle: number }[] }
 export interface Models { models: Record<ModelName, Model>; positions: Float32Array; kinds: Uint8Array }
 
 export function parseModels(file: ArrayBuffer): Models {
@@ -53,7 +53,7 @@ export function fromPose(p: { x: number; y: number; z: number }, q: { x: number;
  * gives a part of its own a transform in the part's own frame (a wheel's spin, a rotor's turn), applied before its
  * rest transform. Returns the new cursor.
  */
-export function writeModel(all: Models, name: ModelName, /** where paint, window, tyre and interior are in the scene's materials: a start index, or the four */ materialBase: number | [number, number, number, number], pose: Mat34, moving: (part: Part, index: number) => Mat34 | null, out: { positions: Float32Array; materials: Uint32Array }, cursor: number): number {
+export function writeModel(all: Models, name: ModelName, /** where paint, window, tyre and interior are in the scene's materials: a start index, or the four */ materialBase: number | number[], pose: Mat34, moving: (part: Part, index: number) => Mat34 | null, out: { positions: Float32Array; materials: Uint32Array }, cursor: number): number {
   const P = all.positions;
   all.models[name].parts.forEach((part, index) => {
     let m = pose;
