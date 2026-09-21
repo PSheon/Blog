@@ -39,7 +39,7 @@ export function SkewLab() {
   const t = useLabels(), [skew, setSkew] = useState<number>(PARAMS.skew);
   return (
     <div className="grid gap-4 text-sm" data-testid="skew-lab">
-      <Param label={t.skew} shown={skew <= 0.4 ? t.skewLow : skew >= 1 ? t.skewHigh : skew.toFixed(1)} value={skew} min={0.2} max={1.6} step={0.1} onChange={setSkew} />
+      <Param label={t.skew} shown={`${skew.toFixed(1)} · ${skew <= 0.4 ? t.skewLow : skew >= 2 ? t.skewExtreme : skew >= 1 ? t.skewHigh : t.skewSome}`} value={skew} min={0.2} max={3} step={0.1} onChange={setSkew} />
       <Panel t={t} options={{ ...GOOD, skew }} workers={PARAMS.workers} bars={["count", "work"]} headline="count" />
     </div>
   );

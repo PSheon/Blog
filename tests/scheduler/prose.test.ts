@@ -53,6 +53,12 @@ describe("the numbers in the article", () => {
     says("平均差 10 點，有 24% 的時間", "16 個時差 17 點", "8.2 點降到 4.0 點", "off by 10 points on average and spends 24%", "from 8.2 points to 4.0");
   }, 120_000);
 
+  it("tasks as unequal as this project's own unit tests", () => {
+    const wild = mean({ ...GOOD, skew: 2.8 }, 4);
+    expect([Math.round(wild.count.error), Math.round(wild.count.above90 * 100)]).toEqual([28, 45]);
+    says("平均差 28 點，有 45% 的時間", "off by 28 points on average and spends 45%");
+  }, 120_000);
+
   it("what one attempt in five failing costs", () => {
     const calm = mean(GOOD, 4), rough = mean({ ...GOOD, failRate: 0.2 }, 4);
     expect([Math.round(calm.total), Math.round(rough.total), Math.round(rough.failed), Math.round(rough.wasted * 100)]).toEqual([38, 44, 15, 13]);
