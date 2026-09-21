@@ -1,0 +1,24 @@
+// Throwaway: a job is a DAG of tasks run by W workers. Three progress bars watch it. How honest is each?
+// Honest = shown progress equals the fraction of wall-clock time that has passed.
+function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const gauss=(R)=>Math.sqrt(-2*Math.log(1-R()))*Math.cos(2*Math.PI*R());
+function job(R,{n=60,skew=1,estErr=0.5,layers=6}){ // layered DAG; true duration lognormal(skew); estimate = true * lognormal(estErr)
+  const tasks=[];for(let i=0;i<n;i++){const layer=Math.min(layers-1,Math.floor(i/(n/layers)));const d=Math.exp(gauss(R)*skew);tasks.push({id:i,layer,d,est:d*Math.exp(gauss(R)*estErr),deps:[]});}
+  for(const t of tasks)if(t.layer>0){const prev=tasks.filter(p=>p.layer===t.layer-1);const k=1+Math.floor(R()*2);for(let j=0;j<k;j++)t.deps.push(prev[Math.floor(R()*prev.length)].id);}
+  return tasks;}
+function run(tasks,W){const done=new Set,start=new Map,finish=new Map;let t=0;const running=[];const events=[];
+  while(done.size<tasks.length){
+    const ready=tasks.filter(x=>!start.has(x.id)&&x.deps.every(d=>done.has(d))).sort((a,b)=>a.id-b.id);
+    while(running.length<W&&ready.length){const x=ready.shift();start.set(x.id,t);running.push(x);}
+    running.sort((a,b)=>(start.get(a.id)+a.d)-(start.get(b.id)+b.d));const x=running.shift();t=start.get(x.id)+x.d;done.add(x.id);finish.set(x.id,t);events.push(t);}
+  return{total:t,start,finish};}
+function bars(tasks,sim,at){ // progress shown at time `at`
+  let count=0,work=0,workAll=0,part=0;for(const x of tasks){workAll+=x.est;const s=sim.start.get(x.id),f=sim.finish.get(x.id);if(f<=at){count++;work+=x.est;part+=x.est;}else if(s<=at){part+=x.est*Math.min(1,(at-s)/x.est);}}
+  return{count:count/tasks.length,work:work/workAll,partial:Math.min(1,part/workAll)};}
+function measure(opts,W,runs=400){const R=rng(7);const acc={count:[0,0],work:[0,0],partial:[0,0]};
+  for(let r=0;r<runs;r++){const tasks=job(R,opts),sim=run(tasks,W);const first={count:null,work:null,partial:null};let err={count:0,work:0,partial:0};const S=200;
+    for(let k=1;k<=S;k++){const at=sim.total*k/S,b=bars(tasks,sim,at);for(const key in b){err[key]+=Math.abs(b[key]-k/S)/S;if(first[key]===null&&b[key]>=0.9)first[key]=k/S;}}
+    for(const key in acc){acc[key][0]+=err[key]/runs;acc[key][1]+=(1-first[key])/runs;}}
+  return Object.fromEntries(Object.entries(acc).map(([k,[e,stuck]])=>[k,`error ${(100*e).toFixed(1)} pts, last ${(100*stuck).toFixed(0)}% of the time spent above 90%`]));}
+for(const [label,opts,W] of [["even tasks, good estimates, 4 workers",{skew:0.2,estErr:0.1},4],["skewed tasks (a few huge), good estimates",{skew:1.2,estErr:0.1},4],["skewed tasks, estimates off by ~2x",{skew:1.2,estErr:0.7},4],["skewed, estimates off, 16 workers",{skew:1.2,estErr:0.7},16]])
+  console.log(label,"\n ",JSON.stringify(measure(opts,W),null,0).replace(/","/g,'",\n   "'));
