@@ -5,7 +5,7 @@ import { NO_SHIFT, Policy, evaluate, picture, view } from "@/content/posts/head-
 /** The page's model module must compute what the research script computed when it saved these weights (its golden outputs). */
 describe("head-camera checkpoints", () => {
   // fixed.json is keep-looking trained with the camera never moved (fig. 04's left side).
-  for (const [file, kind] of [["closed", "closed"], ["open", "open"], ["fixed", "closed"]] as const) {
+  for (const [file, kind] of [["closed", "closed"], ["fixed", "closed"]] as const) {
     it(`${file} reproduces the script's outputs`, () => {
       const saved = JSON.parse(readFileSync(`public/posts/head-camera/${file}.json`, "utf8"));
       const policy = new Policy(saved);

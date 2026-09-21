@@ -22,16 +22,17 @@ interface World {
   s: PickState; from: Vec3; at: number; jaws: number;
   /** look-once: going home to look, or working from what it saw. */
   phase: "home" | "work"; belief: { block: XY; pad: XY } | null;
-  done: boolean; seen: Uint8Array | null; keys: XY[];
+  done: boolean; seen: Float64Array | null; keys: XY[];
   drag: Target | "orbit" | null; px: number; py: number;
 }
 const fresh = (layout = START): World => ({ s: { hand: [...PICK_HOME], closed: false, holding: false, block: [...layout.block], pad: [...layout.pad] }, from: [...PICK_HOME], at: 0, jaws: 0, phase: "home", belief: null, done: false, seen: null, keys: [], drag: null, px: 0, py: 0 });
 
-function paint(canvas: HTMLCanvasElement | null, bytes: Uint8Array) {
+/** Paint what the network was shown: channel-first 0…1, with the reader's noise and light already in it. */
+function paint(canvas: HTMLCanvasElement | null, picture: Float64Array) {
   const context = canvas?.getContext("2d");
   if (!context) return;
-  const image = context.createImageData(PICK_SIZE, PICK_SIZE);
-  for (let i = 0, o = 0; i < bytes.length; i += 3, o += 4) { image.data[o] = bytes[i]; image.data[o + 1] = bytes[i + 1]; image.data[o + 2] = bytes[i + 2]; image.data[o + 3] = 255; }
+  const image = context.createImageData(PICK_SIZE, PICK_SIZE), n = PICK_SIZE * PICK_SIZE;
+  for (let i = 0; i < n; i++) { for (let c = 0; c < 3; c++) image.data[i * 4 + c] = Math.round(picture[c * n + i] * 255); image.data[i * 4 + 3] = 255; }
   context.putImageData(image, 0, 0);
 }
 
@@ -79,12 +80,12 @@ export function PickLab() {
           if (s.holding || s.closed) { s.holding = false; s.closed = false; s.block = inBlockArea(s.block); if (!usable(s.block)) s.block = [...START.block]; }
           const d: Vec3 = [PICK_HOME[0] - s.hand[0], PICK_HOME[1] - s.hand[1], PICK_HOME[2] - s.hand[2]];
           if (Math.hypot(...d) < 1e-6) {
-            const bytes = pickView(s, shift), r = policy.run(pickPicture(bytes, k.noise, k.light), []);
-            w.belief = PickPolicy.believed(r.out); w.seen = bytes; w.keys = r.keypoints; w.phase = "work";
+            const image = pickPicture(pickView(s, shift), k.noise, k.light), r = policy.run(image, []);
+            w.belief = PickPolicy.believed(r.out); w.seen = image; w.keys = r.keypoints; w.phase = "work";
           } else pickAct(s, [d[0] / STEP_XY, d[1] / STEP_XY, d[2] / STEP_Z, 0]);
         } else {
           const r = decide(policy, s, shift, w.belief, { noise: k.noise, dim: k.light });
-          if (r.bytes) { w.seen = r.bytes; w.keys = r.keypoints ?? []; }
+          if (r.image) { w.seen = r.image; w.keys = r.keypoints ?? []; }
           if (pickAct(s, r.action) === "placed") { w.done = true; placed.current++; }
         }
       }

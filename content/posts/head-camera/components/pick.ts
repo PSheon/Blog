@@ -145,13 +145,14 @@ export class PickPolicy {
  * What a driver does next. keep-looking asks the network with a fresh picture. look-once took one picture at the start
  * (`belief`) and lets the teacher work from that belief with perfect joints, never looking again.
  */
-export function decide(policy: PickPolicy, s: PickState, shift: CameraShift, belief: { block: XY; pad: XY } | null, look: { noise?: number; dim?: number } = {}): { action: number[]; keypoints: XY[] | null; bytes: Uint8Array | null } {
+export function decide(policy: PickPolicy, s: PickState, shift: CameraShift, belief: { block: XY; pad: XY } | null, look: { noise?: number; dim?: number } = {}): { action: number[]; keypoints: XY[] | null; image: Float64Array | null } {
   if (policy.kind === "open") {
     if (!belief) throw new Error("look-once needs its belief");
-    return { action: teacher({ ...s, block: s.holding ? [s.hand[0], s.hand[1]] : belief.block, pad: belief.pad }), keypoints: null, bytes: null };
+    return { action: teacher({ ...s, block: s.holding ? [s.hand[0], s.hand[1]] : belief.block, pad: belief.pad }), keypoints: null, image: null };
   }
-  const bytes = pickView(s, shift), r = policy.run(pickPicture(bytes, look.noise, look.dim), feelOf(s));
-  return { action: r.out, keypoints: r.keypoints, bytes };
+  // `image` is what the network was actually shown (noise and light applied), so the page can display exactly that.
+  const image = pickPicture(pickView(s, shift), look.noise, look.dim), r = policy.run(image, feelOf(s));
+  return { action: r.out, keypoints: r.keypoints, image };
 }
 
 export type PickCondition = { shift: CameraShift; movePad?: boolean; moveBlock?: boolean };

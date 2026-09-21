@@ -14,7 +14,6 @@ const zh = {
   policy: "誰在操作",
   closed: "持續看",
   open: "看一眼",
-  mine: "你練的",
   play: "播放", pause: "暫停", reset: "重來",
   gap: "手離方塊", status: "狀態",
   there: "到了", going: "前往中", homing: "回原位拍照",
@@ -38,7 +37,8 @@ const zh = {
   result: "測驗結果",
   straight: "相機沒動", pitched: "相機下傾 5°",
   episodes: (n: number) => `各 ${n} 回合`,
-  toBench: "下面的工作台多了一個「你練的」可以選。",
+  trialTitle: "現在換你弄歪它", trialLabel: "你練的模型正在找方塊（每一步都重看）",
+  trialCount: (reached: number, tried: number) => `到了 ${reached} 次 / 試了 ${tried} 次`,
   secondsUnit: "秒",
 };
 
@@ -54,7 +54,6 @@ const en: typeof zh = {
   policy: "Driving",
   closed: "Keep looking",
   open: "Look once",
-  mine: "Yours",
   play: "Play", pause: "Pause", reset: "Reset",
   gap: "Hand to block", status: "Status",
   there: "There", going: "On its way", homing: "Going home to look",
@@ -78,7 +77,8 @@ const en: typeof zh = {
   result: "Test",
   straight: "Camera as trained", pitched: "Camera tilted 5°",
   episodes: (n: number) => `${n} episodes each`,
-  toBench: "The bench below now has a “Yours” to choose.",
+  trialTitle: "Now knock its camera", trialLabel: "Your model, finding blocks (it looks again every step)",
+  trialCount: (reached: number, tried: number) => `${reached} reached of ${tried} tried`,
   secondsUnit: "s",
 };
 

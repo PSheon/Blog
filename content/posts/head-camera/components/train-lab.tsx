@@ -6,9 +6,9 @@ import { Readout } from "@/components/lab/readout";
 import { Sparkline } from "@/components/lab/sparkline";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
-import { K, NO_SHIFT, SIZE, type XY, view } from "./model";
+import { HOLD, HOME, K, NO_SHIFT, Policy, SIZE, TOL, type XY, advance, picture, somewhere, view } from "./model";
+import { Param } from "./param";
 import type { Reply, Request } from "./protocol";
-import { setMine } from "./trained";
 
 const DOTS = ["#ffff00", "#00ff00", "#ff00ff", "#ffffff", "#000000", "#ff8000", "#00a0ff", "#a0ffa0"];
 
@@ -19,6 +19,7 @@ function paint(canvas: HTMLCanvasElement | null, bytes: Uint8Array) {
   for (let i = 0, o = 0; i < bytes.length; i += 3, o += 4) { image.data[o] = bytes[i]; image.data[o + 1] = bytes[i + 1]; image.data[o + 2] = bytes[i + 2]; image.data[o + 3] = 255; }
   context.putImageData(image, 0, 0);
 }
+const deg = Math.PI / 180, TRIAL_MS = 130, MAX_STEPS = 40;
 
 type Progress = Extract<Reply, { type: "progress" }>;
 type Done = Extract<Reply, { type: "done" }>;
@@ -28,6 +29,8 @@ export function TrainLab() {
   const t = useLabels();
   const worker = useRef<Worker | null>(null), probe = useRef<HTMLCanvasElement>(null);
   const [state, setState] = useState<"idle" | "training" | "testing" | "done">("idle");
+  const [pitch, setPitch] = useState(0), [trial, setTrial] = useState({ reached: 0, tried: 0, keys: [] as XY[] }), tilt = useRef(0);
+  useEffect(() => { tilt.current = pitch; }, [pitch]);
   const [progress, setProgress] = useState<Progress | null>(null), [losses, setLosses] = useState<number[]>([]), [done, setDone] = useState<Done | null>(null);
 
   // The probe is the worker's fixed picture (train.worker.ts PROBE); draw it before training so the figure is not empty.
@@ -41,14 +44,32 @@ export function TrainLab() {
       if (data.type === "probe") paint(probe.current, data.bytes);
       else if (data.type === "progress") { setProgress(data); setLosses((l) => [...l, data.loss]); }
       else if (data.type === "testing") setState("testing");
-      else { setDone(data); setState("done"); setMine(data.saved); w.terminate(); worker.current = null; }
+      else { setDone(data); setState("done"); setTrial({ reached: 0, tried: 0, keys: [] }); w.terminate(); worker.current = null; }
     };
     setProgress(null); setLosses([]); setDone(null); setState("training");
     w.postMessage({ type: "start", seed: Math.floor(Math.random() * 2 ** 31) } satisfies Request);
   };
   const stop = () => { worker.current?.terminate(); worker.current = null; setState("idle"); };
 
-  const keys: XY[] = progress?.keypoints ?? [];
+  // Once trained, the reader's own model runs episode after episode in the same little picture, under a tilt they choose.
+  useEffect(() => {
+    if (!done) return;
+    const policy = new Policy(done.saved);
+    let tip: XY = [...HOME], block = somewhere(Math.random), steps = 0, held = 0, rest = 0, reached = 0, tried = 0;
+    const timer = setInterval(() => {
+      const shift = { ...NO_SHIFT, pitch: tilt.current * deg };
+      if (rest > 0) { if (--rest === 0) { tip = [...HOME]; block = somewhere(Math.random); steps = 0; held = 0; } return; }
+      const bytes = view(tip, block, shift), r = policy.run(picture(bytes));
+      paint(probe.current, bytes);
+      tip = advance(tip, r.out); steps++;
+      held = Math.hypot(tip[0] - block[0], tip[1] - block[1]) < TOL ? held + 1 : 0;
+      if (held >= HOLD || steps >= MAX_STEPS) { tried++; if (held >= HOLD) reached++; rest = 5; }
+      setTrial({ reached, tried, keys: r.keypoints });
+    }, TRIAL_MS);
+    return () => clearInterval(timer);
+  }, [done]);
+
+  const keys: XY[] = done ? trial.keys : progress?.keypoints ?? [];
   const fraction = progress ? progress.step / progress.steps : 0;
   const eta = progress && progress.step > 0 ? (progress.seconds / progress.step) * (progress.steps - progress.step) : null;
   return (
@@ -61,7 +82,7 @@ export function TrainLab() {
               {keys.slice(0, K).map(([x, y], i) => <circle key={i} cx={x} cy={y} r={0.05} fill={DOTS[i]} stroke="#000" strokeWidth={0.012} />)}
             </svg>
           </div>
-          <p className="label">{t.probe}</p>
+          <p className="label">{done ? t.trialLabel : t.probe}</p>
         </div>
         <div className="grid content-start gap-4">
           <div className="flex flex-wrap items-center gap-2">
@@ -93,7 +114,9 @@ export function TrainLab() {
                   <Readout label={t.straight} value={(done.straight * 100).toFixed(0)} unit="%" />
                   <Readout label={t.pitched} value={(done.pitched * 100).toFixed(0)} unit="%" />
                 </div>
-                <p className="text-muted-foreground">{t.toBench}</p>
+                <p className="label mt-2">{t.trialTitle}</p>
+                <Param label={t.pitch} shown={`${pitch}°`} value={pitch} min={-10} max={20} step={1} onChange={setPitch} />
+                <p className="font-mono tabular" data-testid="headcam-trial">{t.trialCount(trial.reached, trial.tried)}</p>
               </div>
             )}
           </div>
