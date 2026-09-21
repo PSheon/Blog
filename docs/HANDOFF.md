@@ -59,6 +59,11 @@ stays in `lib/rt` with its tests. Read before touching it:
 
 ## Rules Paul has set (also in memory)
 
+- Commit messages follow Conventional Commits: `type(scope): summary`, types feat / fix / docs / style / refactor / perf /
+  test / build / ci / chore / revert, scope the area (`playground`, `rt`, `light`, `site`, `e2e`, …). The repository began
+  that way and drifted (about 110 commits of "area: sentence" between 2026-09-19 and 2026-09-21, most of them mine);
+  `.githooks/commit-msg` now refuses anything else (`pnpm install` points git at it). Pushed history is not rewritten:
+  that would need a force-push of `dev`.
 - Never move or push `main`. Releases are a PR `dev` → `main` that he merges. "Deploy" is not "release".
 - Never force-push `dev`. Paul and Dependabot merge into `dev` on GitHub, so `git fetch && git status -sb` before
   every commit and push; on a rejected push, `git rebase origin/dev`, and tell him.
