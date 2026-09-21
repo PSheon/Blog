@@ -468,6 +468,15 @@ the recipe is dependable at three times the steps. Cost: about 40 minutes a mode
 owed before the article's table can use this row: the other rows re-measured on the same (cut) layouts, which run 19
 predates (run 22), and keep-looking without shaking at the same 60 000 steps (run 23).
 
+## Run 22 — the other rows on the cut layouts; the page now ships the 60 000-step checkpoint
+
+Run 19 predates the cut corner of BLOCK_AREA, so its 20 checkpoints were measured again on the current layouts
+(`run-22/`): open 65.8 / 0 / 0 / block moved 17.7 / pad moved 11.7; open + shaken 51.4 / 53.0 (pitch 10°) / 45.6 (yaw 10°) /
+15.5 / 10.5; closed 74.4 (16–100) / 0 / 1.1 / 73.2 / 74.1; closed + shaken at 20 000 steps 59.0 (2–100). The article's table
+uses these three rows and run 21's 60 000-step row, and says the budgets differ. `pick-shaken.json` is now run 20's
+seed 11 (60 000 steps): on 200 page layouts 100 % untouched, 99.5 % at 10° of pitch, 100 / 100 / 97 % at 80 / 70 / 50 % light,
+96.5 % and 44.5 % at noise 0.05 and 0.15.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
