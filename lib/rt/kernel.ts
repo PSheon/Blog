@@ -25,6 +25,9 @@
  * ray that leaves sees white 1 and nothing else shines; a surface that returns more than it was given shows at once.
  * cpu.ts has matte only.
  *
+ * `temporal` = 1 (a picture that is walked through): instead of starting from nothing whenever something moves, the
+ * last frame's result is carried over. See REPROJECT below.
+ *
  * `dynamicRoot` > 0: a second tree, for what moves, stored after the world's in the same buffers.
  *
  * Outdoors (`sun.w` > 0; the Cornell box never sets it, and cpu.ts does not have it): a ray that leaves sees a sky
@@ -34,11 +37,15 @@
  */
 export const WORKGROUP = 8;
 
+/** The one uniform block every shader here reads (256 bytes; gpu.ts writes it). */
+export const PARAMS_BYTES = 256;
+const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, q2: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f };`;
+
 export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
 struct Tri { v0: vec3f, m: u32, v1: vec3f, p1: u32, v2: vec3f, p2: u32 };
 struct Material { albedo: vec3f, mirror: f32, emit: vec3f, roughness: f32, metallic: f32, ior: f32, glass: f32, p3: f32 };
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, q0: u32, q1: u32, q2: u32 };
+${PARAMS}
 
 @group(0) @binding(0) var<storage, read> nodes: array<Node>;
 @group(0) @binding(1) var<storage, read> tris: array<Tri>;
@@ -47,6 +54,7 @@ struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec
 @group(0) @binding(4) var<storage, read_write> counters: array<atomic<u32>, 4>; // rays, node visits, stack overflows
 @group(0) @binding(5) var<uniform> params: Params;
 @group(0) @binding(6) var<storage, read> normals: array<vec4f>;          // three per smooth triangle; Tri.p1 is 1 + its index, 0 = flat
+@group(0) @binding(7) var<storage, read_write> gbuf: array<vec4f>;       // temporal: what each pixel's first ray of a frame hit (world position, and the triangle, or −1 for the sky)
 
 var<workgroup> tally: array<atomic<u32>, 3>;
 var<private> state: u32;
@@ -184,6 +192,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
     for (var bounce = 0u; ; bounce++) {
       rays++;
       let h = nearest(o, d, 1e-5 * scale); steps += h.steps; overflow += h.overflow;
+      if (bounce == 0u && params.temporal == 1u && params.sample == 0u) { gbuf[pixel] = select(vec4f(o + d * h.t, f32(h.tri)), vec4f(o + d * 1e5, -1.0), h.tri == MISS); }
       if (params.view == 1u) { rgb = vec3f(f32(h.steps)); break; } // the heat map: the camera ray's node visits, nothing else
       if (h.tri == MISS) {
         if (params.furnace == 1u) { rgb += through; }
@@ -291,7 +300,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
  * samples most pixels are black in both pictures and agree by accident, and the clamp hides every bright hit.
  */
 export const MEASURE = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, q0: u32, q1: u32, q2: u32 };
+${PARAMS}
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<storage, read_write> tiles: array<vec2f>;
 @group(0) @binding(2) var<uniform> params: Params;
@@ -321,9 +330,10 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
 
 /** A full-screen triangle that shows A + B, tone-mapped (Narkowicz's ACES fit) and gamma-encoded. */
 export const PRESENT = /* wgsl */ `
-struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, q0: u32, q1: u32, q2: u32 };
+${PARAMS}
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<uniform> params: Params;
+@group(0) @binding(2) var<storage, read> carried: array<vec4f>; // temporal: last frame's result where this pixel's surface was then, and how many samples it is worth
 struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> Out {
   var corners = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
@@ -334,7 +344,8 @@ struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
   let x = min(u32(in.uv.x * f32(params.size.x)), params.size.x - 1u); let y = min(u32(in.uv.y * f32(params.size.y)), params.size.y - 1u);
   let half = params.size.x * params.size.y; let pixel = y * params.size.x + x;
   let a = accum[pixel]; let b = accum[half + pixel]; let n = max(a.w + b.w, 1.0);
-  let c = (a.rgb + b.rgb) / n;
+  var c = (a.rgb + b.rgb) / n;
+  if (params.temporal == 1u && params.view == 0u) { let old = carried[pixel]; c = (old.rgb * old.w + a.rgb + b.rgb) / max(old.w + a.w + b.w, 1.0); }
   if (params.view == 1u) {
     // Node visits as heat: black → violet → pink → yellow → white, linear in the count up to heatMax.
     let t = clamp(c.x / f32(params.heatMax), 0.0, 1.0);
@@ -344,5 +355,59 @@ struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
   let e = c * params.exposure;
   let mapped = clamp(e * (2.51 * e + 0.03) / (e * (2.43 * e + 0.59) + 0.14), vec3f(0.0), vec3f(1.0));
   return vec4f(pow(mapped, vec3f(1.0 / 2.2)), 1.0);
+}
+`;
+
+/**
+ * Carrying a picture across a movement. Two small passes around every frame in which something moved:
+ *
+ *   COMMIT (before anything changes): history ← what the screen shows now = (carried · its weight + this frame's
+ *   samples) / (the weights together), with the weight capped at historyCap so that old light fades out.
+ *   REPROJECT (after the new frame's first sample has written gbuf): for every pixel, take the surface point it sees,
+ *   find which pixel showed that point in the LAST frame (prevEye …), and if that pixel really did show the same point
+ *   (its old gbuf entry is the same triangle, close by), carry its history over. Otherwise start from nothing: the point
+ *   was hidden, off screen, or belongs to something that moved.
+ */
+export const COMMIT = /* wgsl */ `
+${PARAMS}
+@group(0) @binding(0) var<storage, read> accum: array<vec4f>;
+@group(0) @binding(1) var<storage, read> carried: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> history: array<vec4f>;
+@group(0) @binding(3) var<uniform> params: Params;
+@compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.size.x || gid.y >= params.size.y) { return; }
+  let half = params.size.x * params.size.y; let pixel = gid.y * params.size.x + gid.x;
+  let a = accum[pixel]; let b = accum[half + pixel]; let old = carried[pixel]; let weight = old.w + a.w + b.w;
+  history[pixel] = vec4f((old.rgb * old.w + a.rgb + b.rgb) / max(weight, 1.0), min(weight, params.historyCap));
+}
+`;
+
+export const REPROJECT = /* wgsl */ `
+${PARAMS}
+@group(0) @binding(0) var<storage, read> gbuf: array<vec4f>;
+@group(0) @binding(1) var<storage, read> gprev: array<vec4f>;
+@group(0) @binding(2) var<storage, read> history: array<vec4f>;
+@group(0) @binding(3) var<storage, read_write> carried: array<vec4f>;
+@group(0) @binding(4) var<uniform> params: Params;
+@compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.size.x || gid.y >= params.size.y) { return; }
+  let pixel = gid.y * params.size.x + gid.x; let here = gbuf[pixel];
+  var result = vec4f(0.0);
+  let v = here.xyz - params.prevEye.xyz; let depth = dot(v, params.prevForward.xyz);
+  if (depth > 1e-3) {
+    let x = dot(v, params.prevRight.xyz) / (depth * dot(params.prevRight.xyz, params.prevRight.xyz)); let y = dot(v, params.prevUp.xyz) / (depth * dot(params.prevUp.xyz, params.prevUp.xyz));
+    let at = vec2f((x * 0.5 + 0.5) * f32(params.size.x), (0.5 - y * 0.5) * f32(params.size.y));
+    if (at.x >= 0.0 && at.y >= 0.0 && at.x < f32(params.size.x) && at.y < f32(params.size.y)) {
+      let q = u32(at.y) * params.size.x + u32(at.x); let there = gprev[q];
+      // The same point? Two jittered rays through one pixel land far apart on ground seen at a shallow angle, so a plain
+      // distance test throws the whole floor away. The same TRIANGLE, roughly the same place, is the test that holds.
+      let sky = here.w < 0.0 && there.w < 0.0; let gap = distance(there.xyz, here.xyz);
+      let same = select(gap < 0.03 + 0.01 * depth, gap < 0.3 + 0.1 * depth, here.w == there.w);
+      if (sky || (here.w >= 0.0 && there.w >= 0.0 && same)) { result = history[q]; }
+    }
+  }
+  carried[pixel] = result;
 }
 `;

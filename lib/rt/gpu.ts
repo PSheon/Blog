@@ -1,7 +1,7 @@
 /// <reference types="@webgpu/types" />
 import type { Bvh } from "./bvh";
 import { cross, sub, unit } from "./cpu";
-import { KERNEL, MEASURE, PRESENT, WORKGROUP } from "./kernel";
+import { COMMIT, KERNEL, MEASURE, PARAMS_BYTES, PRESENT, REPROJECT, WORKGROUP } from "./kernel";
 import type { Material, Scene } from "./scene";
 
 const MATERIAL_FLOATS = 12;
@@ -42,11 +42,15 @@ export class Renderer {
     private readonly tracePipe: GPUComputePipeline, private readonly traceBind: GPUBindGroup, private readonly measurePipe: GPUComputePipeline, private readonly measureBind: GPUBindGroup,
     private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[], private readonly mats: GPUBuffer,
     private readonly nodes: GPUBuffer, private readonly tris: GPUBuffer, /** where a dynamic tree starts: pass these to buildDynamicBvh */ readonly nodeBase: number, readonly triangleBase: number, readonly dynamicCapacity: number,
+    private readonly temporal: { commitPipe: GPUComputePipeline; commitBind: GPUBindGroup; reprojectPipe: GPUComputePipeline; reprojectBind: GPUBindGroup; gbuf: GPUBuffer; gprev: GPUBuffer; carried: GPUBuffer; bytes: number } | null,
   ) {}
+  /** How many samples' worth a carried-over pixel may count for: higher is smoother and slower to notice that the light changed. */
+  historyCap = 12;
+  private pendingReproject = false;
   private dynamicRoot = 0;
 
   /** `dynamicTriangles`: room to keep after the world's tree for a second one that is rebuilt every frame (`setDynamic`). */
-  static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number, dynamicTriangles = 0): Promise<Renderer | Unavailable> {
+  static async create(canvas: HTMLCanvasElement, scene: Scene, bvh: Bvh, width: number, height: number, dynamicTriangles = 0, /** keep what `advance()` needs to carry a picture across a movement (four more buffers the size of the picture) */ temporal = false): Promise<Renderer | Unavailable> {
     if (!navigator.gpu) return "no-webgpu"; // some browsers define the property and leave it undefined
     const adapter = await navigator.gpu.requestAdapter({ powerPreference: "high-performance" });
     if (!adapter) return "no-adapter";
@@ -66,7 +70,7 @@ export class Renderer {
     const across = Math.ceil(width / WORKGROUP), down = Math.ceil(height / WORKGROUP), tileCount = across * down;
     const nodes = make(bvh.nodes.byteLength + dynamicTriangles * 2 * 32, STORAGE, bvh.nodes), tris = make(bvh.triangles.byteLength + dynamicTriangles * 48, STORAGE, bvh.triangles), mats = make(materials.byteLength, STORAGE, materials), smooth = make(Math.max(48, bvh.normals?.byteLength ?? 0), STORAGE, bvh.normals?.byteLength ? bvh.normals : undefined);
     const accum = make(width * height * 16 * 2, STORAGE), counters = make(16, STORAGE), tiles = make(tileCount * 8, STORAGE);
-    const paramData = new ArrayBuffer(192), params = make(192, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
+    const paramData = new ArrayBuffer(PARAMS_BYTES), params = make(PARAMS_BYTES, GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST);
 
     new Uint32Array(paramData, 0, 4).set([width, height, 0, 16]);
     Renderer.writeCamera(paramData, scene.camera, width / height);
@@ -79,14 +83,16 @@ export class Renderer {
       if (problems.length) throw new Error(`${name}: ${problems.map((m) => `line ${m.lineNum}: ${m.message}`).join("; ")}`);
       return shader;
     };
+    const picture = temporal ? width * height * 16 : 16, gbuf = make(picture, STORAGE), gprev = make(picture, STORAGE), history = make(picture, STORAGE), carried = make(picture, STORAGE);
     const entries = (buffers: GPUBuffer[]) => buffers.map((buffer, binding) => ({ binding, resource: { buffer } }));
-    const [trace, measure, shader] = await Promise.all([compile(KERNEL, "path tracing kernel"), compile(MEASURE, "error measurement"), compile(PRESENT, "present")]);
-    const [tracePipe, measurePipe] = await Promise.all([trace, measure].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
+    const [trace, measure, shader, commit, reproject] = await Promise.all([compile(KERNEL, "path tracing kernel"), compile(MEASURE, "error measurement"), compile(PRESENT, "present"), compile(COMMIT, "commit history"), compile(REPROJECT, "reproject history")]);
+    const [tracePipe, measurePipe, commitPipe, reprojectPipe] = await Promise.all([trace, measure, commit, reproject].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
     const presentPipe = await device.createRenderPipelineAsync({ layout: "auto", vertex: { module: shader, entryPoint: "vs" }, fragment: { module: shader, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return new Renderer(device, adapter.info?.description || adapter.info?.architecture || adapter.info?.vendor || "GPU", context, width, height, params, paramData, accum, counters, tiles, tileCount,
-      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth]) }),
+      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth, gbuf]) }),
       measurePipe, device.createBindGroup({ layout: measurePipe.getBindGroupLayout(0), entries: entries([accum, tiles, params]) }),
-      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params]) }), owned, mats, nodes, tris, bvh.nodeCount, bvh.triangleCount, dynamicTriangles);
+      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params, carried]) }), owned, mats, nodes, tris, bvh.nodeCount, bvh.triangleCount, dynamicTriangles,
+      temporal ? { commitPipe, commitBind: device.createBindGroup({ layout: commitPipe.getBindGroupLayout(0), entries: entries([accum, carried, history, params]) }), reprojectPipe, reprojectBind: device.createBindGroup({ layout: reprojectPipe.getBindGroupLayout(0), entries: entries([gbuf, gprev, history, carried, params]) }), gbuf, gprev, carried, bytes: picture } : null);
   }
 
   private static writeCamera(paramData: ArrayBuffer, camera: Scene["camera"], aspect: number): void {
@@ -110,17 +116,37 @@ export class Renderer {
     new Uint32Array(this.paramData, 8, 2).set([this.samples, this.bounces]);
     new Float32Array(this.paramData, 96, 6).set([...this.sun, this.exposure, this.skyLevel]);
     new Uint32Array(this.paramData, 120, 2).set([this.strategy, this.furnace ? 1 : 0]);
-    new Uint32Array(this.paramData, 176, 1).set([this.dynamicRoot]);
+    new Uint32Array(this.paramData, 176, 2).set([this.dynamicRoot, this.temporal ? 1 : 0]);
+    new Float32Array(this.paramData, 184, 1).set([this.historyCap]);
     new Uint32Array(this.paramData, 80, 4).set([this.heat ? 1 : this.raster ? 2 : 0, this.quad === "strategies" ? 2 : this.quad ? 1 : 0, this.brute ? 1 : 0, this.heatMax]);
     this.device.queue.writeBuffer(this.params, 0, this.paramData);
   }
 
-  /** Forget everything accumulated: the scene, the camera or the bounce limit changed. */
+  /** Forget everything accumulated: the scene, the camera or the bounce limit changed. (With `temporal`, also what was carried over: for a change of light, not of view.) */
   reset(): void {
-    this.samples = 0;
+    this.samples = 0; this.pendingReproject = false;
     const e = this.device.createCommandEncoder();
     e.clearBuffer(this.accum); e.clearBuffer(this.counters);
+    if (this.temporal) e.clearBuffer(this.temporal.carried);
     this.device.queue.submit([e.finish()]);
+  }
+
+  /**
+   * Something moved: instead of `reset()`, keep the picture. Call this BEFORE `setCamera` / `setDynamic`: it records
+   * what the screen shows and where the camera was, then empties the accumulation. The next `sample()` carries the
+   * old picture over to the new view (kernel.ts, REPROJECT). Without `temporal` this is `reset()`.
+   */
+  advance(): void {
+    const t = this.temporal;
+    if (!t || this.samples === 0) { this.reset(); return; }
+    this.writeParams();
+    const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+    pass.setPipeline(t.commitPipe); pass.setBindGroup(0, t.commitBind); pass.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP)); pass.end();
+    e.copyBufferToBuffer(t.gbuf, 0, t.gprev, 0, t.bytes);
+    e.clearBuffer(this.accum); e.clearBuffer(this.counters);
+    this.device.queue.submit([e.finish()]);
+    new Float32Array(this.paramData, 192, 16).set(new Float32Array(this.paramData, 16, 16)); // where the camera was
+    this.samples = 0; this.pendingReproject = true;
   }
 
   /** `count` more samples for every pixel. Each is its own submit: the sample index is a uniform. */
@@ -133,6 +159,12 @@ export class Renderer {
       pass.end();
       this.device.queue.submit([e.finish()]);
       this.samples++;
+      if (this.pendingReproject && this.temporal) { // the first sample of the frame has said what every pixel sees: fetch its past
+        this.pendingReproject = false;
+        const t = this.temporal, r = this.device.createCommandEncoder(), p = r.beginComputePass();
+        p.setPipeline(t.reprojectPipe); p.setBindGroup(0, t.reprojectBind); p.dispatchWorkgroups(Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP)); p.end();
+        this.device.queue.submit([r.finish()]);
+      }
     }
   }
 

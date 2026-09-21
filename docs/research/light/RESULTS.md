@@ -168,3 +168,20 @@ preparing each object's tree once with the surface area heuristic and refitting 
 anyway because it halves the CPU cost per frame: 2.8 ms → 1.2 ms for 11,275 triangles. The vehicles still cost
 2.6 ms per sample for 5.5 more visits per ray; not understood yet (the second traversal's fixed cost per ray, and
 paths that rattle around inside a car's metal shell, are the suspects).
+
+## 2026-09-21 — carrying the picture across a movement (temporal reprojection)
+
+Same machine and view; the character strafes (D held), 12 consecutive frames read back from the canvas while moving.
+Noise number: mean absolute difference between horizontally neighbouring pixels, 8-bit sRGB, every second pixel
+(it includes real edges, so the true reduction is larger than the ratio). Frame rate while moving: 121 fps, one sample
+per frame, both ways.
+
+| History cap (samples a carried pixel may count for) | run 1 | run 2 |
+| --- | --- | --- |
+| 0 (start from nothing every frame, as before) | 6.81 | 7.44 |
+| 12 | 3.04 | 2.85 |
+
+First attempt validated history by distance alone (3 cm + 1% of depth) and did nothing for the ground: two jittered
+rays through one pixel land decimetres apart on a floor seen at a shallow angle. Same triangle + a loose distance is
+the test that holds. Known artefacts: the character itself gets no history (its triangles move, so every frame is its
+first) and its shadow trails for a fraction of a second.

@@ -28,12 +28,12 @@ interface Assets { models: Models; world: World; skinner: ReturnType<typeof crea
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
   const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<"foot" | "near" | "driving">("foot");
-  const settings = useRef({ mode, hour }), dirty = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
+  const settings = useRef({ mode, hour }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
   const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), interact = useRef(false), seatNow = useRef("foot");
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 });
 
   const tracer = useTracer(root, canvas, {
-    playground: PLAYGROUND_URL, dynamicTriangles: DYNAMIC, size: W, height: H, autostart: true, maxSamples: MAX_SAMPLES, budgetMs: 8,
+    playground: PLAYGROUND_URL, dynamicTriangles: DYNAMIC, temporal: true, size: W, height: H, autostart: true, maxSamples: MAX_SAMPLES, budgetMs: 8,
     configure: (r) => { mine.current = r; dirty.current = true; },
     afterFrame: (r, _built, batch) => { const k = timing.current; k.ms = k.ms ? k.ms * 0.9 + (batch.gpuMs / batch.samples) * 0.1 : batch.gpuMs / batch.samples; setSeen({ spp: r.samples, ms: k.ms, moving: k.triangles, tree: k.tree }); },
   });
@@ -62,9 +62,10 @@ export function PlaygroundLab() {
   }, [built]);
 
   /** This frame's moving things into their tree, the camera behind the character, and a fresh picture. */
-  const draw = useCallback((blend: number) => {
+  const draw = useCallback((blend: number, lightChanged: boolean) => {
     const r = mine.current, a = assets.current, park = built?.playground;
     if (!r || !a || !park) return;
+    if (lightChanged) r.reset(); else r.advance(); // a movement keeps the picture and carries it over; new light makes the old picture wrong
     const started = performance.now(), person = a.world.person, out = a.scratch;
     let cursor = 0;
     let cars = 0;
@@ -83,7 +84,7 @@ export function PlaygroundLab() {
     const back: Vec3 = [-Math.sin(o.yaw) * Math.cos(o.pitch), -Math.sin(o.pitch), Math.cos(o.yaw) * Math.cos(o.pitch)], distance = a.world.clearance(head, back, driven ? o.distance * 1.7 : o.distance);
     r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
     r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? 8 : 1;
-    r.reset(); r.sample(1); r.present();
+    r.sample(1); r.present();
     resume();
   }, [built, resume]);
 
@@ -101,7 +102,7 @@ export function PlaygroundLab() {
         jump.current = false; interact.current = false;
         const now = a.world.driving() ? "driving" : a.world.nearby() ? "near" : "foot";
         if (now !== seatNow.current) { seatNow.current = now; setSeat(now); dirty.current = true; }
-        if (changed || dirty.current) { dirty.current = false; draw(1 - Math.exp(-dt * 14)); }
+        if (changed || dirty.current || relit.current) { const relight = relit.current; dirty.current = false; relit.current = false; draw(1 - Math.exp(-dt * 14), relight); }
       }
       requestAnimationFrame(tick);
     };
@@ -109,7 +110,7 @@ export function PlaygroundLab() {
     return () => { alive = false; };
   }, [draw]);
 
-  const change = (next: Partial<{ mode: Mode; hour: number }>) => { settings.current = { ...settings.current, ...next }; dirty.current = true; };
+  const change = (next: Partial<{ mode: Mode; hour: number }>) => { settings.current = { ...settings.current, ...next }; relit.current = true; };
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.key === " " ? "space" : event.key.toLowerCase();
     if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "f") return;

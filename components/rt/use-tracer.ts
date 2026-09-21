@@ -17,6 +17,8 @@ interface Options {
   studio?: StudioOptions;
   /** …or a packed scene to fetch (lib/rt/playground.ts). */
   playground?: string;
+  /** Carry the picture across movements (Renderer.advance). */
+  temporal?: boolean;
   /** Room for this many triangles that move (Renderer.setDynamic). */
   dynamicTriangles?: number;
   /** Pixels across; the picture is square unless `height` says otherwise. */
@@ -64,7 +66,7 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
       if (!canvas.current) return;
       const { Renderer } = await import("@/lib/rt/gpu");
       const scene = { positions: [], material: [], materials: result.materials, camera: result.camera, light: result.light }, bvh = { nodes: result.nodes, nodeCount: result.nodeCount, triangles: result.packed, triangleCount: result.triangles, order: new Uint32Array(0), depth: result.depth, normals: result.normals };
-      const made = await Renderer.create(canvas.current, scene, bvh, size, height, latest.current.dynamicTriangles ?? 0);
+      const made = await Renderer.create(canvas.current, scene, bvh, size, height, latest.current.dynamicTriangles ?? 0, !!latest.current.temporal);
       if (!alive) { if (typeof made !== "string") made.destroy(); return; }
       if (typeof made === "string") { setStatus(made); return; }
       // In development the renderers are reachable from the console (`__lights[<the canvas's test id>]`, `__light` = the last built): measurements for docs/research are taken through it.
