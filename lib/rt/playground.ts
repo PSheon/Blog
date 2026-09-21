@@ -10,13 +10,18 @@ export const PLAYGROUND_URL = "/posts/light-playground/playground.bin";
 export const PLAYGROUND_CREDIT = "Sketchbook by Jan Blaha (swift502), MIT";
 
 const MAX_EDGE = 12, MAX_CUTS = 8;
-const grass: Vec3 = [0.2, 0.4, 0.11];
-/** Linear albedo per material name. Saturated on purpose: a grey playground has no colour to bleed. */
+/**
+ * Linear albedo per material name. The names are the original's and mislead: `roof` is the great slab everything stands
+ * on, `concrete` the plaza, `plaster` the paths, ramps and loops, `helipad` the pad and yellow trims, s1–s6 the props.
+ * The idea: a sun-bleached concrete park by the sea. Large surfaces are pale and warm so that light has something to
+ * bounce off and coloured things can tint them; colour is kept for what you steer around (barriers, props, pads).
+ */
 const PALETTE: Record<string, Vec3> = {
-  s1: grass, s2: grass, s3: grass, s4: grass, s5: grass, s6: grass,
-  plaster: [0.8, 0.72, 0.52], wall_rough: [0.55, 0.38, 0.22], wall_segmented: [0.7, 0.7, 0.72], concrete: [0.55, 0.55, 0.55], roof: [0.62, 0.16, 0.08],
-  race_track: [0.08, 0.08, 0.09], runway: [0.12, 0.12, 0.13], dirt_road: [0.45, 0.32, 0.18], barrier: [0.75, 0.08, 0.06], side_barrier: [0.8, 0.8, 0.8],
-  helipad: [0.9, 0.55, 0.05], arrow_down: [0.9, 0.8, 0.1], ocean: [0.01, 0.05, 0.08],
+  roof: [0.5, 0.25, 0.17], concrete: [0.6, 0.58, 0.54], plaster: [0.8, 0.77, 0.7], wall_segmented: [0.48, 0.49, 0.52], wall_rough: [0.58, 0.45, 0.31],
+  race_track: [0.07, 0.07, 0.08], runway: [0.09, 0.09, 0.1], dirt_road: [0.42, 0.31, 0.19], side_barrier: [0.84, 0.84, 0.84], barrier: [0.72, 0.1, 0.07],
+  helipad: [0.72, 0.52, 0.1], arrow_down: [0.9, 0.85, 0.6],
+  s1: [0.2, 0.42, 0.13], s2: [0.42, 0.6, 0.24], s3: [0.16, 0.36, 0.3], s4: [0.26, 0.47, 0.16], s5: [0.5, 0.62, 0.22], s6: [0.18, 0.4, 0.2],
+  ocean: [0.01, 0.05, 0.08],
 };
 
 export interface Playground extends Scene { spawns: { type: string; at: Vec3; /** the spawn's three axes, column by column */ basis: number[] }[]; /** where each vehicle's three materials (paint, window, tyre) start in `materials` */ vehicleMaterials: Record<ModelName, number>; /** the character's material */ characterMaterial: number; /** where the extra car paints start */ carPaints: number }

@@ -14,7 +14,7 @@ import { createWorld, type World } from "./game/world";
 import { cn } from "@/lib/utils";
 import { useLabels, type Labels } from "./labels";
 
-const W = 960, H = 540, EXPOSURE = 0.18, MAX_SAMPLES = 1024, DYNAMIC = 16_384; // room for the moving triangles: five cars, a helicopter, an aeroplane and a person are about 11,300
+const W = 960, H = 540, EXPOSURE = 0.15, MAX_SAMPLES = 1024, DYNAMIC = 16_384; // room for the moving triangles: five cars, a helicopter, an aeroplane and a person are about 11,300
 const MODES = ["raster", "direct", "full"] as const;
 type Mode = (typeof MODES)[number];
 /** Physical keys (`event.code`): an input method changes what a key TYPES (W is ㄊ in Zhuyin), never which key it is. */

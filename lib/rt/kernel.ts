@@ -39,7 +39,7 @@ export const WORKGROUP = 8;
 
 /** The one uniform block every shader here reads (256 bytes; gpu.ts writes it). */
 export const PARAMS_BYTES = 256;
-const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, q2: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f };`;
+const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, movingBase: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f };`;
 
 export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
@@ -390,12 +390,25 @@ ${PARAMS}
 @group(0) @binding(2) var<storage, read> history: array<vec4f>;
 @group(0) @binding(3) var<storage, read_write> carried: array<vec4f>;
 @group(0) @binding(4) var<uniform> params: Params;
+struct Tri { v0: vec3f, m: u32, v1: vec3f, p1: u32, v2: vec3f, p2: u32 };
+@group(0) @binding(5) var<storage, read> tris: array<Tri>;      // this frame's triangles
+@group(0) @binding(6) var<storage, read> movedFrom: array<Tri>; // last frame's moving triangles, in the same order
 @compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   if (gid.x >= params.size.x || gid.y >= params.size.y) { return; }
   let pixel = gid.y * params.size.x + gid.x; let here = gbuf[pixel];
   var result = vec4f(0.0);
-  let v = here.xyz - params.prevEye.xyz; let depth = dot(v, params.prevForward.xyz);
+  // Where was this point a frame ago? On the ground, where it is now. On something that moves, the same spot of the same
+  // triangle, where that triangle was then: the moving triangles keep their order from frame to frame, so triangle i is
+  // triangle i, and the point's place inside it (its barycentric coordinates) does not change when the triangle moves.
+  var was = here.xyz;
+  if (here.w >= f32(params.movingBase) && params.dynamicRoot > 0u) {
+    let id = u32(here.w); let t = tris[id]; let e1 = t.v1 - t.v0; let e2 = t.v2 - t.v0; let p = here.xyz - t.v0;
+    let d11 = dot(e1, e1); let d12 = dot(e1, e2); let d22 = dot(e2, e2); let p1 = dot(p, e1); let p2 = dot(p, e2); let det = max(d11 * d22 - d12 * d12, 1e-20);
+    let bu = (d22 * p1 - d12 * p2) / det; let bv = (d11 * p2 - d12 * p1) / det;
+    let o = movedFrom[id - params.movingBase]; was = o.v0 + (o.v1 - o.v0) * bu + (o.v2 - o.v0) * bv;
+  }
+  let v = was - params.prevEye.xyz; let depth = dot(v, params.prevForward.xyz);
   if (depth > 1e-3) {
     let x = dot(v, params.prevRight.xyz) / (depth * dot(params.prevRight.xyz, params.prevRight.xyz)); let y = dot(v, params.prevUp.xyz) / (depth * dot(params.prevUp.xyz, params.prevUp.xyz));
     let at = vec2f((x * 0.5 + 0.5) * f32(params.size.x), (0.5 - y * 0.5) * f32(params.size.y));
@@ -403,7 +416,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
       let q = u32(at.y) * params.size.x + u32(at.x); let there = gprev[q];
       // The same point? Two jittered rays through one pixel land far apart on ground seen at a shallow angle, so a plain
       // distance test throws the whole floor away. The same TRIANGLE, roughly the same place, is the test that holds.
-      let sky = here.w < 0.0 && there.w < 0.0; let gap = distance(there.xyz, here.xyz);
+      let sky = here.w < 0.0 && there.w < 0.0; let gap = distance(there.xyz, was);
       let same = select(gap < 0.03 + 0.01 * depth, gap < 0.3 + 0.1 * depth, here.w == there.w);
       if (sky || (here.w >= 0.0 && there.w >= 0.0 && same)) { result = history[q]; }
     }
