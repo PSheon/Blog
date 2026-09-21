@@ -31,7 +31,7 @@ export function TagLink({ tag, locale, className }: { tag: string; locale: Local
     <Link
       href={`/${locale}/tags/${tag}`}
       className={cn(
-        "rounded-sm border border-border px-1.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:border-signal hover:text-signal",
+        "tap rounded-sm border border-border px-1.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:border-signal hover:text-signal",
         className,
       )}
     >

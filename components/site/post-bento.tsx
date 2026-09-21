@@ -50,7 +50,7 @@ export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
               aria-pressed={tag === name}
               onClick={() => setTag(name)}
               className={cn(
-                "cursor-pointer rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
+                "tap cursor-pointer rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
                 tag === name ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
               )}
             >

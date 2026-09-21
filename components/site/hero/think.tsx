@@ -88,7 +88,7 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
         <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
           <span className="label">{t.steps}</span>
           <span className="tabular text-signal-3">{view.steps.toLocaleString()}</span>
-          {view.done && <button type="button" onClick={() => setRun((r) => r + 1)} className="label cursor-pointer underline decoration-dotted underline-offset-4 hover:text-foreground">{t.again}</button>}
+          {view.done && <button type="button" onClick={() => setRun((r) => r + 1)} className="label tap cursor-pointer underline decoration-dotted underline-offset-4 hover:text-foreground">{t.again}</button>}
         </p>
       </div>
     </div>

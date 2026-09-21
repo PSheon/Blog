@@ -24,7 +24,7 @@ export function SearchIconButton({ label }: { label: string }) {
       onClick={openSearch}
       onPointerEnter={() => void loadPalette()}
       aria-label={label}
-      className="grid size-8 cursor-pointer place-items-center justify-self-end rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+      className="tap grid size-8 cursor-pointer place-items-center justify-self-end rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
     >
       <SearchIcon className="size-[1.125rem]" aria-hidden />
     </button>

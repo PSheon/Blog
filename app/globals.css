@@ -5,6 +5,25 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* A control smaller than a fingertip gets a 44 px area to press where the pointer is a finger, without moving a pixel of
+   layout: an invisible ::before, centred on it. (Not for an element that already uses its ::before.) */
+@utility tap {
+  @media (pointer: coarse) {
+    &:not(.absolute, .fixed, .sticky) {
+      position: relative;
+    }
+    &::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: max(100%, 2.75rem);
+      height: max(100%, 2.75rem);
+      transform: translate(-50%, -50%);
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -82,7 +101,7 @@
   --accent-foreground: #1c2033;
   --destructive: #b3261e;
   --border: #12162a38;
-  --input: #12162a52;
+  --input: #12162a7a; /* a control's own edge: 3:1 against every surface it sits on (WCAG 1.4.11). --border stays faint: it only divides. */
   --ring: #065a82;
   --signal: #065a82;
   --signal-2: #c2255c;
@@ -292,7 +311,7 @@ html:not(.dark) {
   --accent-foreground: #e9eaf6;
   --destructive: #ff6e96;
   --border: #9b9bc42e;
-  --input: #9b9bc447;
+  --input: #9b9bc494;
   --ring: #79dafa;
   --signal: #79dafa;
   --signal-2: #ff6e96;

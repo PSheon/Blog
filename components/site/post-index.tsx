@@ -52,7 +52,7 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
               aria-pressed={tag === name}
               onClick={() => setTag(name)}
               className={cn(
-                "rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
+                "tap rounded-sm border px-2 py-1 font-mono text-xs transition-colors",
                 tag === name
                   ? "border-signal bg-signal/10 text-signal"
                   : "border-border text-muted-foreground hover:text-foreground",

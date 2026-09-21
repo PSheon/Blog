@@ -38,7 +38,7 @@ function TocList({ items, active, onNavigate, stagger }: { items: TocItem[]; act
             onClick={onNavigate}
             aria-current={active === item.id ? "location" : undefined}
             className={cn(
-              "-ml-px block border-l py-1.5 leading-snug transition-colors",
+              "tap -ml-px block border-l py-1.5 leading-snug transition-colors",
               item.depth === 3 ? "pl-7" : "pl-4",
               active === item.id
                 ? "border-signal text-foreground"
