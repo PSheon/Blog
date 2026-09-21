@@ -1,7 +1,4 @@
-import fs from "node:fs";
-import path from "node:path";
-import matter from "gray-matter";
-import { POSTS_DIR, getAllPosts } from "@/lib/content/posts";
+import { getAllPosts, getPostSource } from "@/lib/content/posts";
 import { isLocale, locales } from "@/lib/i18n";
 import { type SearchDoc, toSections } from "@/lib/search";
 
@@ -17,7 +14,6 @@ export async function GET(_: Request, { params }: RouteContext<"/[locale]/search
   if (!isLocale(locale)) return new Response("Not found", { status: 404 });
 
   const docs: SearchDoc[] = getAllPosts(locale).map((post) => {
-    const file = path.join(POSTS_DIR, post.slug, `${post.locale}.mdx`);
     return {
       slug: post.slug,
       no: post.no,
@@ -25,7 +21,7 @@ export async function GET(_: Request, { params }: RouteContext<"/[locale]/search
       description: post.description,
       tags: post.tags,
       interactive: post.interactive,
-      sections: toSections(matter(fs.readFileSync(file, "utf8")).content),
+      sections: toSections(getPostSource(post.slug, locale) ?? ""),
     };
   });
   return Response.json(docs);

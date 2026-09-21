@@ -19,6 +19,7 @@ no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 
 | № | English | 中文 |
 | --- | --- | --- |
+| 010 | [A task scheduler from scratch](https://paul-notebook.vercel.app/en/posts/task-scheduler) | [從零打造一個任務排程器](https://paul-notebook.vercel.app/zh/posts/task-scheduler) |
 | 009 | [A city nobody schedules — 300 people, each minding their own needs](https://paul-notebook.vercel.app/en/posts/city-of-agents) | [沒有人排班的城市：300 個小人各忙各的](https://paul-notebook.vercel.app/zh/posts/city-of-agents) |
 | 008 | [Drawing the map while finding yourself on it — SLAM from scratch](https://paul-notebook.vercel.app/en/posts/slam-2d) | [一邊畫地圖，一邊找自己](https://paul-notebook.vercel.app/zh/posts/slam-2d) |
 | 007 | [How a cloud of noise becomes an apple: a 3-D diffusion model trained in the browser](https://paul-notebook.vercel.app/en/posts/diffusion-points) | [一團雜訊怎麼長成一顆蘋果](https://paul-notebook.vercel.app/zh/posts/diffusion-points) |

@@ -41,7 +41,8 @@ describe("attempts that fail", () => {
 
   it("do not change which job a seed gives: the same tasks, the same durations, only more attempts", () => {
     const calm = makeJob(6, DEFAULT_JOB), rough = makeJob(6, failing);
-    expect(rough.tasks.map(({ attempts: _, ...rest }) => rest)).toEqual(calm.tasks.map(({ attempts: _, ...rest }) => rest));
+    const withoutAttempts = <T extends { attempts: unknown }>(task: T) => Object.fromEntries(Object.entries(task).filter(([key]) => key !== "attempts"));
+    expect(rough.tasks.map(withoutAttempts)).toEqual(calm.tasks.map(withoutAttempts));
     expect(calm.tasks.every((t) => t.attempts.length === 1)).toBe(true);
     expect(rough.tasks.some((t) => t.attempts.length > 1)).toBe(true);
     expect(Math.max(...rough.tasks.map((t) => t.attempts.length))).toBeLessThanOrEqual(4);

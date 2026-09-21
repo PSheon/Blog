@@ -17,8 +17,8 @@ For whoever picks this up next. Read this, then the memory files under
 | Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
 
 Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
-007 point-cloud diffusion, 008 2D SLAM, 009 city of agents. In progress: **010 a task scheduler from scratch**
-(`content/posts/task-scheduler`, a draft; built on `feat/sche` by another session and folded into dev on 2026-09-21). A
+007 point-cloud diffusion, 008 2D SLAM, 009 city of agents, 010 a task scheduler from scratch (published 2026-09-21;
+built on `feat/sche` by another session). A
 VLA article was started as 010 and is parked on the branch `feat/vla` (pushed): the PCB-flip draft, its training
 pipeline, and the head-camera study in `docs/research/head-camera/` that would replace it. A draft shows only in
 `next dev`, with a "草稿 DRAFT" mark.
@@ -71,15 +71,57 @@ it dull.
 - A service worker hides requests from `page.route`: `test.use({ serviceWorkers: "block" })` where a test routes.
 - Instruments hydrate a moment after the page. The E2E fixture in `smoke.spec.ts` waits for `[data-lab]`; a test
   with its own `page` must do the same before clicking.
-- A 404 is server-rendered as an empty shell and drawn by the client, because the root layout lives under `[locale]`
-  (audit, item 6). Do not "fix" it with `dynamicParams = false`: that makes Next throw `Internal: NoFallbackError` for
-  an unknown URL (a full-screen runtime error in `next dev`). Unknown locales, slugs and tags are rendered on demand
-  and the PAGE calls `notFound()`; the layout never throws (it falls back to the default language), or `/nope` gets
-  the framework's bare 404. The 404 speaks the URL's language (`components/site/not-found-body.tsx`).
+- 404s: see "How a URL that does not exist is answered" below before touching `dynamicParams`, `notFound()` or the proxy.
 - A yielding loop: MessageChannel, not nested `setTimeout(0)` (clamped to 4 ms). A time budget only works if one
   unit of work is much smaller than the budget.
 - Inside an `Instrument`, titles are `<p>`, not headings (axe `heading-order`).
 - Scrollable regions (tables, display maths) need `tabIndex={0}` + a name (axe).
+
+## How a URL that does not exist is answered
+
+Four pieces cooperate, because the root layout lives under `[locale]` and nothing can sit above it. This is the part of
+the site most likely to break on a Next upgrade: after one, run the 404 tests in `e2e/smoke.spec.ts` against a
+production build and read the server log for `NoFallbackError`.
+
+| The reader asks for | What happens |
+| --- | --- |
+| `/` | `proxy.ts` redirects to `/zh` or `/en` by `Accept-Language` (the official i18n pattern). |
+| `/zh/posts/no-such`, `/en/tags/no-such` | The route matches; the slug or tag is rendered on demand (`dynamicParams = true`); the PAGE calls `notFound()`. Status 404, `noindex`. |
+| `/zh/anything/else` | `app/[locale]/[...rest]/page.tsx` matches and calls `notFound()`. |
+| `/nope` (one segment, not a locale) | Matches `[locale]`. The LAYOUT does not throw: it dresses the page in the default language, and `app/[locale]/page.tsx` calls `notFound()`. |
+| `/no/such/path` (deep, not under a locale) | `proxy.ts` rewrites it to `/not-found`, which is the row above. The status stays 404. |
+| a draft's URL, in production | `getPostMeta()` answers null for a draft wherever drafts are not shown, so it is the second row. |
+
+In every row the body is `components/site/not-found-body.tsx`: one language when the URL starts with `/zh` or `/en`,
+both when it does not. The server sends an empty shell and the client draws the page (audit, item 6); that is a
+limitation of this layout, not a bug to chase.
+
+Three things NOT to do, each tried and measured:
+- `dynamicParams = false` anywhere, the leaf routes included: an unknown value then makes Next throw
+  `Internal: NoFallbackError`, a full-screen runtime error in `next dev` (HTTP 500) and a log line in production.
+- `notFound()` in the layout: nothing above the root layout can catch it, and `/nope` gets the framework's bare 404.
+- Trusting the static params to keep drafts private. They did, by accident, until slugs were rendered on demand.
+
+The price of rendering unknown URLs on demand is one function invocation per distinct junk URL. If a crawler makes
+that matter, the answer is a rate limit on `/zh/posts/*`, `/en/posts/*` and the tag paths in Vercel's Firewall
+(Paul's dashboard), not a change to the routes.
+
+## Before upgrading Next
+
+- `experimental.globalNotFound` is still experimental in 16.3 and `app/global-not-found.tsx` depends on it. With
+  `[locale]` open it is no longer reached in practice, but keep it until a production build proves it is dead.
+- Caching here is Next 16's "previous model": `dynamic = "force-static"`, `dynamicParams`, `generateStaticParams`. It is
+  supported. `cacheComponents` + `"use cache"` is where Next is going, and turning it on forbids `dynamic` and
+  `dynamicParams`: the table above would have to be rethought first.
+- `typedRoutes` was tried on 2026-09-21 and dropped: its `Route` type rejects a dynamic route passed through a prop
+  (`"/zh/posts/cnn-from-scratch"` is not a `Route`), so every component that takes an href needs a generic or a cast,
+  and a cast is the check switched off. `tests/content/links.test.ts` covers the real risk instead: an article slug
+  written into the site's code must belong to a published article.
+- The React Compiler is not on. Two files memoise by hand; the instruments that redraw often do it in canvas loops
+  outside React. Try it only with a before-and-after measurement and the full E2E run, not before a release.
+- `lib/content/posts.ts` and `lib/og/render.tsx` import `"server-only"`; vitest aliases it to an empty module.
+- The share cards fetch a Noto Sans TC subset from Google Fonts at build time: three tries, a warning if they fail, and
+  on a production deployment a failed build, so a Chinese card can no longer fall back to Latin text unnoticed.
 
 ## Measured state of the site
 
