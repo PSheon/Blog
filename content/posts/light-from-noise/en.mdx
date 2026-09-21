@@ -18,7 +18,7 @@ The room below has had one sample so far, and it is almost all snow. Press Start
 
 Not one pixel of that picture is drawn. There is no code for shadows and no code that says the red wall should tint the floor. Nobody wrote why the corners the lamp cannot reach are still a little bright. The whole picture does one thing, many times: **shoot a ray out through a pixel, let it bounce around the room at random, and see whether it ends up at the lamp.**
 
-This is path tracing. This article writes it from scratch: the scene, the acceleration structure, a reference version on the CPU and the WGSL kernel on the GPU, about a thousand lines in all (TypeScript, plus the WGSL written for the GPU), with no graphics library. Then it answers a few questions. How does one ray become a colour? How long does the noise take to clear, and can it clear faster? What more do metal and glass need? And why does it still run when a thousand triangles become a million?
+This is path tracing. This article writes it from scratch: the scene, the acceleration structure, a reference version on the CPU and the WGSL kernel on the GPU, about 1,100 lines in all (TypeScript, plus the WGSL written for the GPU; what part two needs outdoors is counted in), with no graphics library. Then it answers a few questions. How does one ray become a colour? How long does the noise take to clear, and can it clear faster? What more do metal and glass need? And why does it still run when a thousand triangles become a million?
 
 This is part one. [Part two](/en/posts/light-playground) takes the same engine outdoors: a playground to walk, drive and fly a helicopter and an aeroplane through, every frame computed this way.
 

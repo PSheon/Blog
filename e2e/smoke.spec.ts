@@ -731,7 +731,7 @@ test("a picture clears from noise on the reader's GPU, or the figure says why it
   expect(errors).toEqual([]);
 });
 
-test("the playground is flown through while it is path traced, or the figure says why it cannot", async ({ page }) => {
+test("the playground is a game: a character walks it, gets into a car, and the picture is path traced, or the figure says why it cannot", async ({ page }) => {
   const response = await page.goto("/zh/posts/light-playground");
   test.skip(response?.status() === 404, "light-playground is still a draft");
   const errors = watchErrors(page);
@@ -739,17 +739,32 @@ test("the playground is flown through while it is path traced, or the figure say
   await figure.scrollIntoViewIfNeeded();
   const adapter = await page.evaluate(async () => { const gpu = (navigator as unknown as { gpu?: { requestAdapter(): Promise<unknown> } }).gpu; return gpu ? Boolean(await gpu.requestAdapter()) : false; });
   if (!adapter) {
-    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the playground was not rendered; only the message was checked" });
+    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "the playground was not rendered and the game did not start; only the message was checked" });
     await expect(figure.getByTestId("light-status")).toContainText(/WebGPU/);
     expect(errors).toEqual([]);
     return;
   }
-  const spp = async () => Number((await figure.getByTestId("playground-spp").textContent())!.replace(/\D/g, "") || 0);
-  await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(32);
-  await figure.getByTestId("playground-stage").focus();
-  await page.keyboard.down("w");
-  await page.waitForTimeout(400);
-  expect(await spp()).toBeLessThan(32); // moving throws the samples away
-  await page.keyboard.up("w");
+  const stage = figure.getByTestId("playground-stage"), spp = async () => Number((await figure.getByTestId("playground-spp").textContent())!.replace(/\D/g, "") || 0);
+  await expect(stage).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
+  await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(32); // standing still, it clears
+  await stage.focus();
+  await page.keyboard.down("KeyW");
+  await page.waitForTimeout(500);
+  expect(await spp()).toBeLessThan(8); // moving, every frame is a new picture
+  await page.keyboard.up("KeyW");
+  // next to a car, F walks to the door, opens it, sits down: Sketchbook's states end at the wheel
+  await figure.getByTestId("playground-go-car").click();
+  await stage.focus();
+  await page.keyboard.press("KeyF");
+  await expect(stage).toHaveAttribute("data-seat", "driving", { timeout: 15_000 });
+  await page.keyboard.press("KeyF");
+  await expect(stage).not.toHaveAttribute("data-seat", "driving", { timeout: 10_000 });
+  // expanded it covers the window and says which keys do what now; Escape closes it
+  await figure.getByTestId("playground-expand").click();
+  await expect(page.locator('[data-expanded="true"]')).toBeVisible();
+  const covers = await page.getByTestId("playground-canvas").evaluate((c) => { const r = c.getBoundingClientRect(); return r.width >= innerWidth - 1 && r.height >= innerHeight - 1; });
+  expect(covers).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-expanded="true"]')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

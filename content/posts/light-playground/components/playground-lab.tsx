@@ -49,8 +49,8 @@ function Hints({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | n
  */
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true);
-  const settings = useRef({ mode, hour }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
+  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [carry, setCarry] = useState(true), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true);
+  const settings = useRef({ mode, hour, carry: true }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
   const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), down = useRef(false), hover = useRef(false), interact = useRef(false), seatNow = useRef("foot");
   const turnedNow = useRef(false);
   useEffect(() => { turnedNow.current = turned; }, [turned]);
@@ -111,7 +111,7 @@ export function PlaygroundLab() {
     const o = orbit.current, s = settings.current, light = sunAt(s.hour), at = driven ? driven.pose().slice(9) : person.at, head: Vec3 = [at[0], at[1] + (driven ? 1.1 : 0.95), at[2]], reach = driven ? (driven.craft ? 2.4 : 1.7) : 1;
     const back: Vec3 = [-Math.sin(o.yaw) * Math.cos(o.pitch), -Math.sin(o.pitch), Math.cos(o.yaw) * Math.cos(o.pitch)], distance = a.world.clearance(head, back, o.distance * reach);
     r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
-    r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? 8 : 1;
+    r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? 8 : 1; r.historyCap = s.carry ? 12 : 0;
     r.sample(1); r.present();
     resume();
   }, [built, resume]);
@@ -159,7 +159,7 @@ export function PlaygroundLab() {
 
   /** Stand the character next to the first vehicle of a kind, on its driver's side. */
   const go = (name: ModelName) => { const a = assets.current, v = a?.world.vehicles.find((x) => x.name === name); if (!a || !v) return; const m = v.pose(); a.world.teleport([m[9] + m[0] * 2.4, m[10] + 0.5, m[11] + m[2] * 2.4]); relit.current = true; };
-  const change = (next: Partial<{ mode: Mode; hour: number }>) => { settings.current = { ...settings.current, ...next }; relit.current = true; };
+  const change = (next: Partial<{ mode: Mode; hour: number; carry: boolean }>) => { settings.current = { ...settings.current, ...next }; relit.current = true; };
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift" : event.code === "Space" ? "space" : event.code;
     if (event.code === "Escape" && expanded) { setExpanded(false); return; }
@@ -185,6 +185,8 @@ export function PlaygroundLab() {
         <span className="label">{t.mode}</span>
         {MODES.map((m) => <Button key={m} size="sm" variant={mode === m ? "default" : "outline"} aria-pressed={mode === m} disabled={!tracer.live} onClick={() => { setMode(m); change({ mode: m }); }} data-testid={`playground-mode-${m}`}>{t[m]}</Button>)}
       </div>
+      {/* the one switch of this article's subject: keep last frame's picture across a movement, or start from nothing every frame */}
+      <Button size="sm" variant={carry ? "default" : "outline"} aria-pressed={carry} disabled={!tracer.live} onClick={() => { setCarry(!carry); change({ carry: !carry }); }} data-testid="playground-carry">{t.carry}</Button>
       <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.place}>
         <span className="label">{t.place}</span>
         {([["car", t.placeCar], ["heli", t.placeHeli], ["airplane", t.placePlane]] as const).map(([name, text]) => <Button key={name} size="sm" variant="outline" disabled={!ready} onClick={() => go(name)} data-testid={`playground-go-${name}`}>{text}</Button>)}

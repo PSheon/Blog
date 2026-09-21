@@ -272,6 +272,23 @@ function Light() {
   );
 }
 
+/** № 012: the playground's loop against the sky, a car on the ground with its shadow, a helicopter above, and the sun that casts it all. */
+function Playground() {
+  return (
+    <>
+      <path d="M8 78 H152" stroke={DIM} strokeWidth={1} />
+      <path d="M10 78 C40 78 52 70 66 52 C78 36 100 34 102 52 C104 68 84 70 82 54 C80 40 96 22 150 18" fill="none" stroke={S} strokeWidth={1.6} strokeLinecap="round" />
+      <circle cx={132} cy={20} r={6} fill="none" stroke={S3} strokeWidth={1.4} />
+      <path d="M132 8 v4 M132 28 v4 M120 20 h4 M140 20 h4" stroke={S3} strokeWidth={1.2} strokeLinecap="round" />
+      <path d="M24 70 h22 l-3 -7 h-12 l-4 7 Z" fill={S2} />
+      <circle cx={29} cy={72} r={2.6} fill="var(--background)" stroke={S2} strokeWidth={1.2} /><circle cx={42} cy={72} r={2.6} fill="var(--background)" stroke={S2} strokeWidth={1.2} />
+      <path d="M22 80 L8 86 H34 L48 80 Z" fill={DIM} />
+      <path d="M40 30 h18 M49 30 v4 M42 36 h12 l4 5 h-6 l-2 -2 h-8 Z" fill="none" stroke={S} strokeWidth={1.3} strokeLinejoin="round" strokeLinecap="round" />
+      <path d="M132 26 L36 80" stroke={S3} strokeWidth={0.8} strokeDasharray="2 3" />
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -284,6 +301,7 @@ const covers: Record<string, () => ReactNode> = {
   "city-of-agents": City,
   "task-scheduler": Scheduler,
   "light-from-noise": Light,
+  "light-playground": Playground,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {

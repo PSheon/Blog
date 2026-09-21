@@ -1,0 +1,91 @@
+---
+title: "Into a playground made of light: walk, drive and fly through real-time path tracing"
+description: Part one's room stood still. This part takes the same path tracer outdoors and puts in a character you steer, five cars, a helicopter and an aeroplane, with the light computed anew every frame. When anything moves, every accumulated sample is void; three things keep it playable all the same.
+date: 2026-09-21
+tags: [graphics, from-scratch]
+no: 12
+interactive: true
+draft: true
+---
+
+import { PlaygroundLab } from "./components";
+
+Play first. Click the picture, walk with W A S D, drag to turn the camera; walk up to a car and press F. "Expand" at the top right makes it the whole window, and the key hints follow what you are doing.
+
+<Instrument fig="01" title="playground / fly" size="wide" caption="Every pixel here is path traced: the shadows, the brightness under an overhang, the colour a car's paint throws on the ground. None of it was written separately. 'Take me to' puts the character next to a car, the helicopter or the aeroplane. Stand still and the picture clears; move, and it is back to a few samples.">
+  <PlaygroundLab />
+</Instrument>
+
+[Part one](/en/posts/light-from-noise) ended on a sentence: when the camera or the scene moves, every accumulated sample is void. That room needed hundreds of samples to be clean. Things here move sixty times a second or more, and a frame has time for one sample.
+
+This part is about three things that together make the figure above playable. The result first (my machine, 960×540, full path tracing): 6.8 ms a sample, keeping up with a 120 Hz display while moving (121 frames a second measured), and less than half the noise in motion of "start from nothing every frame".
+
+## One: the world is built once, and what moves only gets new boxes
+
+Part one's BVH took a second to build and then never changed. Here there is a person, five cars, a helicopter and an aeroplane, 11,275 moving triangles in all, and rebuilding every frame is out of the question.
+
+So there are two trees. The playground itself (ground, ramps, tracks) is built once; what moves has a tree of its own, a ray walks both, and the nearer hit wins.
+
+The moving tree is not rebuilt either. A car does not change shape, and which of its triangles are near which never changes; so each car's tree is built once, at the start, by part one's careful method, and every frame only the box of every node is recomputed from where the triangles are now, leaves first. A person bends arms and legs, but not by much, and the same trick holds. Measured: rebuilding every frame cost 2.8 ms, recomputing the boxes 1.2 ms.
+
+## Two: carry the last frame's picture over
+
+One sample a frame is noise. But the last frame had a sample too, and the one before, of almost the same world, and it is a waste to throw them away.
+
+Every frame remembers one more thing: what each pixel's first ray hit (the point in the world, and which triangle). On the next frame every pixel asks: "the point I see now, where was it on the screen a frame ago?" Projecting the point with the previous frame's camera answers that. Then a check: did that pixel see the same triangle then? If so, the colour accumulated there is taken over and added to; if not (the point was hidden then, or off screen), the pixel starts from nothing.
+
+The figure's settings have a switch, "Carry the last frame over": turn it off and walk a few steps. I measured the same walk twice each way, as the difference in brightness between neighbouring pixels (larger is noisier): off, 6.8 and 7.4; on, 3.0 and 2.9. The frame rate is the same.
+
+The first version did nothing at all. I had judged "the same place" by distance, with a threshold of a few centimetres; but a floor is seen at a shallow angle, and two rays through one pixel can land decimetres apart on it, so the whole floor was called "not the same place" on every frame. Comparing triangles is the test that holds.
+
+Things that move need one more step: a point on a car, where was it a frame ago? Its triangle has the same place in the list on both frames, and the point's position inside the triangle does not change, so the previous frame's three corners of that triangle give back where it was.
+
+There is a price, and it shows: the colour carried over is old. After the character runs past, its shadow stays on the ground for a moment. How many samples a carried pixel may count for is a trade; here it is 12. More is steadier, and the shadow trails longer.
+
+## Three: the ground was the expensive part, not the cars
+
+With the cars in, a sample took over 9 ms, much slower than I expected. I guessed the cars, spent a round improving the moving tree, and gained almost nothing.
+
+Drawing how many nodes each pixel's ray visits (the heat map of part one's figure 05) showed the whole picture saturated, also where no car was. The ground was the problem: this playground's floor is a few triangles over a hundred metres long, a box around one of those holds half the playground, and a ray travelling along the ground has to look into every such box.
+
+The fix is to cut long triangles short. With no edge longer than 12 metres there are more triangles and tighter boxes:
+
+| The ground's long triangles | One sample | Nodes visited per ray |
+| --- | --- | --- |
+| as in the file | 9.24 ms | 60.8 |
+| no edge over 12 m | 6.84 ms | 36.6 |
+| no edge over 6 m | 7.07 ms | 37.2 |
+| no edge over 3 m | 7.78 ms | 41.9 |
+
+Finer is not better: cut too fine and the tree gets deep and slow again.
+
+I measured this wrong once myself. The first numbers made no sense, and the cause was a counter on the GPU overflowing: part one says it is 32 bits wide, the picture here is larger, and 64 samples at a time take it all the way round. At 16 samples a time the numbers came out right.
+
+## The person, the cars, the helicopter, the aeroplane
+
+The scene's geometry, the character, the vehicles and all 34 animation clips are from [Sketchbook](https://github.com/swift502/Sketchbook) by Jan Blaha (swift502), under the MIT licence. Its textures are not used: the playground's are photographs that may not be redistributed, and the vehicles' are baked light, which is the very thing this article computes as you watch. So the packed files keep vertices, the skeleton, the animations and the materials' names, and the colours are mine.
+
+The character behaves by Sketchbook's state machine, ported state by state: a start-walk clip chosen by the angle to turn, a stop, turning on the spot, sprinting, two jumps, three landings chosen by how hard the ground was hit; after F it walks to the driver's side by itself, opens the door, sits down, closes the door from inside, and closes it again after getting out. The physics is Rapier: the ground is one triangle mesh, the person a capsule, a car four rays on springs, the helicopter and the aeroplane rigid bodies under forces. Let go of the helicopter and it hovers; the aeroplane needs throttle, and speed before the nose will come up.
+
+The character's skeleton (14 bones, 186 triangles) is evaluated on the CPU every frame and goes straight into the moving tree.
+
+## What is different from the real thing, and how the numbers were measured
+
+**No denoising.** There is only carrying the last frame over. Real-time path tracing also filters across the picture, or hands it to a neural network; with one sample a frame and no filter, the grain in the shadows shows.
+
+**A carried picture is wrong when the light changes.** Moving the time of day simply throws the history away. A real system detects where the light changed and drops only that.
+
+**Reflections and the sea trail.** What a mirror shows moves with the camera, but the past is looked up by where the surface itself was, so reflections in car paint and on the sea are half a beat late.
+
+**The flying is arcade flying.** The helicopter balances itself and the aeroplane cannot stall. The cars have no gears, a door does not fly open while driving, and there are no passengers.
+
+**Without WebGPU there is nothing to play.** Part one could show a picture rendered earlier; here that would be pointless.
+
+Where the numbers come from: the readouts in the figure are measured by your browser as it runs. Where the text says "measured", that was Chrome on an M4 Pro at 960×540, with the camera at the spawn point looking over the car park; the method and the full tables are in this project's `docs/research/light/RESULTS.md`. The cars', the helicopter's and the aeroplane's physics and the character's state machine each have automatic tests that need no GPU (`tests/rt/`).
+
+## Sources
+
+- The scene, the character, the vehicles, the animations and the original design of the character's states: Jan Blaha (swift502), *Sketchbook*, MIT licence, github.com/swift502/Sketchbook.
+- The physics engine: Dimforge, *Rapier*, Apache-2.0, rapier.rs.
+- Reusing the last frame by projecting a surface point back and validating it: Schied et al., *Spatiotemporal Variance-Guided Filtering*, High Performance Graphics 2017 (only the "temporal" half of it is done here).
+- Recomputing boxes instead of rebuilding the tree for things that deform: Wald, Boulos, Shirley, *Ray Tracing Deformable Scenes Using Dynamic Bounding Volume Hierarchies*, ACM Transactions on Graphics, 2007.
