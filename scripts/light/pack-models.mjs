@@ -7,7 +7,7 @@
 // vehicle's paint; wheels are tyres. The colours are ours (lib/rt/models.ts).
 //
 // A model is a list of PARTS. The body holds everything that does not move by itself; wheels and rotors are parts of
-// their own, stored about their own origin, with the 3 × 4 rest transform that puts them on the body. Also kept: the
+// their own (so are doors, which swing about their hinge), stored about their own origin, with the 3 × 4 rest transform that puts them on the body. Also kept: the
 // colliders (boxes and spheres, for the physics), seats and the camera anchor.
 //
 // Layout (little endian): u32 jsonBytes, json (padded to 4), f32 positions[9·triangles], u8 kind[triangles]
@@ -60,15 +60,17 @@ for (const name of ["car", "heli", "airplane"]) {
     grey.push({ data, w: info.width, h: info.height, tyre: /wheel/i.test(material.name) });
   }
 
-  const parts = [{ name: "body", role: "body", rest: null, first: positions.length / 9, count: 0 }], colliders = [], seats = [], anchors = {};
+  const parts = [{ name: "body", role: "body", rest: null, first: positions.length / 9, count: 0 }], colliders = [], seats = [], anchors = {}, entries = {};
   const movers = [];
   const visit = (index, parent, part) => {
     const node = gltf.nodes[index], world = mul(parent, trs(node)), data = node.extras?.data;
     if (data === "collision") { const p = accessor(gltf.meshes[node.mesh].primitives[0].attributes.POSITION); let r = 0; const half = [0, 0, 0]; for (let k = 0; k < p.count; k++) { const v = [p.get(k, 0), p.get(k, 1), p.get(k, 2)].map((x, c) => Math.abs(x * Math.hypot(world[c * 4], world[c * 4 + 1], world[c * 4 + 2]))); r = Math.max(r, Math.hypot(...v)); for (let c = 0; c < 3; c++) half[c] = Math.max(half[c], v[c]); } colliders.push(node.extras.shape === "sphere" ? { shape: "sphere", at: [world[12], world[13], world[14]].map(round), radius: round(r) } : { shape: "box", at: [world[12], world[13], world[14]].map(round), half: half.map(round), rest: world.slice(0, 12).map(round) }); return; }
-    if (data === "seat") seats.push({ name: node.name, type: node.extras.seat_type, at: [world[12], world[13], world[14]].map(round) });
+    if (data === "seat") seats.push({ name: node.name, type: node.extras.seat_type, at: [world[12], world[13], world[14]].map(round), door: node.extras.door_object ?? null, entries: (node.extras.entry_points ?? "").split(";").filter(Boolean) });
+    if (/^entrance/.test(node.name)) entries[node.name] = [world[12], world[13], world[14]].map(round);
     if (data === "camera") anchors.camera = [world[12], world[13], world[14]].map(round);
     let target = part;
-    if (data === "wheel" || data === "rotor") movers.push(target = { name: node.name, role: data, steering: node.extras.steering === "true", drive: node.extras.drive ?? null, rest: world, inverse: invert(world), triangles: [] });
+    const door = /^door/.test(node.name);
+    if (data === "wheel" || data === "rotor" || door) movers.push(target = { name: node.name, role: door ? "door" : data, steering: node.extras?.steering === "true", drive: node.extras?.drive ?? null, rest: world, inverse: invert(world), triangles: [] });
     if (node.mesh != null) for (const primitive of gltf.meshes[node.mesh].primitives) {
       const p = accessor(primitive.attributes.POSITION), uv = primitive.attributes.TEXCOORD_0 != null ? accessor(primitive.attributes.TEXCOORD_0) : null, ix = primitive.indices != null ? accessor(primitive.indices) : null, count = ix ? ix.count : p.count, tex = grey[primitive.material ?? 0];
       for (let t = 0; t + 2 < count; t += 3) {
@@ -87,6 +89,7 @@ for (const name of ["car", "heli", "airplane"]) {
     parts.push({ name: m.name, role: m.role, steering: m.steering, drive: m.drive, rest: m.rest.slice(0, 3).concat(m.rest.slice(4, 7), m.rest.slice(8, 11), m.rest.slice(12, 15)).map(round), first, count: m.triangles.length });
   }
   const windows = kinds.slice(parts[0].first, parts[0].first + parts[0].count).filter((k) => k === 1).length;
+  for (const seat of seats) seat.entries = seat.entries.map((e) => ({ name: e, at: entries[e] })).filter((e) => e.at);
   models[name] = { parts, colliders, seats, anchors };
   console.log(`${name}: ${parts.map((p) => `${p.name}(${p.role}) ${p.count}`).join(", ")}; ${windows} window triangles; ${colliders.length} colliders; seats ${seats.map((s) => s.type).join("/")}`);
 }

@@ -8,7 +8,7 @@ import { Stage } from "@/components/rt/stage";
 import { useTracer } from "@/components/rt/use-tracer";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, assembleDynamicBvh, compose, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, prepareObject, rotationY, sunAt, writeModel, type Mat34, type ModelName, type Models, type Prepared, type Vec3 } from "@/lib/rt";
+import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, assembleDynamicBvh, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, prepareObject, sunAt, writeModel, type Mat34, type ModelName, type Models, type Prepared, type Vec3 } from "@/lib/rt";
 import type { Renderer } from "@/lib/rt/gpu";
 import { createWorld, type World } from "./game/world";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,7 @@ export function PlaygroundLab() {
       // cars from around the first spawn, the aircraft from around the second (Sketchbook's airfield)
       const near = (s: { type: string; at: Vec3 }) => { const from = s.type === "car" ? start : airfield; return Math.hypot(s.at[0] - from[0], s.at[2] - from[2]); };
       for (const name of ["car", "heli", "airplane"] as ModelName[]) for (const spawn of park.spawns.filter((s) => s.type === name && s.at[1] < 100).sort((a, b) => near(a) - near(b)).slice(0, name === "car" ? 5 : 1)) parked.push({ name, pose: [...spawn.basis, ...spawn.at] });
-      const world = await createWorld(ground, start, models, parked);
+      const world = await createWorld(ground, start, models, parked, man);
       if (!alive) { world.destroy(); return; }
       made = world;
       if (process.env.NODE_ENV !== "production") (window as unknown as { __world?: World }).__world = world; // for measurements, as window.__lights
@@ -100,10 +100,11 @@ export function PlaygroundLab() {
     for (const v of a.world.vehicles) {
       objects.push({ prepared: a.prepared[v.name], first: cursor });
       const base = park.vehicleMaterials[v.name], paint = v.name === "car" && cars++ > 0 ? park.carPaints + ((cars - 2) % 4) : base; // the first car keeps the red
-      cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2], v.pose(), (part) => v.wheel(part), out, cursor);
+      cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2], v.pose(), (part) => v.part(part), out, cursor);
     }
-    const driven = a.world.driving();
-    if (!driven) { objects.push({ prepared: a.prepared.person, first: cursor }); a.skinner.pose(person.clip, person.clipTime, person.loop, blend); cursor = a.skinner.write(compose([1, 0, 0, 0, 1, 0, 0, 0, 1, ...person.at], rotationY(Math.PI - person.facing)), park.characterMaterial, out, cursor); }
+    // the character is always there to be seen: walking, opening a door, sitting at the wheel
+    const driven = a.world.seated() ? a.world.driving() : null;
+    objects.push({ prepared: a.prepared.person, first: cursor }); a.skinner.pose(person.clip, person.clipTime, person.loop, Math.min(1, blend * (0.1 / Math.max(person.fade, 0.02)))); cursor = a.skinner.write(person.place, park.characterMaterial, out, cursor);
     r.setDynamic(assembleDynamicBvh(objects, out.positions, out.materials, r.nodeBase, r.triangleBase));
     timing.current.tree = timing.current.tree * 0.9 + (performance.now() - started) * 0.1; timing.current.triangles = cursor;
 
@@ -127,7 +128,7 @@ export function PlaygroundLab() {
         for (const key of held.current) { const k = KEYS[key]; if (k) { move[0] += k[0]; move[1] += k[1]; } }
         const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current });
         jump.current = false; interact.current = false;
-        const inside = a.world.driving(), now = inside ? (inside.craft ? "flying" : "driving") : a.world.nearby() ? "near" : "foot";
+        const inside = a.world.seated() ? a.world.driving() : null, now = inside ? (inside.craft ? "flying" : "driving") : a.world.nearby() ? "near" : "foot";
         if (now !== seatNow.current) { seatNow.current = now; setSeat(now); setCraft(inside?.name ?? null); dirty.current = true; }
         if (changed || dirty.current || relit.current) { const relight = relit.current; dirty.current = false; relit.current = false; draw(1 - Math.exp(-dt * 14), relight); }
       }

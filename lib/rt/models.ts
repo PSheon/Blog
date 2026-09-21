@@ -10,8 +10,10 @@ export type ModelName = "car" | "heli" | "airplane";
 /** Column-major 3 × 4: three basis vectors, then the translation. */
 export type Mat34 = number[];
 
-export interface Part { name: string; role: "body" | "wheel" | "rotor"; steering?: boolean; drive?: string | null; rest: Mat34 | null; first: number; count: number }
-export interface Model { parts: Part[]; colliders: ({ shape: "sphere"; at: Vec3; radius: number } | { shape: "box"; at: Vec3; half: Vec3; rest: number[] })[]; seats: { name: string; type: string; at: Vec3 }[]; anchors: { camera?: Vec3 } }
+/** Where someone sits, which door is theirs, and where they stand to get in (all in the model's frame; all facing +z, as the models do). */
+export interface Seat { name: string; type: string; at: Vec3; door: string | null; entries: { name: string; at: Vec3 }[] }
+export interface Part { name: string; role: "body" | "wheel" | "rotor" | "door"; steering?: boolean; drive?: string | null; rest: Mat34 | null; first: number; count: number }
+export interface Model { parts: Part[]; colliders: ({ shape: "sphere"; at: Vec3; radius: number } | { shape: "box"; at: Vec3; half: Vec3; rest: number[] })[]; seats: Seat[]; anchors: { camera?: Vec3 } }
 export interface Models { models: Record<ModelName, Model>; positions: Float32Array; kinds: Uint8Array }
 
 export function parseModels(file: ArrayBuffer): Models {

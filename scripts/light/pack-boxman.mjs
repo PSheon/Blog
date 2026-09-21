@@ -2,15 +2,15 @@
 //
 //   node scripts/light/pack-boxman.mjs <boxman.glb> [out.bin]
 //
-// Kept: the mesh with its skin weights, the skeleton, and a handful of the 34 animation clips, sampled at 30 frames a
-// second so the page needs no curve evaluation. Not kept: the texture (baked light, like the vehicles').
+// Kept: the mesh with its skin weights, the skeleton, and all 34 animation clips, sampled at 30 frames a second so the
+// page needs no curve evaluation. Not kept: the texture (baked light, like the vehicles').
 //
 // Layout (little endian): u32 jsonBytes, json (padded to 4), f32 positions[3v], f32 weights[4v], f32 inverseBind[16j],
 // f32 clips[...] (per frame, per joint: translation 3, rotation 4 (xyzw), scale 3), u8 joints[4v] (padded to 4),
 // u16 indices[3t].
 import { readFileSync, writeFileSync } from "node:fs";
 
-const KEEP = ["idle", "run", "sprint", "jump_idle", "jump_running", "falling", "drop_idle", "drop_running", "sitting", "driving"], FPS = 30;
+const FPS = 30; // every clip the file has: Sketchbook's character states use all of them but two
 const [source, out = "public/posts/light-playground/boxman.bin"] = process.argv.slice(2);
 if (!source) { console.error("usage: node scripts/light/pack-boxman.mjs <boxman.glb> [out.bin]"); process.exit(1); }
 const file = readFileSync(source), buf = file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength), dv = new DataView(buf);
@@ -42,9 +42,8 @@ for (let j = 0; j < joints.length; j++) if (joints[j].parent >= j) throw new Err
 
 const slerp = (a, b, t) => { let d = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]; const s = d < 0 ? -1 : 1; d = Math.abs(d); if (d > 0.9995) { const o = a.map((v, k) => v + (s * b[k] - v) * t), l = Math.hypot(...o); return o.map((v) => v / l); } const th = Math.acos(d), wa = Math.sin((1 - t) * th) / Math.sin(th), wb = (s * Math.sin(t * th)) / Math.sin(th); return a.map((v, k) => v * wa + b[k] * wb); };
 const clipData = [], clips = {};
-for (const name of KEEP) {
-  const animation = gltf.animations.find((a) => a.name === name);
-  if (!animation) { console.warn(`no clip ${name}`); continue; }
+for (const animation of gltf.animations) {
+  const name = animation.name;
   const tracks = animation.channels.filter((c) => jointNodes.includes(c.target.node)).map((c) => { const s = animation.samplers[c.sampler], times = read(s.input).flat, values = read(s.output), cubic = s.interpolation === "CUBICSPLINE", width = values.width; return { joint: jointNodes.indexOf(c.target.node), path: c.target.path, times, step: s.interpolation === "STEP", at: (k) => values.flat.slice((cubic ? k * 3 + 1 : k) * width, (cubic ? k * 3 + 2 : k + 1) * width) }; });
   const duration = Math.max(...tracks.map((t) => t.times.at(-1))), frames = Math.max(1, Math.round(duration * FPS));
   clips[name] = { first: clipData.length / (joints.length * 10), frames, duration: +duration.toFixed(4) };

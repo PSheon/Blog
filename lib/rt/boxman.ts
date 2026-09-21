@@ -7,7 +7,10 @@ import type { Mat34 } from "./models";
  * result has to go into this frame's BVH anyway.
  */
 export const BOXMAN_URL = "/posts/light-playground/boxman.bin";
-export type ClipName = "idle" | "run" | "sprint" | "jump_idle" | "jump_running" | "falling" | "drop_idle" | "drop_running" | "sitting" | "driving";
+/** All 34 of Sketchbook's clips. */
+export type ClipName = "idle" | "run" | "sprint" | "stop" | "start_forward" | "start_left" | "start_right" | "start_back_left" | "start_back_right" | "rotate_left" | "rotate_right" | "jump_idle" | "jump_running" | "falling" | "drop_idle" | "drop_running" | "drop_running_roll"
+  | "open_door_standing_left" | "open_door_standing_right" | "close_door_standing_left" | "close_door_standing_right" | "close_door_sitting_left" | "close_door_sitting_right" | "sit_down_left" | "sit_down_right" | "stand_up_left" | "stand_up_right"
+  | "enter_airplane_left" | "enter_airplane_right" | "sitting" | "sitting_shift_left" | "sitting_shift_right" | "driving" | "reset";
 
 export interface Boxman {
   vertices: number; triangles: number; fps: number;
