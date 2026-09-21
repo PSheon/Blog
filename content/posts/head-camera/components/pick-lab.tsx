@@ -7,7 +7,7 @@ import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
 import { NO_SHIFT, type Vec3, type XY } from "./model";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { K, PICK_HOME, PICK_SIZE, PickPolicy, type PickState, STEP_XY, STEP_Z, decide, inBlockArea, layout, pickAct, pickBones, pickPicture, pickView, usable } from "./pick";
 import type { BenchView, Target } from "./view3d";
 

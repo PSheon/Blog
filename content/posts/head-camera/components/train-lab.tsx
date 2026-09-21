@@ -7,7 +7,7 @@ import { Sparkline } from "@/components/lab/sparkline";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
 import { HOLD, HOME, K, NO_SHIFT, Policy, SIZE, TOL, type XY, advance, picture, somewhere, view } from "./model";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import type { Reply, Request } from "./protocol";
 
 const DOTS = ["#ffff00", "#00ff00", "#ff00ff", "#ffffff", "#000000", "#ff8000", "#00a0ff", "#a0ffa0"];

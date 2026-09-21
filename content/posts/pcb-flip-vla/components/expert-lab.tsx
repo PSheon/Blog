@@ -6,7 +6,7 @@ import { Readout } from "@/components/lab/readout";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 import { BIG, type Driver, type Reply, type Request } from "./protocol";
 import { PARAMS, sentence } from "./sim";
 

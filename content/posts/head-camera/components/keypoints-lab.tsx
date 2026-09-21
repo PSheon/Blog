@@ -6,7 +6,7 @@ import { useNear } from "@/components/lab/use-near";
 import { Button } from "@/components/ui/button";
 import { useLabels } from "./labels";
 import { K, NO_SHIFT, Policy, SIZE, type XY, picture, somewhere, view } from "./model";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 
 const DOTS = ["#ffff00", "#00ff00", "#ff00ff", "#ffffff", "#000000", "#ff8000", "#00a0ff", "#a0ffa0"];
 const deg = Math.PI / 180;

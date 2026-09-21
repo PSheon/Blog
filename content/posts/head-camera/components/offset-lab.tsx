@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { useLabels } from "./labels";
 import { AREA, HEAD, NO_SHIFT, type XY, backProject, project } from "./model";
-import { Param } from "./param";
+import { Param } from "@/components/lab/param";
 
 const deg = Math.PI / 180, H = 0.02;
 /** Nine places on the bench, inside the area blocks are drawn from. */
