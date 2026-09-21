@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDownToLine, ArrowUpFromLine, CarFront, Maximize2, Minimize2, SlidersHorizontal } from "lucide-react";
-import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
+import { type KeyboardEvent, type MouseEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Stick } from "@/components/lab/stick";
 import { Stage } from "@/components/rt/stage";
@@ -49,9 +49,13 @@ function Hints({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | n
  */
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [carry, setCarry] = useState(true), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true);
+  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [carry, setCarry] = useState(true), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true), [locked, setLocked] = useState(false);
   const settings = useRef({ mode, hour, carry: true }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
   const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), down = useRef(false), hover = useRef(false), interact = useRef(false), seatNow = useRef("foot");
+  const stageElement = useRef<HTMLDivElement>(null), pressedAt = useRef({ x: 0, y: 0 }), lockedNow = useRef(false), releasedAt = useRef(-1e9);
+  /** Some browsers hand the page the very Escape that released the pointer: that one must not also collapse the view. */
+  const justReleased = () => lockedNow.current || performance.now() - releasedAt.current < 400;
+  useEffect(() => { lockedNow.current = locked; }, [locked]);
   const turnedNow = useRef(false);
   useEffect(() => { turnedNow.current = turned; }, [turned]);
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 });
@@ -144,7 +148,7 @@ export function PlaygroundLab() {
   // quarter turn with CSS instead, and the reader turns the phone.
   useEffect(() => {
     if (!expanded) return;
-    const before = document.documentElement.style.overflow, close = (e: globalThis.KeyboardEvent) => { if (e.code === "Escape") setExpanded(false); };
+    const before = document.documentElement.style.overflow, close = (e: globalThis.KeyboardEvent) => { if (e.code === "Escape" && !document.pointerLockElement && !justReleased()) setExpanded(false); }; // the first Escape gives the mouse back, the second collapses
     document.documentElement.style.overflow = "hidden"; window.addEventListener("keydown", close);
     const touch = window.matchMedia("(pointer: coarse)").matches, upright = () => touch && window.innerHeight > window.innerWidth;
     let locked = false, alive = true;
@@ -157,12 +161,22 @@ export function PlaygroundLab() {
     return () => { alive = false; document.documentElement.style.overflow = before; window.removeEventListener("keydown", close); window.removeEventListener("resize", settle); document.removeEventListener("fullscreenchange", left); screen.orientation?.unlock?.(); if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined); setTurned(false); };
   }, [expanded]);
 
+  // With a mouse: a click on the world takes the pointer (the mouse then turns the camera without a button held, as in
+  // any game), and Escape gives it back. The browser keeps that Escape for itself, so it takes a second one to collapse.
+  useEffect(() => {
+    const changed = () => { const on = !!document.pointerLockElement && document.pointerLockElement === stageElement.current; if (!on) releasedAt.current = performance.now(); setLocked(on); };
+    // The browser releases the pointer on Escape by itself. If an Escape reaches the page while it is still taken (some do), release it here: Escape always gives the mouse back.
+    const release = (e: globalThis.KeyboardEvent) => { if (e.code === "Escape" && document.pointerLockElement === stageElement.current) document.exitPointerLock(); };
+    document.addEventListener("pointerlockchange", changed); window.addEventListener("keydown", release, true);
+    return () => { document.removeEventListener("pointerlockchange", changed); window.removeEventListener("keydown", release, true); if (document.pointerLockElement) document.exitPointerLock(); };
+  }, []);
+
   /** Stand the character next to the first vehicle of a kind, on its driver's side. */
   const go = (name: ModelName) => { const a = assets.current, v = a?.world.vehicles.find((x) => x.name === name); if (!a || !v) return; const m = v.pose(); a.world.teleport([m[9] + m[0] * 2.4, m[10] + 0.5, m[11] + m[2] * 2.4]); relit.current = true; };
   const change = (next: Partial<{ mode: Mode; hour: number; carry: boolean }>) => { settings.current = { ...settings.current, ...next }; relit.current = true; };
   const key = (event: KeyboardEvent, down: boolean) => {
     const k = event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift" : event.code === "Space" ? "space" : event.code;
-    if (event.code === "Escape" && expanded) { setExpanded(false); return; }
+    if (event.code === "Escape") return; // the window's listener decides (it knows whether this Escape only released the pointer)
     if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF") return;
     if (k !== "shift") event.preventDefault(); // the arrows and the space bar would scroll the page
     if (k === "KeyF") { if (down && !event.repeat) interact.current = true; return; }
@@ -171,12 +185,13 @@ export function PlaygroundLab() {
   };
   // On a phone a vertical swipe still scrolls the page (touch-pan-y): the browser cancels the pointer and the drag ends.
   const look = (event: PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
+    if (!drag.current && !lockedNow.current) return;
     const o = orbit.current;
-    let dx = event.clientX - drag.current.x, dy = event.clientY - drag.current.y;
+    let dx = lockedNow.current ? event.movementX : event.clientX - (drag.current?.x ?? event.clientX), dy = lockedNow.current ? event.movementY : event.clientY - (drag.current?.y ?? event.clientY);
     if (turnedNow.current) [dx, dy] = [dy, -dx]; // the overlay is a quarter turn clockwise: its right is the screen's down
     o.yaw += dx * 0.006; o.pitch = Math.max(-1.2, Math.min(0.45, o.pitch - dy * 0.005));
-    drag.current = { x: event.clientX, y: event.clientY }; dirty.current = true;
+    if (drag.current) drag.current = { x: event.clientX, y: event.clientY };
+    dirty.current = true;
   };
 
   const settings$ = (
@@ -200,16 +215,27 @@ export function PlaygroundLab() {
   // held for as long as they are pressed: down / brake, and up / throttle
   const holdDown = { onPointerDown: () => { down.current = true; }, onPointerUp: () => { down.current = false; }, onPointerLeave: () => { down.current = false; }, onPointerCancel: () => { down.current = false; } };
   const holdUp = { onPointerDown: () => { hover.current = true; }, onPointerUp: () => { hover.current = false; }, onPointerLeave: () => { hover.current = false; }, onPointerCancel: () => { hover.current = false; } };
-  const stop = { onPointerDown: (e: PointerEvent) => e.stopPropagation() }; // a press on a control is not the start of a camera drag
+  const stop = { onPointerDown: (e: PointerEvent) => e.stopPropagation(), onClick: (e: MouseEvent) => e.stopPropagation() }; // a press on a control is not the start of a camera drag, nor a click that takes the pointer
 
   return (
     // Expanded, this is a game: the world covers the window and everything else floats over it. `turned`: a quarter turn, for an upright phone that cannot be asked to rotate.
     <div ref={root} className={cn("text-sm", expanded ? "fixed inset-0 z-50 overflow-hidden bg-black" : "grid gap-4")}
       role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined} aria-label={expanded ? t.picture : undefined} data-expanded={expanded} data-turned={turned}>
-      <div tabIndex={0} role="application" aria-label={t.picture} className={cn("relative outline-none", expanded ? "touch-none" : "touch-pan-y rounded-md focus-visible:ring-2 focus-visible:ring-ring", expanded && !turned && "size-full")}
+      <div ref={stageElement} tabIndex={0} role="application" aria-label={t.picture} className={cn("relative outline-none", expanded ? "touch-none" : "touch-pan-y rounded-md focus-visible:ring-2 focus-visible:ring-ring", expanded && !turned && "size-full")}
         // The quarter turn is on this inner element: a browser overrides the transform of the fullscreen element itself.
         style={expanded && turned ? { position: "absolute", top: 0, left: "100%", width: "100dvh", height: "100dvw", transform: "rotate(90deg)", transformOrigin: "top left" } : undefined} onKeyDown={(e) => key(e, true)} onKeyUp={(e) => key(e, false)} onBlur={() => held.current.clear()}
-        onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); e.currentTarget.focus({ preventScroll: true }); }} onPointerMove={look} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)} data-testid="playground-stage" data-ready={ready} data-seat={seat}>
+        onPointerDown={(e) => {
+          e.currentTarget.focus({ preventScroll: true });
+          if (locked) return;
+          drag.current = { x: e.clientX, y: e.clientY }; pressedAt.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId);
+        }}
+        // A click with a mouse (a press that did not turn into a drag) takes the pointer, in the article as well as expanded, where the
+        // browser can. On the click and not on the press: a browser refuses a document that the press itself has only just focused.
+        onClick={(e) => {
+          const native = e.nativeEvent as globalThis.PointerEvent, moved = Math.hypot(e.clientX - pressedAt.current.x, e.clientY - pressedAt.current.y);
+          if (locked || moved > 4 || (native.pointerType && native.pointerType !== "mouse") || typeof e.currentTarget.requestPointerLock !== "function") return;
+          void Promise.resolve(e.currentTarget.requestPointerLock()).catch(() => undefined); // refused: dragging still turns the camera
+        }} onPointerMove={look} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)} data-testid="playground-stage" data-ready={ready} data-seat={seat}>
         <Stage canvas={canvas} status={tracer.status} label={t.picture} t={t} testid="playground-canvas" wide fill={expanded}>
           {/* top right: what the renderer is doing, and the way out */}
           <div className="absolute top-2 right-2 flex items-center gap-2" {...stop}>
@@ -217,7 +243,7 @@ export function PlaygroundLab() {
             <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { if (!expanded) setTools(!window.matchMedia("(pointer: coarse)").matches); setExpanded(!expanded); }} aria-pressed={expanded} data-testid="playground-expand">{expanded ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}{expanded ? t.collapse : t.expand}</Button>
           </div>
           {/* top left, expanded only: the settings, folded away on a phone until asked for */}
-          {expanded && (
+          {expanded && !locked && ( // with the pointer taken there is nothing to click them with
             <div className="absolute top-2 left-2 flex max-w-[min(46rem,calc(100%-11rem))] items-start gap-2" {...stop}>
               <Button size="icon" variant="secondary" className="shrink-0 opacity-90" aria-label={t.settings} aria-pressed={tools} onClick={() => setTools(!tools)} data-testid="playground-tools"><SlidersHorizontal className="size-4" aria-hidden /></Button>
               {tools && <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-md border border-white/15 bg-background/80 px-3 py-2 backdrop-blur-sm">{settings$}</div>}
@@ -234,6 +260,8 @@ export function PlaygroundLab() {
             <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { jump.current = true; }} {...(seat === "driving" || seat === "flying" ? holdUp : {})} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</Button>
           </div>
           {expanded && <div className="absolute right-4 bottom-4 hidden [@media(pointer:fine)]:block"><Hints t={t} seat={seat} craft={craft} /></div>}
+          {/* what the mouse is doing, and how to get it back: at the bottom, clear of the settings */}
+          <p className={cn("pointer-events-none absolute left-1/2 hidden -translate-x-1/2 whitespace-nowrap", expanded ? "bottom-4" : "bottom-2", "rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs text-white/90 backdrop-blur-md [@media(pointer:fine)]:block")} data-testid="playground-lock" data-locked={locked}>{locked ? t.lockOn : expanded ? t.lockOff : t.lockOffArticle}</p>
         </Stage>
       </div>
       {!expanded && (
