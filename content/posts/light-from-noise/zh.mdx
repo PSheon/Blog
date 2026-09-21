@@ -1,0 +1,19 @@
+---
+title: 一張圖怎麼從雪花變清晰：從零寫一個 WebGPU 路徑追蹤器
+description: 渲染方程式只有一行，用亂數去猜它就是光線追蹤。看一張圖從滿是雜訊慢慢變清楚，量它的誤差怎麼隨樣本數下降，再看 BVH 怎麼讓一百萬個三角形也跑得動。
+date: 2026-09-21
+tags: [graphics, from-scratch]
+no: 11
+interactive: true
+draft: true
+---
+
+import { ConvergeLab } from "./components";
+
+{/* 草稿頁：先給 Paul 看可玩的頁面，內文之後才寫。引擎在 lib/rt/。 */}
+
+這一頁目前只有第一張圖。下面這張 Cornell box 是你的 GPU 現在算出來的：每個像素每一輪射出一條光線，讓它在房間裡亂彈，彈到燈才有顏色。一輪的結果幾乎全是雜訊；把很多輪平均起來，畫面才慢慢浮現。
+
+<Instrument fig="01" title="light / converge" caption="左：正在累積的畫面。右上的數字全部是在你這個分頁裡即時量的。右下：畫面誤差對樣本數，兩軸都是對數；虛線的斜率是 −½，也就是誤差 ∝ 1/√N。把三角形從一千拉到一百萬，看「每條光線走訪的節點」只多了幾個。">
+  <ConvergeLab />
+</Instrument>

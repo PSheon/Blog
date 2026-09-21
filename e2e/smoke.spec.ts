@@ -697,3 +697,26 @@ test("three progress bars watch a job and disagree; a fourth learns", async ({ p
   expect(learned).toBeLessThan(plan * 0.7);
   expect(errors).toEqual([]);
 });
+
+test("a picture clears from noise on the reader's GPU, or the figure says why it cannot", async ({ page }) => {
+  const response = await page.goto("/zh/posts/light-from-noise");
+  // The article is a draft until Paul publishes it; drafts are left out of production builds.
+  test.skip(response?.status() === 404, "light-from-noise is still a draft");
+  const errors = watchErrors(page);
+  const figure = page.locator('[data-instrument="light / converge"]');
+  await figure.scrollIntoViewIfNeeded();
+  const adapter = await page.evaluate(async () => ("gpu" in navigator ? Boolean(await (navigator as unknown as { gpu: { requestAdapter(): Promise<unknown> } }).gpu.requestAdapter()) : false));
+  if (!adapter) {
+    // CI has no GPU. Say so where a reader of the report will see it, and check what a reader without one is shown.
+    test.info().annotations.push({ type: "NO WEBGPU ADAPTER", description: "only the fallback message was checked; the path tracer did not run" });
+    await expect(page.getByTestId("light-status")).toContainText(/WebGPU/);
+    return;
+  }
+  const spp = async () => Number((await page.getByTestId("light-spp").textContent())!.replace(/\D/g, "") || 0);
+  await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(64);
+  await page.getByTestId("light-toggle").click(); // pause: the count stops
+  const held = await spp();
+  await page.waitForTimeout(600);
+  expect(await spp()).toBe(held);
+  expect(errors).toEqual([]);
+});
