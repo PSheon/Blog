@@ -1,0 +1,112 @@
+---
+title: "How a picture clears from snow: a WebGPU path tracer from scratch"
+description: The colour of one pixel is the average of many rays bouncing at random. Watch a picture clear from noise, shoot one ray and see how it becomes a colour, measure how the error falls with the sample count, and see how a BVH keeps a million triangles running.
+date: 2026-09-21
+tags: [graphics, from-scratch]
+no: 11
+interactive: true
+draft: true
+---
+
+import { BouncesLab, BvhLab, ConvergeLab, PathLab } from "./components";
+
+The room below has had one sample so far, and it is almost all snow. Press Start and your GPU does the rest.
+
+<Instrument fig="01" title="light / converge" caption="Left: the picture as it accumulates. The numbers at the top right are all measured in this tab while it runs. Bottom right: the error of the picture against the sample count, both axes logarithmic; the dashed line has slope −½.">
+  <ConvergeLab />
+</Instrument>
+
+Not one pixel of that picture is drawn. There is no code for shadows and no code that says the red wall should tint the floor. Nobody wrote why the corners the lamp cannot reach are still a little bright. The whole picture does one thing, many times: **shoot a ray out through a pixel, let it bounce around the room at random, and see whether it ends up at the lamp.**
+
+This is path tracing. This article writes it from scratch: the scene, the acceleration structure, a reference version on the CPU and the WGSL kernel on the GPU, 692 lines in all (TypeScript, plus the WGSL written for the GPU), with no graphics library. Then it answers three questions. How does one ray become a colour? How long does the noise take to clear? And why does it still run when a thousand triangles become a million?
+
+It is the first of four articles on how light is computed.
+
+## One pixel, one ray
+
+Look at a single pixel first. The picture below is the GPU's, finished. The line over it is one path from the pixel inside the dashed circle, traced on your CPU by the same algorithm.
+
+<Instrument fig="02" title="light / one path" caption="Click anywhere on the picture to choose another pixel. Each dot is a hit, coloured like the surface it hit; a line's colour is what the light is still worth when it gets there. On the right, from the top: the colour this one path gives, the mean of all paths so far, and the same pixel in the GPU's picture.">
+  <PathLab />
+</Instrument>
+
+A path has three rules:
+
+1. Leave the eye through this pixel and find the first surface in the way.
+2. If it is the lamp, the path has a colour: the lamp's brightness, times whatever share is still left after the journey.
+3. If it is not the lamp, multiply what is left by the surface's colour (a red wall keeps only the red part), leave in a random direction, and go back to rule 2.
+
+Press "Shoot one more" a few times. Most paths never reach the lamp: they leave through the open side of the room, or they run out of energy. Their colour is plain black. For the few pixels I measured, only 3% to 7% of paths found the lamp; those few are very bright, far beyond the white a screen can show.
+
+So the answer of any single path is almost certainly wrong: black, or much too bright. **The pixel's real colour is the average of many paths.** Press "Shoot 100" and watch the second swatch approach the third. For one pixel on the red wall, the mean of 101 paths was rgb(195, 38, 36) and the GPU's 1,024 paths gave rgb(163, 31, 29): the same red already, but not there yet.
+
+The snow at the start of figure 01 is exactly this. Every pixel had shot one path; most were black and a few were white.
+
+## How long the noise takes to clear
+
+How many paths are enough? Go back to the chart at the bottom right of figure 01. Its horizontal axis is samples per pixel, its vertical axis is the error of the whole picture, and both are logarithmic.
+
+The points follow the dashed line, whose slope is −½: **the error falls as one over the square root of the sample count**. On my machine the measured points lie on that line from 2 samples to 2,000. It is the law of any average estimated with random numbers. It does not depend on what the picture shows, or on how fast the GPU is.
+
+The price is concrete: **half the noise costs four times the samples.** From "I can tell what it is" to "clean" is not twice the time but a hundred times. That is why figure 01 changes a lot in its first seconds and then seems to stop. It has not stopped; each improvement you can see costs four times as much as the one before.
+
+How is the error measured with no correct answer to compare against? Odd and even samples accumulate into two pictures of their own. Both are pictures of the same room, and they differ only by luck, so half the gap between them is the error of the two put together.
+
+## How many times light should bounce
+
+Rule 3 says "leave again" and does not say how often. Below is the same room four times over, from exactly the same samples; the only difference is how many times a path may bounce.
+
+<Instrument fig="03" title="light / bounces" caption="Top left: 0 bounces, only what glows. Top right: 1, direct light, shadows fully black. Bottom left: 2. Bottom right: no limit. Press Start and all four tiles accumulate together, up to 512 samples.">
+  <BouncesLab />
+</Instrument>
+
+With 0 bounces only the lamp itself is visible. With 1 you get direct lighting: a surface is bright only where the lamp shines on it, everything else is black, and so is the ceiling, because the lamp faces down. With 2 something appears inside the shadows, and the red and green of the walls seep onto the floor and the tori. None of this is an effect written separately. It is the same rule run one more round.
+
+The tile without a limit is a little brighter and softer than the one with 2. "No limit" does not mean bouncing for ever, though. From the fourth bounce on, every bounce rolls a die: the darker the surface, the likelier the path ends there, and the paths that survive are scaled up to make good the loss, so the average is neither more nor less. The trick is called Russian roulette.
+
+## Why a million triangles still run
+
+By now the expensive step is always the same one: **what did this ray hit?** The honest way is to test every triangle in the scene. This room has 876 of them, the picture is 512×512, and the question is asked for every pixel, every sample and every bounce.
+
+The answer is to put triangles in boxes and boxes in bigger boxes until it is a tree, called a BVH (bounding volume hierarchy). If a ray misses a big box, nothing inside needs a look. The picture below is not shaded: a pixel's colour is how many nodes of the tree its ray had to visit to find its answer.
+
+<Instrument fig="04" title="light / bvh" caption="Every press measures exactly 64 samples: the nodes visited by all their rays, and the GPU time they took. Take the triangles from 1k to 1M first and watch how much the numbers on the right change; then go back to 1k and turn the BVH off.">
+  <BvhLab />
+</Instrument>
+
+Take the triangles all the way to a million. The tori get rounder, and the numbers on the right hardly move. This is what I measured (M4 Pro, Chrome, 256×256, camera rays only):
+
+| Triangles | BVH | Nodes visited per ray (or triangles tested) | Rays per second (millions) |
+| --- | --- | --- | --- |
+| 876 | on | 9.5 | 112 |
+| 9,612 | on | 10.4 | 170 |
+| 101,412 | on | 11.4 | 158 |
+| 998,796 | on | 11.9 | 141 |
+| 876 | off | 876 | 45 |
+| 9,612 | off | 9,612 | 5.4 |
+
+Eleven hundred times the triangles cost each ray 2.4 more nodes. Every level of the tree doubles what it can hold, so the tree for a million triangles is only 23 levels deep. With the BVH off, 9,612 triangles are already thirty times slower. Past ten thousand I locked the switch, because one sample would take long enough for the browser to kill the GPU task.
+
+In the top two rows 876 triangles are slower than 9,612, and the BVH is not the reason: the scene is so small that 64 samples are over before the GPU reaches full speed. Read rays per second as an order of magnitude; the node counts are exact.
+
+The tree is built by binned SAH: whenever a set of triangles has to be split in two, each of the three axes is cut into 16 bins, the 15 planes between them are tried, and the one with the smallest "surface area of each side's box × its number of triangles" wins. A million triangles take about a second to build in your browser, in a worker, so the page does not freeze.
+
+## What is different from the real thing, and how the numbers were measured
+
+**One material.** Every surface in this room is perfectly rough (Lambert). No mirrors, no glass, no metal. The next article deals with that.
+
+**Finding the lamp is pure luck.** In figure 02 only 3% to 7% of paths reach the lamp, and the rest are wasted work. A real renderer asks the lamp directly at every hit (next event estimation) and gets much less noise in the same time. That is the subject of the next article, which will measure how much less on this same error chart.
+
+**No denoising.** Real-time path tracing today has one or two samples per pixel per frame; it gets by on averaging with earlier frames and neighbouring pixels, or on a neural network. That is the third article.
+
+**Nothing moves.** When the camera or the scene moves, every accumulated sample is void. That is the fourth.
+
+Where the numbers come from: the readouts in the figures are measured by your browser as it runs, so they will differ from mine. Where the text says "I measured", that was Chrome on an M4 Pro, in this page, recorded in this project's `docs/research/light/RESULTS.md`. The CPU and GPU versions are the same algorithm written twice: on eight pixels of figure 02 (both coloured walls, floor, ceiling, back wall, a torus, the lamp) the mean of 2,001 CPU paths and the GPU's 1,024 samples differ by at most 12 levels out of 255 in any channel, some above and some below. That the BVH finds the same hit as testing every triangle is held by the tests in `tests/rt/`. A browser without WebGPU gets a picture rendered earlier, and figure 02 still works on it, because its rays are the CPU's.
+
+## Sources
+
+- Writing a pixel's colour as an integral and estimating it with random paths: Kajiya, *The Rendering Equation*, SIGGRAPH 1986.
+- Building the BVH: Wald, *On fast Construction of SAH-based Bounding Volume Hierarchies*, IEEE Symposium on Interactive Ray Tracing, 2007.
+- The random numbers on the GPU: Jarzynski, Olano, *Hash Functions for GPU Rendering*, Journal of Computer Graphics Techniques, 2020.
+- Squeezing computed brightness into what a screen can show: Narkowicz, *ACES Filmic Tone Mapping Curve*, 2016.
+- The scene is a variation on the Cornell box, which comes from Goral, Torrance, Greenberg, Battaile, *Modeling the Interaction of Light Between Diffuse Surfaces*, SIGGRAPH 1984.

@@ -75,3 +75,27 @@ Paths are traced on the main thread by `lib/rt/cpu.ts` with `streamFor(pixel, n)
 every visit. Pixel (40, 256) on the red wall: mean of 101 paths tone-maps to rgb(195, 38, 36); the GPU's 1,024-sample
 pixel is rgb(163, 31, 29). Pixel (196, 430) on the floor: 201 paths rgb(194, 183, 183) against rgb(183, 168, 168).
 About 3–7% of paths reach the light (no next-event estimation yet: that is article 2).
+
+## 2026-09-21 — CPU against GPU, eight pixels
+
+Through figure 2 itself (en page, 1440 px, M4 Pro, Chrome metal-3): click a pixel, press "Shoot 100" twenty times (2,001
+CPU paths, `streamFor(pixel, n)`), read the swatches. The GPU pixel has 1,024 samples. Values are tone-mapped sRGB.
+
+| Pixel (fraction of the picture) | CPU, 2,001 paths | GPU, 1,024 samples |
+| --- | --- | --- |
+| red wall (0.08, 0.50) | 162, 30, 28 | 158, 29, 28 |
+| green wall (0.92, 0.50) | 77, 162, 86 | 87, 174, 97 |
+| floor (0.50, 0.93) | 118, 105, 98 | 127, 111, 103 |
+| ceiling (0.50, 0.06) | 128, 115, 100 | 134, 116, 105 |
+| back wall (0.50, 0.30) | 213, 210, 207 | 213, 210, 206 |
+| floor, left (0.38, 0.84) | 166, 148, 137 | 170, 146, 136 |
+| torus (0.30, 0.62) | 174, 158, 154 | 176, 167, 159 |
+| lamp (0.50, 0.115) | 255, 255, 255 | 255, 255, 255 |
+
+Largest gap 12 levels (green wall, G). Both sides are still noisy at these counts; the gaps go both ways. This is a
+spot check by hand, not a test: CI has no GPU adapter, so it cannot be automated there.
+
+## 2026-09-21 — the playground, in the page
+
+960×540, 24,545 triangles, M4 Pro: full path tracing (8 bounces, sun by NEE) 3.3 ms per sample; raster view 0.7 ms.
+While W is held the accumulation stays at single-digit samples (7 seen).

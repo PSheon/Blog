@@ -251,6 +251,27 @@ function Scheduler() {
   );
 }
 
+/** № 011: a room seen from its open side. One ray bounces its way to the lamp; the left half is still snow, the right has cleared. */
+function Light() {
+  const next = rng(11), snow: [number, number, number][] = [];
+  for (let i = 0; i < 46; i++) snow.push([r1(32 + next() * 46), r1(14 + next() * 72), next()]);
+  return (
+    <>
+      <rect x={30} y={10} width={100} height={80} rx={2} fill="none" stroke={DIM} strokeWidth={1} />
+      <rect x={56} y={30} width={48} height={40} fill="none" stroke={DIM} strokeWidth={1} />
+      <path d="M30 10 L56 30 M130 10 L104 30 M30 90 L56 70 M130 90 L104 70" stroke={DIM} strokeWidth={1} />
+      <path d="M30 10 L56 30 V70 L30 90 Z" fill={S2} opacity={0.22} />
+      <path d="M130 10 L104 30 V70 L130 90 Z" fill={S3} opacity={0.22} />
+      <path d="M68 17 H92 L88 23 H72 Z" fill={S} />
+      {snow.map(([x, y, v], i) => <rect key={i} x={x} y={y} width={1.8} height={1.8} fill={v > 0.8 ? S : DIM} opacity={v > 0.8 ? 1 : 0.8} />)}
+      <path d="M6 58 L92 79 L120 46 L81 21" fill="none" stroke={S} strokeWidth={1.4} strokeLinejoin="round" />
+      <circle cx={6} cy={58} r={2.4} fill="var(--background)" stroke={S} strokeWidth={1.4} />
+      <circle cx={92} cy={79} r={2.6} fill={DIM} stroke={S} strokeWidth={1} />
+      <circle cx={120} cy={46} r={2.6} fill={S3} />
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -262,6 +283,7 @@ const covers: Record<string, () => ReactNode> = {
   "slam-2d": Slam,
   "city-of-agents": City,
   "task-scheduler": Scheduler,
+  "light-from-noise": Light,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {
