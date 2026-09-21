@@ -423,6 +423,9 @@ test("one visit is enough to read offline: the first page, an article reached by
   await page.goto("/en");
   await expect.poll(kept, { timeout: 30_000 }).toBe(true);
   // A client-side navigation fetches an RSC payload, not the HTML that a reload asks for. That has to be kept too.
+  // (By way of the index of all articles: the home page lists the newest six, and this one is no longer among them.)
+  await page.locator('main a[href="/en/posts"]').first().click();
+  await expect(page).toHaveURL(/\/en\/posts$/);
   await page.locator('main a[href="/en/posts/transformer-from-scratch"]').first().click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Transformer");
   await expect.poll(kept, { timeout: 30_000 }).toBe(true);

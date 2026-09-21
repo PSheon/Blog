@@ -21,10 +21,10 @@ Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 T
 built on `feat/sche` by another session). A
 VLA article was started as 010 and is parked on the branch `feat/vla` (pushed): the PCB-flip draft, its training
 pipeline, and the head-camera study in `docs/research/head-camera/` that would replace it. A draft shows only in
-`next dev`, with a "草稿 DRAFT" mark.
+`next dev`, with a mark in the page's language ("草稿" / "DRAFT").
 it dull.
 
-### The light series (two articles, both complete drafts on `dev`)
+### The light series (two articles, published 2026-09-22)
 
 `light-from-noise` (№ 011, part one: what path tracing is) and `light-playground` (№ 012, part two: a playground you
 walk, drive and fly through, path traced every frame). Paul cut the plan from four articles to two because theory-first
@@ -46,12 +46,12 @@ stays in `lib/rt` with its tests. Read before touching it:
 - Assets are packed by `scripts/light/pack-*.mjs` from `../light-work/assets/*.glb`. **`world.glb` must never be
   committed**: it embeds Textures.com photographs. The packed files hold geometry, skeleton, clips and names only, and
   tests check that no image is inside.
-- CI has no GPU. The light E2E tests skip (draft) or take the "no adapter" branch; what needs a GPU was checked by hand
+- CI has no GPU. The light E2E tests take the "no adapter" branch; what needs a GPU was checked by hand
   in the Playwright MCP browser, whose own tab must be in front for pointer lock (a `newContext()` window is refused).
 
 ## Waiting on Paul
 
-- Read and play the two light articles; on his word both lose `draft` and go out in ONE `dev` → `main` PR.
+- The two light articles lost `draft` on his word (2026-09-22) and go out in ONE `dev` → `main` PR that he merges.
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
 - A test on a real phone. Nobody has done one.
 - Search Console (the verification env vars exist). The custom domain is done. Open: should `psheon.me` and `www.psheon.me` redirect to `blog.` instead of serving the site too.
