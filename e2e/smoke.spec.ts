@@ -645,12 +645,19 @@ for (const locale of ["zh", "en"] as const) {
 }
 
 test("three progress bars watch a job and disagree; a fourth learns", async ({ page }) => {
-  const response = await page.goto("/zh/posts/progress-bar");
+  const response = await page.goto("/zh/posts/task-scheduler");
   // The article is a draft until Paul publishes it; drafts are left out of production builds.
-  test.skip(response?.status() === 404, "progress-bar is still a draft");
+  test.skip(response?.status() === 404, "task-scheduler is still a draft");
   test.setTimeout(90_000);
   const errors = watchErrors(page);
-  await expect(page.locator("[data-instrument]")).toHaveCount(4);
+  await expect(page.locator("[data-instrument]")).toHaveCount(5);
+
+  // Failures: with one attempt in five failing, the averaged jobs report failed attempts and wasted time.
+  const fail = page.getByTestId("fail-lab");
+  await fail.scrollIntoViewIfNeeded();
+  await expect(fail.getByRole("status")).toContainText("150", { timeout: 40_000 });
+  await expect.poll(async () => Number.parseFloat(await fail.locator(".tabular").nth(2).innerText()), { timeout: 40_000 }).toBeGreaterThan(5); // failed attempts per job
+  await page.getByTestId("race-start").scrollIntoViewIfNeeded();
 
   // The opener: the bars start at zero, and once the job is over all of them say 100.
   await expect(page.getByTestId("race-count")).toContainText("0%");

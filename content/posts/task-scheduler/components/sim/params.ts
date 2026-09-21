@@ -11,6 +11,11 @@ export const PARAMS = {
   bias: 0.6,
   /** Error no one can learn: each task's own luck, standard deviation of the logarithm. */
   noise: 0.25,
+  /** Chance that an attempt at a task fails part-way. The task then goes back among the ready ones and is tried again. */
+  failRate: 0,
+  /** A task fails at most this many times; a failed attempt dies somewhere between these shares of the way through. */
+  maxFails: 3,
+  failPoint: [0.2, 1] as [number, number],
   /** The learning bar trusts its prior (estimates are right) as much as this many minutes of finished work per kind. */
   priorWeight: 2,
   /** A task that has outrun its estimate is assumed to have this share of the estimate still to go. */
@@ -19,5 +24,5 @@ export const PARAMS = {
   samples: 100,
 } as const;
 
-export type JobOptions = { tasks: number; layers: number; skew: number; kinds: number; bias: number; noise: number };
-export const DEFAULT_JOB: JobOptions = { tasks: PARAMS.tasks, layers: PARAMS.layers, skew: PARAMS.skew, kinds: PARAMS.kinds, bias: PARAMS.bias, noise: PARAMS.noise };
+export type JobOptions = { tasks: number; layers: number; skew: number; kinds: number; bias: number; noise: number; failRate: number };
+export const DEFAULT_JOB: JobOptions = { tasks: PARAMS.tasks, layers: PARAMS.layers, skew: PARAMS.skew, kinds: PARAMS.kinds, bias: PARAMS.bias, noise: PARAMS.noise, failRate: PARAMS.failRate };

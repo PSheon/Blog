@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type Bar, BARS, DEFAULT_JOB, type JobOptions, makeJob, schedule, shown, trace } from "@/content/posts/progress-bar/components/sim";
+import { type Bar, BARS, DEFAULT_JOB, type JobOptions, makeJob, schedule, shown, trace } from "@/content/posts/task-scheduler/components/sim";
 
 const mean = (o: JobOptions, workers: number, n = 100) => {
   const sum = Object.fromEntries(BARS.map((b) => [b, { error: 0, above90: 0 }])) as Record<Bar, { error: number; above90: number }>;
@@ -15,7 +15,7 @@ describe("the job and its schedule", () => {
 
   it("never starts a task before what it waits for, and never runs more tasks than there are workers", () => {
     for (const workers of [1, 4, 16]) {
-      const job = makeJob(9, DEFAULT_JOB), run = schedule(job.tasks, workers, job.tasks.map((t) => t.duration));
+      const job = makeJob(9, DEFAULT_JOB), run = schedule(job.tasks, workers, job.tasks.map((t) => t.attempts));
       for (const t of job.tasks) { expect(run.finish[t.id] - run.start[t.id]).toBeCloseTo(t.duration, 9); for (const d of t.deps) expect(run.start[t.id]).toBeGreaterThanOrEqual(run.finish[d] - 1e-9); }
       // A worker does one thing at a time: no two tasks on the same worker overlap.
       for (const a of job.tasks) for (const b of job.tasks) if (a.id < b.id && run.worker[a.id] === run.worker[b.id]) expect(run.finish[a.id] <= run.start[b.id] + 1e-9 || run.finish[b.id] <= run.start[a.id] + 1e-9).toBe(true);
@@ -26,7 +26,7 @@ describe("the job and its schedule", () => {
   });
 
   it("stops getting faster once there are more workers than the graph can use: the longest chain is the floor", () => {
-    const job = makeJob(5, DEFAULT_JOB), durations = job.tasks.map((t) => t.duration), total = (w: number) => schedule(job.tasks, w, durations).total;
+    const job = makeJob(5, DEFAULT_JOB), durations = job.tasks.map((t) => t.duration), total = (w: number) => schedule(job.tasks, w, job.tasks.map((t) => t.attempts)).total;
     const chain = new Float64Array(job.tasks.length);
     for (const t of job.tasks) chain[t.id] = t.duration + Math.max(0, ...t.deps.map((d) => chain[d]));
     expect(total(1)).toBeCloseTo(durations.reduce((a, b) => a + b, 0), 9);
@@ -36,9 +36,44 @@ describe("the job and its schedule", () => {
   });
 });
 
+describe("attempts that fail", () => {
+  const failing = { ...DEFAULT_JOB, failRate: 0.25 };
+
+  it("do not change which job a seed gives: the same tasks, the same durations, only more attempts", () => {
+    const calm = makeJob(6, DEFAULT_JOB), rough = makeJob(6, failing);
+    expect(rough.tasks.map(({ attempts: _, ...rest }) => rest)).toEqual(calm.tasks.map(({ attempts: _, ...rest }) => rest));
+    expect(calm.tasks.every((t) => t.attempts.length === 1)).toBe(true);
+    expect(rough.tasks.some((t) => t.attempts.length > 1)).toBe(true);
+    expect(Math.max(...rough.tasks.map((t) => t.attempts.length))).toBeLessThanOrEqual(4);
+  });
+
+  it("send the task back to be tried again, make whatever waits for it keep waiting, and cost time", () => {
+    const job = makeJob(6, failing), run = schedule(job.tasks, 4, job.tasks.map((t) => t.attempts)), calm = schedule(job.tasks, 4, job.tasks.map((t) => [t.duration]));
+    for (const task of job.tasks) {
+      const mine = run.attempts.filter((a) => a.task === task.id);
+      expect(mine).toHaveLength(task.attempts.length);
+      mine.forEach((a, k) => { expect(a.ok).toBe(k === mine.length - 1); expect(a.to - a.from).toBeCloseTo(task.attempts[k], 9); if (k) expect(a.from).toBeGreaterThanOrEqual(mine[k - 1].to - 1e-9); });
+      expect(run.finish[task.id]).toBeCloseTo(mine[mine.length - 1].to, 9);
+      for (const d of task.deps) expect(mine[0].from).toBeGreaterThanOrEqual(run.finish[d] - 1e-9); // nothing starts on a task that has only failed so far
+    }
+    // A worker still does one thing at a time, failed attempts included.
+    for (const a of run.attempts) for (const b of run.attempts) if (a !== b && a.worker === b.worker) expect(a.to <= b.from + 1e-9 || b.to <= a.from + 1e-9).toBe(true);
+    expect(run.total).toBeGreaterThan(calm.total);
+  });
+
+  // Measured first (docs/research/task-scheduler/RESULTS.md): with good estimates and 20 % of attempts failing, the plan
+  // bar goes from 0.7 to 2.7 points; counting and weighting hardly move.
+  it("make the forecast optimistic again, and leave the two simple bars as wrong as they were", () => {
+    const good = { ...DEFAULT_JOB, bias: 0, noise: 0.05 }, calm = mean(good, 4), rough = mean({ ...good, failRate: 0.2 }, 4);
+    expect(rough.plan.error).toBeGreaterThan(calm.plan.error * 2.5);
+    expect(Math.abs(rough.count.error - calm.count.error)).toBeLessThan(1.5);
+    expect(Math.abs(rough.work.error - calm.work.error)).toBeLessThan(1.5);
+  }, 60_000);
+});
+
 describe("the four bars", () => {
   it("start at 0, end at 100, and only know what has happened so far", () => {
-    const job = makeJob(2, DEFAULT_JOB), run = schedule(job.tasks, 4, job.tasks.map((t) => t.duration));
+    const job = makeJob(2, DEFAULT_JOB), run = schedule(job.tasks, 4, job.tasks.map((t) => t.attempts));
     for (const b of BARS) { expect(shown(job, run, 4, 0)[b]).toBe(0); expect(shown(job, run, 4, run.total)[b]).toBe(1); }
     // Change the truth about a task that has not started: what is shown now must not move.
     const later = job.tasks[job.tasks.length - 1], at = run.start[later.id] * 0.5, before = shown(job, run, 4, at);
@@ -52,7 +87,7 @@ describe("the four bars", () => {
     expect(h.learn.error).toBeLessThan(1e-9);
   });
 
-  // Measured first (docs/research/progress-bar/RESULTS.md, 200 jobs): count 10.1 / work 5.8 / plan 0.8 points with good
+  // Measured first (docs/research/task-scheduler/RESULTS.md, 200 jobs): count 10.1 / work 5.8 / plan 0.8 points with good
   // estimates and 4 workers; count 17.4 with 16. With biased estimates: plan 8.1, learn 4.0.
   it("with good estimates: counting is worst, weighting by work is better, replaying the plan is nearly honest; more workers hurt counting", () => {
     const good = { ...DEFAULT_JOB, bias: 0, noise: 0.05 }, four = mean(good, 4), sixteen = mean(good, 16);

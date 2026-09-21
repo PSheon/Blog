@@ -16,6 +16,7 @@ const zh = {
   workers: "worker 數", total: "整份工作要多久", minutes: "分鐘", floor: "最長的那條相依鏈：再多 worker 也不會更快",
   bias: "預估有多不準（同一種任務錯同一個方向）", learning: "讓它從做完的任務學",
   computing: "正在算", runs: "份工作的平均", backwards: "曾經倒退",
+  failRate: "每一次嘗試失敗的機率", failTimeline: "同一份工作的時間軸，這次有些嘗試會失敗：粉紅色的空框加一條斜線是失敗的那一次，同一個任務之後會再出現一次", failedAttempts: "每份工作平均失敗幾次", wasted: "worker 的時間有多少花在失敗的嘗試上",
   kinds: "任務種類", learned: "學到的修正", truth: "實際",
 };
 
@@ -33,6 +34,7 @@ const en: typeof zh = {
   workers: "Workers", total: "How long the whole job takes", minutes: "minutes", floor: "the longest chain of tasks waiting on each other: more workers cannot beat it",
   bias: "How wrong the estimates are (one kind of task, wrong the same way)", learning: "Let it learn from finished tasks",
   computing: "working out", runs: "jobs, averaged", backwards: "stepped back by",
+  failRate: "Chance that an attempt fails", failTimeline: "The same job's timeline, now with attempts that fail: an empty pink outline with a stroke through it is a failed attempt, and the same task appears again afterwards", failedAttempts: "failed attempts per job", wasted: "share of worker time spent on attempts that failed",
   kinds: "kind of task", learned: "correction learned", truth: "actual",
 };
 

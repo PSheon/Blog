@@ -1,17 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { CalibrationChart, type Curve, Legend } from "./chart";
 import { type Labels, useLabels } from "./labels";
 import { Param } from "./param";
-import { type Bar, DEFAULT_JOB, type JobOptions, PARAMS } from "./sim";
+import { type Bar, DEFAULT_JOB, type JobOptions, makeJob, PARAMS, schedule } from "./sim";
+import { Timeline } from "./timeline";
 import { useCurves } from "./use-curves";
 
 /** Estimates that are right but for a little luck: for the figures that are about something other than bad estimates. */
 const GOOD: JobOptions = { ...DEFAULT_JOB, bias: 0, noise: 0.05 };
 
-function Panel({ t, options, workers, bars, headline, total = false, gap = false }: { t: Labels; options: JobOptions; workers: number; bars: Bar[]; headline: Bar; total?: boolean; /** Plot the distance from the truth instead of what is shown: for errors that go both ways and cancel in an average. */ gap?: boolean }) {
+function Panel({ t, options, workers, bars, headline, total = false, gap = false, failures = false }: { t: Labels; options: JobOptions; workers: number; bars: Bar[]; headline: Bar; total?: boolean; failures?: boolean; /** Plot the distance from the truth instead of what is shown: for errors that go both ways and cancel in an average. */ gap?: boolean }) {
   const root = useRef<HTMLDivElement>(null), result = useCurves(root, options, workers, bars), curves: Curve[] = bars.map((bar) => ({ bar, label: t.barsShort[bar], points: (gap ? result?.gaps[bar] : result?.curves[bar]) ?? [0, gap ? 0 : 1] }));
   return (
     <div ref={root} className="grid gap-4 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:items-center">
@@ -22,6 +23,8 @@ function Panel({ t, options, workers, bars, headline, total = false, gap = false
       <div className="grid content-start gap-3">
         <p className="label" role="status">{result && result.done >= result.of ? `${result.of} ${t.runs}` : `${t.computing}… ${result?.done ?? 0} / ${result?.of ?? "…"}`}</p>
         {total && <Readout label={t.total} value={(result?.total ?? 0).toFixed(1)} unit={t.minutes} tone="plain" />}
+        {failures && <Readout label={t.failedAttempts} value={(result?.failed ?? 0).toFixed(1)} tone="alt" />}
+        {failures && <Readout label={t.wasted} value={Math.round((result?.wasted ?? 0) * 100)} unit="%" tone="alt" />}
         {bars.map((bar) => (
           <div key={bar} data-testid={`off-${bar}`} data-done={result !== null && result.done >= result.of}><Readout label={`${t.barsShort[bar]} · ${t.error}`} value={(result?.honesty[bar].error ?? 0).toFixed(1)} unit={t.points} tone={bar === headline ? "alt" : "muted"} /></div>
         ))}
@@ -61,6 +64,20 @@ export function LearnLab() {
       <Param label={t.bias} shown={bias.toFixed(1)} value={bias} min={0} max={1} step={0.1} onChange={setBias} />
       <label className="label flex min-h-6 items-center gap-2"><input type="checkbox" className="size-4 accent-[var(--signal)]" checked={learning} onChange={(e) => setLearning(e.target.checked)} data-testid="learn-toggle" />{t.learning}</label>
       <Panel t={t} options={{ ...DEFAULT_JOB, bias }} workers={PARAMS.workers} bars={learning ? ["work", "plan", "learn"] : ["work", "plan"]} headline={learning ? "learn" : "plan"} gap />
+    </div>
+  );
+}
+
+/** Fig. 02: attempts fail, the task goes back among the ready ones and is tried again. One knob: how often. */
+export function FailLab() {
+  const t = useLabels(), [failRate, setFailRate] = useState(0.2);
+  // The opening job again (77), now with attempts that fail: the same tasks, the same order of arrival, more time.
+  const { job, run } = useMemo(() => { const job = makeJob(77, { ...DEFAULT_JOB, failRate }); return { job, run: schedule(job.tasks, PARAMS.workers, job.tasks.map((x) => x.attempts)) }; }, [failRate]);
+  return (
+    <div className="grid gap-4 text-sm" data-testid="fail-lab">
+      <Param label={t.failRate} shown={`${Math.round(failRate * 100)}%`} value={failRate} min={0} max={0.3} step={0.05} onChange={setFailRate} />
+      <Timeline job={job} run={run} workers={PARAMS.workers} label={t.failTimeline} />
+      <Panel t={t} options={{ ...GOOD, failRate }} workers={PARAMS.workers} bars={["work", "plan"]} headline="plan" total failures gap />
     </div>
   );
 }

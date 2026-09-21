@@ -6,17 +6,18 @@ import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Button } from "@/components/ui/button";
 import { CalibrationChart, type Curve, FILL } from "./chart";
 import { useLabels } from "./labels";
+import { Timeline } from "./timeline";
 import { type Bar, DEFAULT_JOB, makeJob, PARAMS, schedule, trace } from "./sim";
 import { useVisible } from "./use-visible";
 
-const SECONDS = 16, SHOWN: Bar[] = ["count", "work", "plan"], KIND = ["fill-chart-1", "fill-chart-2", "fill-chart-3", "fill-chart-5"];
+const SECONDS = 16, SHOWN: Bar[] = ["count", "work", "plan"];
 
 /** Fig. 01: one job, four workers, three progress bars watching it, and the clock they are all trying to guess. */
 export function RaceLab() {
   const t = useLabels(), reduced = useReducedMotion(), root = useRef<HTMLDivElement>(null), visible = useVisible(root);
   // Job 77 is the one of the first 300 whose three bars are closest to the average of all of them (RESULTS.md): typical, not the worst.
   const [seed, setSeed] = useState(77), [at, setAt] = useState(0), [playing, setPlaying] = useState(false);
-  const { job, run, curves } = useMemo(() => { const job = makeJob(seed, DEFAULT_JOB); return { job, run: schedule(job.tasks, PARAMS.workers, job.tasks.map((x) => x.duration)), curves: trace(job, PARAMS.workers, SHOWN).curves }; }, [seed]);
+  const { job, run, curves } = useMemo(() => { const job = makeJob(seed, DEFAULT_JOB); return { job, run: schedule(job.tasks, PARAMS.workers, job.tasks.map((x) => x.attempts)), curves: trace(job, PARAMS.workers, SHOWN).curves }; }, [seed]);
 
   useEffect(() => {
     if (!playing) return;
@@ -34,18 +35,10 @@ export function RaceLab() {
   const value = (bar: Bar) => { const p = curves[bar], f = at * PARAMS.samples, k = Math.min(PARAMS.samples - 1, Math.floor(f)); return p[k] + (p[k + 1] - p[k]) * (f - k); };
   const list: Curve[] = SHOWN.map((bar) => ({ bar, label: t.barsShort[bar], points: curves[bar] }));
   const start = () => { if (reduced) { setAt(1); return; } if (at >= 1) setAt(0); setPlaying(true); }; // reduced motion: straight to the finished run
-  const lane = 12, width = 600;
 
   return (
     <div ref={root} className="grid gap-4 text-sm">
-      <svg viewBox={`0 0 ${width} ${PARAMS.workers * lane + 4}`} className="w-full" role="img" aria-label={t.timeline}>
-        {job.tasks.map((task) => {
-          const x = (run.start[task.id] / run.total) * width, w = Math.max(1, ((run.finish[task.id] - run.start[task.id]) / run.total) * width - 0.8), begun = run.start[task.id] / run.total <= at, over = run.finish[task.id] / run.total <= at;
-          // Rounded: node and the browser disagree in the last digits of exp and log, and a hydrated attribute has to match.
-          return <rect key={task.id} x={x.toFixed(2)} y={run.worker[task.id] * lane + 2} width={w.toFixed(2)} height={lane - 3} rx={1.5} className={KIND[task.kind % KIND.length]} opacity={over ? 0.9 : begun ? 0.5 : 0.12} />;
-        })}
-        <line x1={at * width} x2={at * width} y1={0} y2={PARAMS.workers * lane + 4} className="stroke-foreground" strokeWidth={1.5} />
-      </svg>
+      <Timeline job={job} run={run} workers={PARAMS.workers} at={at} label={t.timeline} />
       <div className="grid gap-5 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] sm:items-center">
         <div className="grid gap-2.5">
           {SHOWN.map((bar) => (

@@ -1,0 +1,12 @@
+// What failing attempts and retries cost, and what they do to each bar: 200 jobs a row, 4 workers.
+// Run: cp docs/research/task-scheduler/fail-probe.test.ts.txt tests/scheduler/fail-probe.test.ts
+//      pnpm exec vitest run tests/scheduler/fail-probe.test.ts --disable-console-intercept ; rm tests/scheduler/fail-probe.test.ts
+import { it } from "vitest";
+import { BARS, DEFAULT_JOB, makeJob, schedule, trace } from "@/content/posts/task-scheduler/components/sim";
+it("failures", () => {
+  for (const [label, o] of [["good estimates", { ...DEFAULT_JOB, bias: 0, noise: 0.05 }], ["default (biased) estimates", DEFAULT_JOB]] as const) for (const failRate of [0, 0.1, 0.2, 0.3]) {
+    const sum = Object.fromEntries(BARS.map((b) => [b, { error: 0, above90: 0 }])), N = 200; let total = 0, fails = 0, wasted = 0, busy = 0;
+    for (let s = 1; s <= N; s++) { const job = makeJob(s, { ...o, failRate }), tr = trace(job, 4), run = schedule(job.tasks, 4, job.tasks.map((t) => t.attempts)); total += tr.total / N; for (const a of run.attempts) { busy += a.to - a.from; if (!a.ok) { fails++; wasted += a.to - a.from; } } for (const b of BARS) { sum[b].error += tr.honesty[b].error / N; sum[b].above90 += tr.honesty[b].above90 / N; } }
+    console.log(`${label}, fail ${failRate}: job ${total.toFixed(1)} min, ${(fails / N).toFixed(1)} failed attempts a job, ${Math.round((100 * wasted) / busy)}% of worker time wasted | ` + BARS.map((b) => `${b} ${sum[b].error.toFixed(1)} (${Math.round(100 * sum[b].above90)}%)`).join(" | "));
+  }
+}, 300000);
