@@ -1,17 +1,21 @@
 import type RAPIER from "@dimforge/rapier3d-compat";
-import type { ClipName, Vec3 } from "@/lib/rt";
+import type { ClipName, Mat34, ModelName, Models, Part, Vec3 } from "@/lib/rt";
+import { createCar, type Car } from "./car";
 
 /**
  * The playground as a place with physics: Rapier (Apache-2.0) holds the ground as one triangle mesh and the character
  * as a capsule moved by its kinematic character controller. Nothing here draws; the figure asks where things are and
  * hands that to the renderer.
  */
-export interface Input { /** the stick: x right, y forward, each −1…1 */ move: [number, number]; /** where the camera looks, radians about y */ yaw: number; jump: boolean; sprint: boolean }
+export interface Input { /** the stick: x right, y forward, each −1…1 */ move: [number, number]; /** where the camera looks, radians about y */ yaw: number; jump: boolean; sprint: boolean; /** get in or out (pressed this frame) */ interact: boolean }
 export interface Person { at: Vec3; /** radians about y; 0 faces −z */ facing: number; clip: ClipName; clipTime: number; loop: boolean; moving: boolean }
 
 const STEP = 1 / 60, WALK = 4, SPRINT = 7.5, JUMP = 6.2, GRAVITY = 18, HALF = 0.25, RADIUS = 0.25;
 
-export async function createWorld(mesh: { vertices: Float32Array; indices: Uint32Array }, spawn: Vec3) {
+/** Something parked in the playground. Cars can be driven; the helicopter and the aeroplane only stand there for now. */
+export interface Vehicle { name: ModelName; pose(): Mat34; wheel(part: Part): Mat34 | null; car: Car | null }
+
+export async function createWorld(mesh: { vertices: Float32Array; indices: Uint32Array }, spawn: Vec3, models: Models, parked: { name: ModelName; pose: Mat34 }[]) {
   const R = (await import("@dimforge/rapier3d-compat")).default;
   await R.init();
   const world = new R.World({ x: 0, y: -9.81, z: 0 });
@@ -22,10 +26,22 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
   const capsule = world.createCollider(R.ColliderDesc.capsule(HALF, RADIUS), body), walker = world.createCharacterController(0.02);
   walker.enableAutostep(0.35, 0.15, false); walker.enableSnapToGround(0.3); walker.setMaxSlopeClimbAngle((50 * Math.PI) / 180); walker.setMinSlopeSlideAngle((60 * Math.PI) / 180);
 
+  const vehicles: Vehicle[] = parked.map(({ name, pose }) => { const car = name === "car" ? createCar(R, world, models.models.car, pose) : null; return { name, car, pose: () => (car ? car.pose() : pose), wheel: (part) => car?.wheel(part) ?? null }; });
+  let driving: Vehicle | null = null, interact = false;
+  const nearest = (): Vehicle | null => { const t = body.translation(); let best: Vehicle | null = null, d = 3.2; for (const v of vehicles) { if (!v.car) continue; const p = v.car.body.translation(), dist = Math.hypot(p.x - t.x, p.y - t.y, p.z - t.z); if (dist < d) { d = dist; best = v; } } return best; };
+
   let pending = 0, vy = 0, grounded = false, facing = 0, clip: ClipName = "idle", clipTime = 0, airborne = 0, still = 1, wantJump = false;
   const person: Person = { at: [spawn[0], spawn[1], spawn[2]], facing: 0, clip, clipTime: 0, loop: true, moving: true };
 
   const tick = (input: Input) => {
+    if (interact) {
+      interact = false;
+      if (driving?.car) { // out, on the driver's side
+        const m = driving.car.pose(); body.setTranslation({ x: m[9] + m[0] * 1.5, y: m[10] + 1.2, z: m[11] + m[2] * 1.5 }, true); capsule.setEnabled(true); driving = null; vy = 0;
+      } else { const v = nearest(); if (v) { driving = v; capsule.setEnabled(false); } }
+    }
+    for (const v of vehicles) if (v.car && (v === driving || v.car.moving())) v.car.drive(v === driving ? { throttle: input.move[1], steer: -input.move[0], brake: input.jump || input.sprint } : { throttle: 0, steer: 0, brake: false }, STEP);
+    if (driving?.car) { world.step(); const m = driving.car.pose(); body.setTranslation({ x: m[9], y: m[10] + 0.6, z: m[11] }, false); person.moving = driving.car.moving(); return; }
     const [mx, my] = input.move, strength = Math.min(1, Math.hypot(mx, my)), sin = Math.sin(input.yaw), cos = Math.cos(input.yaw);
     // the stick is read in the camera's frame: forward is where the camera looks
     const dx = strength ? (sin * my + cos * mx) / Math.hypot(mx, my) : 0, dz = strength ? (-cos * my + sin * mx) / Math.hypot(mx, my) : 0, speed = strength * (input.sprint ? SPRINT : WALK);
@@ -50,14 +66,20 @@ export async function createWorld(mesh: { vertices: Float32Array; indices: Uint3
     /** Advance by `dt` seconds of real time, in fixed steps. Returns whether anything a picture would show has changed. */
     step(dt: number, input: Input): boolean {
       if (input.jump) wantJump = true;
+      if (input.interact) interact = true;
       pending = Math.min(pending + dt, 0.1);
       let stepped = false;
       while (pending >= STEP) { tick(input); pending -= STEP; stepped = true; }
       const t = body.translation();
       person.at = [t.x, t.y - HALF - RADIUS, t.z]; person.facing = facing; person.clip = clip; person.clipTime = clipTime; person.loop = clip === "idle" || clip === "run" || clip === "sprint" || clip === "falling";
-      return stepped && person.moving;
+      return stepped && (person.moving || vehicles.some((v) => v.car?.moving()));
     },
     person,
+    vehicles,
+    /** The vehicle being driven, or null on foot. */
+    driving: () => driving,
+    /** A car close enough to get into, or null. */
+    nearby: () => (driving ? null : nearest()),
     /** How far a camera may pull back from `from` along unit `direction` before something is in the way. */
     clearance(from: Vec3, direction: Vec3, wanted: number): number {
       const hit = world.castRay(new R.Ray({ x: from[0], y: from[1], z: from[2] }, { x: direction[0], y: direction[1], z: direction[2] }), wanted, true, undefined, undefined, capsule);

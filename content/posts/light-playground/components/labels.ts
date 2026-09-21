@@ -10,9 +10,9 @@ const zh = {
   noAdapter: "瀏覽器有 WebGPU，但沒有 GPU 回應（可能被停用，或是在遠端桌面裡）。",
   failed: "GPU 啟動失敗了（驅動程式拒絕了這段著色器，或裝置中途斷線）。細節在瀏覽器的主控台。",
   mode: "怎麼畫", raster: "光柵", direct: "只有直接光", full: "完整光追",
-  hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", movingTriangles: "會動的三角形", treeMs: "每幀重蓋它們的樹", jump: "跳",
+  hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", movingTriangles: "會動的三角形", treeMs: "每幀重蓋它們的樹", jump: "跳", getIn: "上車 (F)", getOut: "下車 (F)", brake: "煞車",
   stick: "移動：拖曳搖桿，或選取它之後用方向鍵、W A S D",
-  hint: "拖曳畫面轉動鏡頭。先點一下畫面，再用 W A S D 或方向鍵走路，Shift 衝刺，空白鍵跳；手機用左下角的搖桿和右下角的「跳」。人一動，累積的樣本就全部作廢，畫面回到雜訊；站著不動，它就慢慢變清楚。",
+  hint: "拖曳畫面轉動鏡頭。先點一下畫面，再用 W A S D 或方向鍵走路，Shift 衝刺，空白鍵跳；走到車旁按 F 上車，上車後同樣的鍵是油門、方向和煞車（空白鍵）；手機用左下角的搖桿和右下角的「跳」。人一動，累積的樣本就全部作廢，畫面回到雜訊；站著不動，它就慢慢變清楚。",
 };
 
 const en: typeof zh = {
@@ -23,9 +23,9 @@ const en: typeof zh = {
   noAdapter: "The browser has WebGPU but no GPU answered (it may be disabled, or this is a remote desktop).",
   failed: "The GPU did not start (the driver rejected the shader, or the device was lost). The details are in the browser console.",
   mode: "Drawn by", raster: "Raster", direct: "Direct light only", full: "Full path tracing",
-  hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", movingTriangles: "Triangles that move", treeMs: "Their tree, rebuilt per frame", jump: "Jump",
+  hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", movingTriangles: "Triangles that move", treeMs: "Their tree, rebuilt per frame", jump: "Jump", getIn: "Get in (F)", getOut: "Get out (F)", brake: "Brake",
   stick: "Move: drag the stick, or focus it and use the arrow keys or W A S D",
-  hint: "Drag the picture to turn the camera. Click it first, then walk with W A S D or the arrow keys, Shift to sprint, Space to jump; on a phone use the stick in the corner and the Jump button. Any movement throws away every sample so far and the picture is noise again; stand still and it clears.",
+  hint: "Drag the picture to turn the camera. Click it first, then walk with W A S D or the arrow keys, Shift to sprint, Space to jump; walk up to a car and press F to get in, and the same keys become throttle, steering and (Space) the brake; on a phone use the stick in the corner and the Jump button. Any movement throws away every sample so far and the picture is noise again; stand still and it clears.",
 };
 
 export type Labels = typeof zh;

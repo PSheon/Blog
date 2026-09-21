@@ -27,6 +27,9 @@ export const VEHICLE_MATERIALS: Record<ModelName, [Material, Material, Material]
   return { car: [paint(0.78, 0.07, 0.06), window, tyre], heli: [paint(0.93, 0.66, 0.08), window, tyre], airplane: [paint(0.86, 0.87, 0.9), window, tyre] };
 })();
 
+/** More paints for the car park, so that five cars are not five red cars. */
+export const CAR_PAINTS: Material[] = [[0.08, 0.32, 0.72], [0.95, 0.72, 0.1], [0.9, 0.9, 0.92], [0.1, 0.5, 0.3]].map(([r, g, b]) => ({ albedo: [r, g, b], emit: [0, 0, 0], metallic: true, roughness: 0.38 }));
+
 export const IDENTITY: Mat34 = [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0];
 /** a · b: first b, then a. */
 export function compose(a: Mat34, b: Mat34): Mat34 {
@@ -47,14 +50,14 @@ export function fromPose(p: { x: number; y: number; z: number }, q: { x: number;
  * gives a part of its own a transform in the part's own frame (a wheel's spin, a rotor's turn), applied before its
  * rest transform. Returns the new cursor.
  */
-export function writeModel(all: Models, name: ModelName, materialBase: number, pose: Mat34, moving: (part: Part, index: number) => Mat34 | null, out: { positions: Float32Array; materials: Uint32Array }, cursor: number): number {
+export function writeModel(all: Models, name: ModelName, /** where paint, window and tyre are in the scene's materials: a start index, or the three */ materialBase: number | [number, number, number], pose: Mat34, moving: (part: Part, index: number) => Mat34 | null, out: { positions: Float32Array; materials: Uint32Array }, cursor: number): number {
   const P = all.positions;
   all.models[name].parts.forEach((part, index) => {
     let m = pose;
     if (part.rest) { const own = moving(part, index); m = compose(pose, own ? compose(part.rest, own) : part.rest); }
     for (let t = part.first; t < part.first + part.count; t++, cursor++) {
       for (let v = 0; v < 3; v++) { const x = P[t * 9 + v * 3], y = P[t * 9 + v * 3 + 1], z = P[t * 9 + v * 3 + 2], o = cursor * 9 + v * 3; out.positions[o] = m[0] * x + m[3] * y + m[6] * z + m[9]; out.positions[o + 1] = m[1] * x + m[4] * y + m[7] * z + m[10]; out.positions[o + 2] = m[2] * x + m[5] * y + m[8] * z + m[11]; }
-      out.materials[cursor] = materialBase + all.kinds[t];
+      out.materials[cursor] = typeof materialBase === "number" ? materialBase + all.kinds[t] : materialBase[all.kinds[t]];
     }
   });
   return cursor;

@@ -1,4 +1,4 @@
-import { VEHICLE_MATERIALS, type ModelName } from "./models";
+import { CAR_PAINTS, VEHICLE_MATERIALS, type ModelName } from "./models";
 import type { Material, Scene, Vec3 } from "./scene";
 
 /**
@@ -18,7 +18,7 @@ const PALETTE: Record<string, Vec3> = {
   helipad: [0.9, 0.55, 0.05], arrow_down: [0.9, 0.8, 0.1], ocean: [0.01, 0.05, 0.08],
 };
 
-export interface Playground extends Scene { spawns: { type: string; at: Vec3; /** the spawn's three axes, column by column */ basis: number[] }[]; /** where each vehicle's three materials (paint, window, tyre) start in `materials` */ vehicleMaterials: Record<ModelName, number>; /** the character's material */ characterMaterial: number }
+export interface Playground extends Scene { spawns: { type: string; at: Vec3; /** the spawn's three axes, column by column */ basis: number[] }[]; /** where each vehicle's three materials (paint, window, tyre) start in `materials` */ vehicleMaterials: Record<ModelName, number>; /** the character's material */ characterMaterial: number; /** where the extra car paints start */ carPaints: number }
 
 export function parsePlayground(file: ArrayBuffer): Playground {
   const view = new DataView(file), jsonBytes = view.getUint32(0, true), header = JSON.parse(new TextDecoder().decode(new Uint8Array(file, 4, jsonBytes))) as { vertices: number; triangles: number; indexBytes: 2 | 4; materials: string[]; spawns: Playground["spawns"] };
@@ -32,7 +32,8 @@ export function parsePlayground(file: ArrayBuffer): Playground {
   const vehicleMaterials = {} as Record<ModelName, number>;
   for (const name of Object.keys(VEHICLE_MATERIALS) as ModelName[]) { vehicleMaterials[name] = materials.length; materials.push(...VEHICLE_MATERIALS[name]); }
   const characterMaterial = materials.push({ albedo: [0.92, 0.78, 0.3], emit: [0, 0, 0] }) - 1;
-  return { vehicleMaterials, characterMaterial, positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
+  const carPaints = materials.length; materials.push(...CAR_PAINTS);
+  return { vehicleMaterials, characterMaterial, carPaints, positions, material, materials, camera: { eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }, spawns: header.spawns };
 }
 
 /** Where the sun is at `hour` (0–24) and how strong: direction towards it, strength 0.05…1, and the sky's level. */
