@@ -1,0 +1,12 @@
+  closed seed 13 step 1000: loss 0.2280
+  closed seed 13 step 2000: loss 0.2013
+  closed seed 13 step 3000: loss 0.1845
+  closed seed 13 step 4000: loss 0.1751
+  closed seed 13 step 5000: loss 0.1664
+  closed seed 13 step 6000: loss 0.1628
+  closed seed 13 step 7000: loss 0.1630
+  closed seed 13 step 8000: loss 0.1538
+  closed seed 13 step 9000: loss 0.1542
+  closed seed 13 step 10000: loss 0.1510
+closed+shake seed 13: as trained 0.0 (grasped 0) | pitch 5° 0.0 (grasped 0) | pitch 10° 0.0 (grasped 0) | pitch 20° 0.0 (grasped 0) | yaw 10° 0.0 (grasped 0) | block moved early 0.0 (grasped 0) | pad moved while carrying 0.0 (grasped 0) | shoved 5 cm 0.0 (grasped 0)
+== closed+shake: 10000 steps, 295 s, size 32

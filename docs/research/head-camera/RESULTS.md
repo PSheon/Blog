@@ -311,6 +311,27 @@ scored. Measured afterwards (closed, seed 11, 100 random blocks, 40 more steps a
 those steps; the largest drift has a median of 2.6 cm and a 90th percentile of 3.5 cm. From one place, [0.30, −0.16],
 the forearm hides the block from the head camera and the hand wobbles 3–4 cm off: the prototype starts elsewhere.
 
+## Run 12 — pick and place, first attempt: nothing learns (2026-09-21)
+
+Paul asked whether the reaching article is interesting enough; my answer was that the mechanism is but the task is
+thin, and that picking a block up and putting it on a pad would make "a small Figure" honest. Script: `pick.test.ts.txt`
+(the first version is `run-12/pick-v1.test.ts.txt`). World: the reaching spike's head camera, a red block and a green
+7 cm pad ≥ 12 cm apart, a hand with height and two jaws; closing within 1.5 cm of the block and low picks it up, opening
+puts it down; success = released within 3 cm of the pad, inside 90 steps. The teacher (rise, travel, descend, close;
+rise, travel, descend, open) succeeds 100 % in every condition, 27 steps on average. Training samples are states drawn
+all over the task, labelled by the teacher. keep-looking reads the picture plus the hand's height and the gripper
+(Helix reads wrist pose and finger positions) but NOT the hand's x–y, which run 2 showed is a shortcut that breaks.
+
+10 000 steps, 3 seeds, 200 episodes:
+
+- open + shaken (one picture, then the teacher with perfect joints): 13.5–17.5 % untouched, grasping in 22–27 % of
+  episodes. A position read from one 32 × 32 picture is not good to 1.5 cm.
+- closed, shaken or not: **0 % in every seed and every condition, not one grasp.** Losses 0.08–0.15.
+
+A step-by-step trace showed why: the hand never heads for the block (the teacher says dx = −1, the net says ≈ 0) and
+hangs in the air. The teacher gated travel on height ("rise first, then move"), so most samples' x–y labels were zero
+and the right one depended on height times direction: too much for this network. Run 13 replaces it with a funnel.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one
