@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine, CarFront } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CarFront, Maximize2, Minimize2 } from "lucide-react";
 import { type KeyboardEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Stick } from "@/components/lab/stick";
@@ -11,14 +11,40 @@ import { Slider } from "@/components/ui/slider";
 import { BOXMAN_URL, MODELS_URL, PLAYGROUND_CREDIT, PLAYGROUND_URL, assembleDynamicBvh, compose, createSkinner, parseBoxman, parseModels, parsePlaygroundMesh, prepareObject, rotationY, sunAt, writeModel, type Mat34, type ModelName, type Models, type Prepared, type Vec3 } from "@/lib/rt";
 import type { Renderer } from "@/lib/rt/gpu";
 import { createWorld, type World } from "./game/world";
-import { useLabels } from "./labels";
+import { cn } from "@/lib/utils";
+import { useLabels, type Labels } from "./labels";
 
 const W = 960, H = 540, EXPOSURE = 0.18, MAX_SAMPLES = 1024, DYNAMIC = 16_384; // room for the moving triangles: five cars, a helicopter, an aeroplane and a person are about 11,300
 const MODES = ["raster", "direct", "full"] as const;
 type Mode = (typeof MODES)[number];
-const KEYS: Record<string, [number, number]> = { w: [0, 1], s: [0, -1], a: [-1, 0], d: [1, 0], arrowup: [0, 1], arrowdown: [0, -1], arrowleft: [-1, 0], arrowright: [1, 0] };
+/** Physical keys (`event.code`): an input method changes what a key TYPES (W is ㄊ in Zhuyin), never which key it is. */
+const KEYS: Record<string, [number, number]> = { KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
 
 interface Assets { models: Models; world: World; skinner: ReturnType<typeof createSkinner>; /** each object's tree, built once from its rest pose */ prepared: Record<ModelName | "person", Prepared>; scratch: { positions: Float32Array; materials: Uint32Array } }
+
+type Seat = "foot" | "near" | "driving" | "flying";
+
+/** The keys, as Sketchbook shows them: a list per thing you can be in, the one you are in lit up. Desktop only: a phone has the stick and the buttons. */
+function Legend({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | null }) {
+  const active = seat === "driving" ? "car" : seat === "flying" ? (craft === "airplane" ? "plane" : "heli") : "foot";
+  return (
+    <div className="grid content-start gap-2.5 text-xs" data-testid="playground-legend">
+      {t.legend.map((group) => (
+        <section key={group.id} className={cn("rounded-md border px-3 py-2.5 transition-colors", group.id === active ? "border-signal bg-signal/5" : "border-border opacity-60")} aria-current={group.id === active}>
+          <div role="heading" aria-level={3} className="label mb-1.5 text-foreground">{group.title}</div>
+          <dl className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1">
+            {group.keys.map(([keys, what]) => (
+              <div key={what} className="contents">
+                <dt className="flex flex-wrap gap-1">{keys.split(" ").map((k) => <kbd key={k} className="rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] leading-none text-foreground shadow-[0_1px_0_var(--border)]">{k}</kbd>)}</dt>
+                <dd className="text-muted-foreground">{what}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      ))}
+    </div>
+  );
+}
 
 /**
  * The playground, walked through while it is path traced. The ground is one BVH, built once; the character and the
@@ -27,7 +53,7 @@ interface Assets { models: Models; world: World; skinner: ReturnType<typeof crea
  */
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<"foot" | "near" | "driving" | "flying">("foot");
+  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false);
   const settings = useRef({ mode, hour }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
   const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), down = useRef(false), hover = useRef(false), interact = useRef(false), seatNow = useRef("foot");
   const timing = useRef({ ms: 0, tree: 0, triangles: 0 });
@@ -103,7 +129,7 @@ export function PlaygroundLab() {
         const changed = a.world.step(dt, { move, yaw: orbit.current.yaw, jump: jump.current || held.current.has("space") || hover.current, sprint: held.current.has("shift") || down.current, interact: interact.current });
         jump.current = false; interact.current = false;
         const inside = a.world.driving(), now = inside ? (inside.craft ? "flying" : "driving") : a.world.nearby() ? "near" : "foot";
-        if (now !== seatNow.current) { seatNow.current = now; setSeat(now); dirty.current = true; }
+        if (now !== seatNow.current) { seatNow.current = now; setSeat(now); setCraft(inside?.name ?? null); dirty.current = true; }
         if (changed || dirty.current || relit.current) { const relight = relit.current; dirty.current = false; relit.current = false; draw(1 - Math.exp(-dt * 14), relight); }
       }
       requestAnimationFrame(tick);
@@ -112,14 +138,23 @@ export function PlaygroundLab() {
     return () => { alive = false; };
   }, [draw]);
 
+  // Expanded, the figure covers the window (the same canvas: nothing is rebuilt). The page behind must not scroll, Escape closes it.
+  useEffect(() => {
+    if (!expanded) return;
+    const before = document.documentElement.style.overflow, close = (e: globalThis.KeyboardEvent) => { if (e.code === "Escape") setExpanded(false); };
+    document.documentElement.style.overflow = "hidden"; window.addEventListener("keydown", close);
+    return () => { document.documentElement.style.overflow = before; window.removeEventListener("keydown", close); };
+  }, [expanded]);
+
   /** Stand the character next to the first vehicle of a kind, on its driver's side. */
   const go = (name: ModelName) => { const a = assets.current, v = a?.world.vehicles.find((x) => x.name === name); if (!a || !v) return; const m = v.pose(); a.world.teleport([m[9] + m[0] * 2.4, m[10] + 0.5, m[11] + m[2] * 2.4]); relit.current = true; };
   const change = (next: Partial<{ mode: Mode; hour: number }>) => { settings.current = { ...settings.current, ...next }; relit.current = true; };
   const key = (event: KeyboardEvent, down: boolean) => {
-    const k = event.key === " " ? "space" : event.key.toLowerCase();
-    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "f") return;
+    const k = event.code === "ShiftLeft" || event.code === "ShiftRight" ? "shift" : event.code === "Space" ? "space" : event.code;
+    if (event.code === "Escape" && expanded) { setExpanded(false); return; }
+    if (!(k in KEYS) && k !== "shift" && k !== "space" && k !== "KeyF") return;
     if (k !== "shift") event.preventDefault(); // the arrows and the space bar would scroll the page
-    if (k === "f") { if (down && !event.repeat) interact.current = true; return; }
+    if (k === "KeyF") { if (down && !event.repeat) interact.current = true; return; }
     if (k === "space" && down && !event.repeat) jump.current = true; // held, it is the car's brake
     if (down) held.current.add(k); else held.current.delete(k);
   };
@@ -132,10 +167,13 @@ export function PlaygroundLab() {
   };
 
   return (
-    <div ref={root} className="grid gap-4 text-sm">
-      <div tabIndex={0} role="application" aria-label={t.picture} className="relative touch-pan-y rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring" onKeyDown={(e) => key(e, true)} onKeyUp={(e) => key(e, false)} onBlur={() => held.current.clear()}
+    <div ref={root} className={cn("grid gap-4 text-sm", expanded && "fixed inset-0 z-50 grid-rows-[minmax(0,1fr)_auto] content-start overflow-y-auto bg-background p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:grid-rows-[auto_auto_auto_1fr]")} role={expanded ? "dialog" : undefined} aria-modal={expanded || undefined} aria-label={expanded ? t.picture : undefined} data-expanded={expanded}>
+      <div tabIndex={0} role="application" aria-label={t.picture} className={cn("relative touch-pan-y rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring", expanded && "mx-auto w-full max-w-[calc((100dvh-12rem)*16/9)] lg:col-start-1 lg:max-w-[calc((100dvh-9rem)*16/9)]")} onKeyDown={(e) => key(e, true)} onKeyUp={(e) => key(e, false)} onBlur={() => held.current.clear()}
         onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY }; e.currentTarget.setPointerCapture(e.pointerId); e.currentTarget.focus({ preventScroll: true }); }} onPointerMove={look} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)} data-testid="playground-stage" data-ready={ready} data-seat={seat}>
         <Stage canvas={canvas} status={tracer.status} label={t.picture} t={t} testid="playground-canvas" wide>
+          <div className="absolute top-2 right-2" onPointerDown={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="secondary" className="opacity-85" onClick={() => setExpanded(!expanded)} aria-pressed={expanded} data-testid="playground-expand">{expanded ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}{expanded ? t.collapse : t.expand}</Button>
+          </div>
           {/* The site's thumb stick (components/lab/stick.tsx), laid over the corner; jumping is the one thing it cannot say. */}
           <div className="absolute bottom-2 left-2 opacity-80" onPointerDown={(e) => e.stopPropagation()}>
             <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} className="size-24 bg-background/70 backdrop-blur-sm" testId="playground-stick" />
@@ -147,13 +185,14 @@ export function PlaygroundLab() {
           </div>
         </Stage>
       </div>
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      {expanded && <div className="hidden lg:col-start-2 lg:row-span-4 lg:row-start-1 lg:block"><Legend t={t} seat={seat} craft={craft} /></div>}
+      <div className={cn("grid grid-cols-2 gap-4 sm:grid-cols-4", expanded && "lg:col-start-1")}>
         <Readout label={t.spp} value={<span data-testid="playground-spp">{seen ? seen.spp.toLocaleString() : "–"}</span>} />
         <Readout label={t.msPerSample} value={seen?.ms ? seen.ms.toFixed(1) : "–"} unit={t.ms} tone="plain" />
         <Readout label={t.movingTriangles} value={seen?.moving ? seen.moving.toLocaleString() : "–"} tone="plain" />
         <Readout label={t.treeMs} value={seen?.tree ? seen.tree.toFixed(1) : "–"} unit={t.ms} tone="plain" />
       </div>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4">
+      <div className={cn("flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4", expanded && "lg:col-start-1")}>
         <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t.mode}>
           <span className="label">{t.mode}</span>
           {MODES.map((m) => <Button key={m} size="sm" variant={mode === m ? "default" : "outline"} aria-pressed={mode === m} disabled={!tracer.live} onClick={() => { setMode(m); change({ mode: m }); }} data-testid={`playground-mode-${m}`}>{t[m]}</Button>)}
@@ -167,8 +206,8 @@ export function PlaygroundLab() {
           <Slider value={[hour]} min={6.5} max={17.5} step={0.25} aria-label={t.hour} disabled={!tracer.live} onValueChange={(v) => { const h = Array.isArray(v) ? v[0] : v; setHour(h); change({ hour: h }); }} />
         </label>
       </div>
-      <p className="text-muted-foreground">{t.hint}</p>
-      <p className="label normal-case">{PLAYGROUND_CREDIT}; Rapier (Dimforge), Apache-2.0</p>
+      {!expanded && <p className="text-muted-foreground">{t.hint}</p>}
+      <p className={cn("label normal-case", expanded && "lg:col-start-1")}>{PLAYGROUND_CREDIT}; Rapier (Dimforge), Apache-2.0</p>
     </div>
   );
 }

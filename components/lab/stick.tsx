@@ -3,7 +3,8 @@
 import { type KeyboardEvent, type PointerEvent, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], w: [0, 1], s: [0, -1], a: [-1, 0], d: [1, 0] };
+/** By physical key (`event.code`), not by the character it types: with a Zhuyin or Cangjie input method on, the W key types ㄊ, and a control that waits for "w" is dead. */
+const KEYS: Record<string, [number, number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0], KeyW: [0, 1], KeyS: [0, -1], KeyA: [-1, 0], KeyD: [1, 0] };
 
 interface Props {
   label: string;
@@ -33,7 +34,7 @@ export function Stick({ label, hintId, onChange, testId, className }: Props) {
     move(x, y);
   };
   const keys = (e: KeyboardEvent<HTMLDivElement>) => {
-    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    const key = e.code;
     if (!(key in KEYS)) return;
     e.preventDefault();
     if (e.type === "keydown") held.current.add(key); else held.current.delete(key);
