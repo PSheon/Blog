@@ -1,6 +1,6 @@
 ---
 title: "Putting a path tracer in a 3D playground: crash a car, gun a plane, fly a helicopter"
-description: Part one's room stood still. This part takes the same path tracer outdoors and puts in a character you steer, five cars, a helicopter and an aeroplane, with the light computed anew every frame. When anything moves, every accumulated sample is void; three things keep it playable all the same.
+description: Part one's room stood still. This part takes the same path tracer outdoors and puts in a character you steer, five cars, a helicopter and an aeroplane, with the light computed anew every frame. When anything moves, every accumulated sample is void; four things keep it playable all the same.
 date: 2026-09-21
 tags: [graphics, from-scratch]
 no: 12
@@ -18,7 +18,7 @@ Play first. Click the picture, walk with W A S D, drag to turn the camera; walk 
 
 [Part one](/en/posts/light-from-noise) ended on a sentence: when the camera or the scene moves, every accumulated sample is void. That room needed hundreds of samples to be clean. Things here move sixty times a second or more, and a frame has time for one sample.
 
-This part is about three things that together make the figure above playable. The result first (my machine, 960×540, full path tracing): 6.8 ms a sample, keeping up with a 120 Hz display while moving (121 frames a second measured), and less than half the noise in motion of "start from nothing every frame".
+This part is about four things that together make the figure above playable. The result first (my machine, 960×540, full path tracing): 6.8 ms a sample, keeping up with a 120 Hz display while moving (121 frames a second measured), and in motion a fifth of the noise of "start from nothing every frame".
 
 ## One: the world is built once, and what moves only gets new boxes
 
@@ -42,7 +42,26 @@ Things that move need one more step: a point on a car, where was it a frame ago?
 
 There is a price, and it shows: the colour carried over is old. After the character runs past, its shadow stays on the ground for a moment. How many samples a carried pixel may count for is a trade; here it is 12. More is steadier, and the shadow trails longer.
 
-## Three: the ground was the expensive part, not the cars
+## Three: borrow from the pixels next door
+
+History carried over is worth twelve samples at most, and the shadows are still grainy. There is one more place to borrow from: **neighbouring pixels on the same wall receive almost the same light.**
+
+So before the picture is shown, every pixel is averaged with the pixels around it, by weight. Everything is in who may be counted. Averaging blindly is blurring; here a neighbour has to pass four tests at once to count as "the same surface, lit the same way":
+
+1. **The same material.** A red barrier and the white ground never mix.
+2. **A normal that agrees.** The line where a wall meets the floor does not blur.
+3. **In the same plane.** Measured along this pixel's normal, the neighbour's position may not be far off; that separates a car in front from the ground behind it.
+4. **A brightness that is not too different.** This one keeps the edge of a shadow: inside and outside differ severalfold and do not seep into each other.
+
+The first three use what the second thing already records (the point each pixel sees), plus the normal and the material.
+
+To be of use the borrowing has to reach far, and looking at 29 × 29 neighbours at once costs too much. So the same 5 × 5 filter runs three times, the second time taking every other pixel and the third every fourth: together they reach fourteen pixels away, and each pass still reads 25 points.
+
+The setting "Borrow from neighbours (denoise)" can be turned off to compare. The same walk, measured: both tricks off, 6.8 to 7.4; carrying the last frame only, 3.1; with this as well, 1.3.
+
+It has a price too. The edge of the character's shadow softens, a very thin shadow fades, and highlights in car paint are smoothed a little. And one rule keeps it from doing harm: **the more samples a pixel has of its own, the less it listens to its neighbours**, less from 8 samples on and not at all from 64. So a picture left standing converges to the unfiltered answer, not to a blurred one.
+
+## Four: the ground was the expensive part, not the cars
 
 With the cars in, a sample took over 9 ms, much slower than I expected. I guessed the cars, spent a round improving the moving tree, and gained almost nothing.
 
@@ -71,7 +90,7 @@ The character's skeleton (14 bones, 186 triangles) is evaluated on the CPU every
 
 ## What is different from the real thing, and how the numbers were measured
 
-**No denoising.** There is only carrying the last frame over. Real-time path tracing also filters across the picture, or hands it to a neural network; with one sample a frame and no filter, the grain in the shadows shows.
+**The denoising is the most basic kind.** A real system measures how noisy each pixel is (its variance) and borrows more where the noise is large and less where it is small; here the thresholds are fixed. Games today mostly hand this step to a neural network.
 
 **A carried picture is wrong when the light changes.** Moving the time of day simply throws the history away. A real system detects where the light changed and drops only that.
 
@@ -87,5 +106,6 @@ Where the numbers come from: the readouts in the figure are measured by your bro
 
 - The scene, the character, the vehicles, the animations and the original design of the character's states: Jan Blaha (swift502), *Sketchbook*, MIT licence, github.com/swift502/Sketchbook.
 - The physics engine: Dimforge, *Rapier*, Apache-2.0, rapier.rs.
-- Reusing the last frame by projecting a surface point back and validating it: Schied et al., *Spatiotemporal Variance-Guided Filtering*, High Performance Graphics 2017 (only the "temporal" half of it is done here).
+- Reusing the last frame by projecting a surface point back and validating it: Schied et al., *Spatiotemporal Variance-Guided Filtering*, High Performance Graphics 2017 (its temporal accumulation is done here; the spatial filter is the simpler one of the next entry).
+- A filter that samples with holes and stops at edges by normal and position: Dammertz, Sewtz, Hanika, Lensch, *Edge-Avoiding À-Trous Wavelet Transform for fast Global Illumination Filtering*, High Performance Graphics 2010.
 - Recomputing boxes instead of rebuilding the tree for things that deform: Wald, Boulos, Shirley, *Ray Tracing Deformable Scenes Using Dynamic Bounding Volume Hierarchies*, ACM Transactions on Graphics, 2007.

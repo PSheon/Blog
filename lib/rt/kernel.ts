@@ -37,9 +37,9 @@
  */
 export const WORKGROUP = 8;
 
-/** The one uniform block every shader here reads (256 bytes; gpu.ts writes it). */
-export const PARAMS_BYTES = 256;
-const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, movingBase: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f };`;
+/** The one uniform block every shader here reads (272 bytes; gpu.ts writes it). */
+export const PARAMS_BYTES = 272;
+const PARAMS = /* wgsl */ `struct Params { size: vec2u, sample: u32, bounces: u32, eye: vec4f, forward: vec4f, right: vec4f, up: vec4f, view: u32, quad: u32, brute: u32, heatMax: u32, sun: vec4f, exposure: f32, skyLevel: f32, strategy: u32, furnace: u32, lightO: vec4f, lightU: vec4f, lightV: vec4f, dynamicRoot: u32, temporal: u32, historyCap: f32, movingBase: u32, prevEye: vec4f, prevForward: vec4f, prevRight: vec4f, prevUp: vec4f, filterOn: u32, filterStep: u32, f2: u32, f3: u32 };`;
 
 export const KERNEL = /* wgsl */ `
 struct Node { mn: vec3f, a: u32, mx: vec3f, b: u32 };
@@ -55,6 +55,7 @@ ${PARAMS}
 @group(0) @binding(5) var<uniform> params: Params;
 @group(0) @binding(6) var<storage, read> normals: array<vec4f>;          // three per smooth triangle; Tri.p1 is 1 + its index, 0 = flat
 @group(0) @binding(7) var<storage, read_write> gbuf: array<vec4f>;       // temporal: what each pixel's first ray of a frame hit (world position, and the triangle, or −1 for the sky)
+@group(0) @binding(8) var<storage, read_write> gnorm: array<vec4f>;      // … and how that surface faces, and what it is made of (−1 for the sky): what a filter must not blur across
 
 var<workgroup> tally: array<atomic<u32>, 3>;
 var<private> state: u32;
@@ -192,7 +193,8 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
     for (var bounce = 0u; ; bounce++) {
       rays++;
       let h = nearest(o, d, 1e-5 * scale); steps += h.steps; overflow += h.overflow;
-      if (bounce == 0u && params.temporal == 1u && params.sample == 0u) { gbuf[pixel] = select(vec4f(o + d * h.t, f32(h.tri)), vec4f(o + d * 1e5, -1.0), h.tri == MISS); }
+      let first = bounce == 0u && params.temporal == 1u && params.sample == 0u;
+      if (first) { gbuf[pixel] = select(vec4f(o + d * h.t, f32(h.tri)), vec4f(o + d * 1e5, -1.0), h.tri == MISS); if (h.tri == MISS) { gnorm[pixel] = vec4f(0.0, 0.0, 0.0, -1.0); } }
       if (params.view == 1u) { rgb = vec3f(f32(h.steps)); break; } // the heat map: the camera ray's node visits, nothing else
       if (h.tri == MISS) {
         if (params.furnace == 1u) { rgb += through; }
@@ -218,6 +220,7 @@ fn main(@builtin(global_invocation_id) gid: vec3u, @builtin(local_invocation_ind
       }
       if (bounce >= limit) { break; }
       if (!front) { n = -n; }
+      if (first) { gnorm[pixel] = vec4f(n, f32(t.m)); }
       var ns = n; // the normal to shade with: interpolated where the mesh has one, never on the far side of the real surface
       if (t.p1 > 0u) { let k = (t.p1 - 1u) * 3u; let bent = normalize(normals[k].xyz * (1.0 - h.u - h.v) + normals[k + 1u].xyz * h.u + normals[k + 2u].xyz * h.v); ns = select(-bent, bent, front); if (dot(ns, d) > -1e-3) { ns = n; } }
       let at = o + d * h.t;
@@ -334,6 +337,7 @@ ${PARAMS}
 @group(0) @binding(0) var<storage, read> accum: array<vec4f>;
 @group(0) @binding(1) var<uniform> params: Params;
 @group(0) @binding(2) var<storage, read> carried: array<vec4f>; // temporal: last frame's result where this pixel's surface was then, and how many samples it is worth
+@group(0) @binding(3) var<storage, read> filtered: array<vec4f>; // the picture after FILTER, when filterOn
 struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) i: u32) -> Out {
   var corners = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
@@ -346,6 +350,7 @@ struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
   let a = accum[pixel]; let b = accum[half + pixel]; let n = max(a.w + b.w, 1.0);
   var c = (a.rgb + b.rgb) / n;
   if (params.temporal == 1u && params.view == 0u) { let old = carried[pixel]; c = (old.rgb * old.w + a.rgb + b.rgb) / max(old.w + a.w + b.w, 1.0); }
+  if (params.filterOn == 1u && params.view == 0u) { c = filtered[pixel].rgb; }
   if (params.view == 1u) {
     // Node visits as heat: black → violet → pink → yellow → white, linear in the count up to heatMax.
     let t = clamp(c.x / f32(params.heatMax), 0.0, 1.0);
@@ -422,5 +427,68 @@ fn main(@builtin(global_invocation_id) gid: vec3u) {
     }
   }
   carried[pixel] = result;
+}
+`;
+
+/**
+ * Borrowing from the neighbours: an edge-stopping à-trous filter (Dammertz et al. 2010, the spatial half of SVGF).
+ *
+ *   MERGE   the picture as PRESENT would show it (carried + this frame's samples), with its sample count in w
+ *   FILTER  run three times with holes of 1, 2 and 4 pixels between its 5 × 5 taps, so together they reach 14 pixels
+ *           away, each for the price of 25 reads. A neighbour counts by the B3-spline weight of its tap, times how much it
+ *           is THE SAME SURFACE LIT THE SAME WAY: the same material, a normal that agrees, a position in the plane of
+ *           this pixel's surface, and a brightness that is not on the other side of a shadow's edge.
+ *
+ * The more samples a pixel already has, the less it takes from its neighbours: a picture left alone converges to the
+ * unfiltered answer, not to a blurred one.
+ */
+export const MERGE = /* wgsl */ `
+${PARAMS}
+@group(0) @binding(0) var<storage, read> accum: array<vec4f>;
+@group(0) @binding(1) var<storage, read> carried: array<vec4f>;
+@group(0) @binding(2) var<storage, read_write> image: array<vec4f>;
+@group(0) @binding(3) var<uniform> params: Params;
+@compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.size.x || gid.y >= params.size.y) { return; }
+  let half = params.size.x * params.size.y; let pixel = gid.y * params.size.x + gid.x;
+  let a = accum[pixel]; let b = accum[half + pixel]; let old = carried[pixel]; let weight = old.w + a.w + b.w;
+  image[pixel] = vec4f((old.rgb * old.w + a.rgb + b.rgb) / max(weight, 1.0), weight);
+}
+`;
+
+export const FILTER = /* wgsl */ `
+${PARAMS}
+@group(0) @binding(0) var<storage, read> source: array<vec4f>;
+@group(0) @binding(1) var<storage, read_write> image: array<vec4f>;
+@group(0) @binding(2) var<storage, read> gbuf: array<vec4f>;
+@group(0) @binding(3) var<storage, read> gnorm: array<vec4f>;
+@group(0) @binding(4) var<uniform> params: Params;
+fn luma(c: vec3f) -> f32 { return dot(c, vec3f(0.2126, 0.7152, 0.0722)); }
+@compute @workgroup_size(${WORKGROUP}, ${WORKGROUP})
+fn main(@builtin(global_invocation_id) gid: vec3u) {
+  if (gid.x >= params.size.x || gid.y >= params.size.y) { return; }
+  let pixel = gid.y * params.size.x + gid.x; let here = source[pixel]; let p = gbuf[pixel]; let n = gnorm[pixel];
+  // a pixel that has its samples needs no help: from 8 samples on it listens less, from 64 on not at all
+  let trust = clamp((here.w - 8.0) / 56.0, 0.0, 1.0);
+  if (trust >= 1.0) { image[pixel] = here; return; }
+  let reach = 0.02 * distance(p.xyz, params.eye.xyz) + 0.01; let logHere = log(luma(here.rgb) + 0.02);
+  var kernel = array<f32, 5>(0.0625, 0.25, 0.375, 0.25, 0.0625);
+  var sum = vec3f(0.0); var total = 0.0;
+  for (var dy = -2; dy <= 2; dy++) { for (var dx = -2; dx <= 2; dx++) {
+    let x = i32(gid.x) + dx * i32(params.filterStep); let y = i32(gid.y) + dy * i32(params.filterStep);
+    if (x < 0 || y < 0 || x >= i32(params.size.x) || y >= i32(params.size.y)) { continue; }
+    let q = u32(y) * params.size.x + u32(x); let there = source[q]; let pq = gbuf[q]; let nq = gnorm[q];
+    var w = kernel[dx + 2] * kernel[dy + 2];
+    if (nq.w != n.w) { continue; } // another material (or the sky): another colour, never mixed
+    if (n.w >= 0.0) {
+      w *= pow(max(dot(n.xyz, nq.xyz), 0.0), 32.0); // facing the same way
+      w *= exp(-abs(dot(n.xyz, pq.xyz - p.xyz)) / reach); // in the plane of this pixel's surface
+    }
+    w *= exp(-abs(log(luma(there.rgb) + 0.02) - logHere) / 0.9); // not across the edge of a shadow
+    sum += there.rgb * w; total += w;
+  } }
+  let smoothed = select(here.rgb, sum / total, total > 1e-6);
+  image[pixel] = vec4f(mix(smoothed, here.rgb, trust), here.w);
 }
 `;

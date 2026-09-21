@@ -185,3 +185,12 @@ First attempt validated history by distance alone (3 cm + 1% of depth) and did n
 rays through one pixel land decimetres apart on a floor seen at a shallow angle. Same triangle + a loose distance is
 the test that holds. Known artefacts: the character itself gets no history (its triangles move, so every frame is its
 first) and its shadow trails for a fraction of a second.
+
+## 2026-09-21 — borrowing from neighbours (edge-stopping à-trous, three passes, steps 1 / 2 / 4)
+
+Same walk (D held), same noise number as above (mean absolute difference between neighbouring pixels, 12 frames read
+back while moving, foreground tab of the MCP browser): denoise off 3.11, on 1.33 (history cap 12 both). Against 6.8–7.4
+with neither. Frame rate the same either way (85 and 88 while the measuring loop itself reads the canvas back; 121
+without it). Edge stops: same material, normal (cosine^32), distance from the pixel's plane (2% of the distance to the
+eye + 1 cm), log-luminance (0.9). A pixel listens to its neighbours fully up to 8 samples of its own and not at all
+from 64. Known: the character's thin shadow softens and fades a little; highlights in car paint are smoothed.

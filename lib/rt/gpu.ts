@@ -1,7 +1,7 @@
 /// <reference types="@webgpu/types" />
 import type { Bvh } from "./bvh";
 import { cross, sub, unit } from "./cpu";
-import { COMMIT, KERNEL, MEASURE, PARAMS_BYTES, PRESENT, REPROJECT, WORKGROUP } from "./kernel";
+import { COMMIT, FILTER, KERNEL, MEASURE, MERGE, PARAMS_BYTES, PRESENT, REPROJECT, WORKGROUP } from "./kernel";
 import type { Material, Scene } from "./scene";
 
 const MATERIAL_FLOATS = 12;
@@ -42,10 +42,12 @@ export class Renderer {
     private readonly tracePipe: GPUComputePipeline, private readonly traceBind: GPUBindGroup, private readonly measurePipe: GPUComputePipeline, private readonly measureBind: GPUBindGroup,
     private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[], private readonly mats: GPUBuffer,
     private readonly nodes: GPUBuffer, private readonly tris: GPUBuffer, /** where a dynamic tree starts: pass these to buildDynamicBvh */ readonly nodeBase: number, readonly triangleBase: number, readonly dynamicCapacity: number,
-    private readonly temporal: { commitPipe: GPUComputePipeline; commitBind: GPUBindGroup; reprojectPipe: GPUComputePipeline; reprojectBind: GPUBindGroup; gbuf: GPUBuffer; gprev: GPUBuffer; carried: GPUBuffer; movedFrom: GPUBuffer; bytes: number } | null,
+    private readonly temporal: { commitPipe: GPUComputePipeline; commitBind: GPUBindGroup; reprojectPipe: GPUComputePipeline; reprojectBind: GPUBindGroup; gbuf: GPUBuffer; gprev: GPUBuffer; carried: GPUBuffer; movedFrom: GPUBuffer; bytes: number; mergePipe: GPUComputePipeline; mergeBind: GPUBindGroup; filterPipe: GPUComputePipeline; filterBinds: GPUBindGroup[] } | null,
   ) {}
   /** How many samples' worth a carried-over pixel may count for: higher is smoother and slower to notice that the light changed. */
   historyCap = 12;
+  /** Borrow from neighbouring pixels of the same surface before showing the picture (needs `temporal`). */
+  denoise = false;
   private pendingReproject = false;
   private dynamicRoot = 0;
 
@@ -83,16 +85,19 @@ export class Renderer {
       if (problems.length) throw new Error(`${name}: ${problems.map((m) => `line ${m.lineNum}: ${m.message}`).join("; ")}`);
       return shader;
     };
-    const picture = temporal ? width * height * 16 : 16, movedFrom = make(Math.max(48, temporal ? dynamicTriangles * 48 : 0), STORAGE), gbuf = make(picture, STORAGE), gprev = make(picture, STORAGE), history = make(picture, STORAGE), carried = make(picture, STORAGE);
+    const picture = temporal ? width * height * 16 : 16, movedFrom = make(Math.max(48, temporal ? dynamicTriangles * 48 : 0), STORAGE), gbuf = make(picture, STORAGE), gnorm = make(picture, STORAGE), imageA = make(picture, STORAGE), imageB = make(picture, STORAGE), gprev = make(picture, STORAGE), history = make(picture, STORAGE), carried = make(picture, STORAGE);
     const entries = (buffers: GPUBuffer[]) => buffers.map((buffer, binding) => ({ binding, resource: { buffer } }));
-    const [trace, measure, shader, commit, reproject] = await Promise.all([compile(KERNEL, "path tracing kernel"), compile(MEASURE, "error measurement"), compile(PRESENT, "present"), compile(COMMIT, "commit history"), compile(REPROJECT, "reproject history")]);
-    const [tracePipe, measurePipe, commitPipe, reprojectPipe] = await Promise.all([trace, measure, commit, reproject].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
+    const [trace, measure, shader, commit, reproject, merge, filter] = await Promise.all([compile(KERNEL, "path tracing kernel"), compile(MEASURE, "error measurement"), compile(PRESENT, "present"), compile(COMMIT, "commit history"), compile(REPROJECT, "reproject history"), compile(MERGE, "merge for the filter"), compile(FILTER, "spatial filter")]);
+    const [tracePipe, measurePipe, commitPipe, reprojectPipe, mergePipe, filterPipe] = await Promise.all([trace, measure, commit, reproject, merge, filter].map((module) => device.createComputePipelineAsync({ layout: "auto", compute: { module, entryPoint: "main" } })));
     const presentPipe = await device.createRenderPipelineAsync({ layout: "auto", vertex: { module: shader, entryPoint: "vs" }, fragment: { module: shader, entryPoint: "fs", targets: [{ format }] }, primitive: { topology: "triangle-list" } });
     return new Renderer(device, adapter.info?.description || adapter.info?.architecture || adapter.info?.vendor || "GPU", context, width, height, params, paramData, accum, counters, tiles, tileCount,
-      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth, gbuf]) }),
+      tracePipe, device.createBindGroup({ layout: tracePipe.getBindGroupLayout(0), entries: entries([nodes, tris, mats, accum, counters, params, smooth, gbuf, gnorm]) }),
       measurePipe, device.createBindGroup({ layout: measurePipe.getBindGroupLayout(0), entries: entries([accum, tiles, params]) }),
-      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params, carried]) }), owned, mats, nodes, tris, bvh.nodeCount, bvh.triangleCount, dynamicTriangles,
-      temporal ? { commitPipe, commitBind: device.createBindGroup({ layout: commitPipe.getBindGroupLayout(0), entries: entries([accum, carried, history, params]) }), reprojectPipe, reprojectBind: device.createBindGroup({ layout: reprojectPipe.getBindGroupLayout(0), entries: entries([gbuf, gprev, history, carried, params, tris, movedFrom]) }), gbuf, gprev, carried, movedFrom, bytes: picture } : null);
+      presentPipe, device.createBindGroup({ layout: presentPipe.getBindGroupLayout(0), entries: entries([accum, params, carried, imageB]) }), owned, mats, nodes, tris, bvh.nodeCount, bvh.triangleCount, dynamicTriangles,
+      temporal ? { commitPipe, commitBind: device.createBindGroup({ layout: commitPipe.getBindGroupLayout(0), entries: entries([accum, carried, history, params]) }), reprojectPipe, reprojectBind: device.createBindGroup({ layout: reprojectPipe.getBindGroupLayout(0), entries: entries([gbuf, gprev, history, carried, params, tris, movedFrom]) }), gbuf, gprev, carried, movedFrom, bytes: picture,
+        mergePipe, mergeBind: device.createBindGroup({ layout: mergePipe.getBindGroupLayout(0), entries: entries([accum, carried, imageA, params]) }), filterPipe,
+        // three passes: A → B, B → A, A → B, so the result is where PRESENT looks for it
+        filterBinds: [[imageA, imageB], [imageB, imageA], [imageA, imageB]].map(([from, to]) => device.createBindGroup({ layout: filterPipe.getBindGroupLayout(0), entries: entries([from, to, gbuf, gnorm, params]) })) } : null);
   }
 
   private static writeCamera(paramData: ArrayBuffer, camera: Scene["camera"], aspect: number): void {
@@ -171,6 +176,17 @@ export class Renderer {
   }
 
   present(): void {
+    const t = this.temporal, filtering = !!t && this.denoise && !this.heat && !this.raster;
+    if (t && filtering) { // merge, then the three passes, each with its own spacing: a uniform is read when its pass runs, so each is its own submit
+      const workgroups: [number, number] = [Math.ceil(this.width / WORKGROUP), Math.ceil(this.height / WORKGROUP)];
+      [0, 1, 2, 4].forEach((step, k) => {
+        new Uint32Array(this.paramData, 256, 2).set([1, step]); this.writeParams();
+        const e = this.device.createCommandEncoder(), pass = e.beginComputePass();
+        if (k === 0) { pass.setPipeline(t.mergePipe); pass.setBindGroup(0, t.mergeBind); } else { pass.setPipeline(t.filterPipe); pass.setBindGroup(0, t.filterBinds[k - 1]); }
+        pass.dispatchWorkgroups(...workgroups); pass.end(); this.device.queue.submit([e.finish()]);
+      });
+    }
+    new Uint32Array(this.paramData, 256, 2).set([filtering ? 1 : 0, 0]);
     this.writeParams();
     const e = this.device.createCommandEncoder(), pass = e.beginRenderPass({ colorAttachments: [{ view: this.context.getCurrentTexture().createView(), loadOp: "clear", storeOp: "store", clearValue: { r: 0, g: 0, b: 0, a: 1 } }] });
     pass.setPipeline(this.presentPipe); pass.setBindGroup(0, this.presentBind); pass.draw(3); pass.end();
