@@ -238,8 +238,8 @@ function City() {
   );
 }
 
-/** № 011: a bar that says it is nearly done, above the few long tasks that say otherwise. */
-function Progress() {
+/** № 011: workers' lanes of tasks, a few of them long, and above them a bar that says it is nearly done. */
+function Scheduler() {
   const tasks: [number, number, number, string][] = [[14, 52, 18, S3], [34, 52, 8, DIM], [44, 52, 10, DIM], [56, 52, 90, S], [14, 64, 10, DIM], [26, 64, 6, DIM], [34, 64, 12, DIM], [48, 64, 70, S3], [14, 76, 8, DIM], [24, 76, 14, DIM], [40, 76, 9, DIM], [51, 76, 8, DIM]];
   return (
     <>
@@ -261,7 +261,7 @@ const covers: Record<string, () => ReactNode> = {
   "diffusion-points": Diffusion,
   "slam-2d": Slam,
   "city-of-agents": City,
-  "progress-bar": Progress,
+  "task-scheduler": Scheduler,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {
