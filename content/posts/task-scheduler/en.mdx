@@ -23,7 +23,7 @@ There is nothing to fault in the scheduling: no worker idles while there is some
 
 This article does two things. It writes that scheduler from scratch, which takes four rules, including what happens when a task fails. Then it answers the question every scheduler gets asked: **how long is left?** The second is much harder than the first, and the best answer turns out to be calling the scheduler again.
 
-What this is not: a scheduler in the sense of Kubernetes or Airflow. No machine fails, there are no priorities, nobody competes for resources. How a single request queues, retries and gets routed, [Sam Rose has covered in three fine interactive essays](https://samwho.dev/load-balancing/); this one is about tasks that wait for each other. The whole simulation is 152 lines of TypeScript with no library, and every chart below is worked out by your browser as you read.
+The scheduler and the four progress bars that follow are 152 lines of TypeScript with no library, and every chart below is worked out by your browser as you read. It is a size you can read to the end: tasks fail and are scheduled again, but there are no priorities and nobody competes with you for machines. What else is missing is listed, item by item, at the end.
 
 ## A scheduler is four rules
 
@@ -75,6 +75,8 @@ Failures have one more consequence, which the next section runs into: **nobody k
 
 ## How long is left: three different quantities
 
+The three charts from here on switch failures off, to look at one thing at a time.
+
 A progress bar can answer three questions:
 
 - **How many tasks are done?** The easiest: count.
@@ -107,13 +109,13 @@ First, the job gets faster and then stops getting faster. On average: 122 minute
 
 Second, the counting bar gets less honest: 10 points off with 4 workers, 17 with 16, a third of the run spent above 90%. More hands make the head of the job go faster; the tail is as long as ever.
 
-The charts in this section and the next switch failures off, to look at one thing at a time.
+The third line stays on the diagonal (under 1 point off). It is the thing promised above: **calling the scheduler again**. It does not ask how much is done; it takes the tasks that are not finished, with their estimated durations, schedules them on these same workers, and looks at how long that comes to. The scheduler is used twice: once to run the job, once to forecast itself. To answer a question about time, the graph and the number of workers have to be in the calculation, and those are exactly what a scheduler already has.
 
-The third line stays on the diagonal (under 1 point off). It is the thing promised above: **calling the scheduler again**. It does not ask how much is done; it takes the tasks that are not finished, with their estimated durations, schedules them on these same workers, and looks at how long that comes to. The scheduler is used twice: once to run the job, once to forecast itself. (Its forecast assumes every remaining task goes through first time; switch on the 20% failures of the last section and its average error goes from 0.7 points to 2.7. The counting and weighting bars hardly notice: they were wrong already.) To answer a question about time, the graph and the number of workers have to be in the calculation, and those are exactly what a scheduler already has.
+It has one blind spot, the failures from before: when it forecasts, it assumes every remaining task goes through first time. Switch on the 20% failures of the "When a task fails" figure and its average error goes from 0.7 points to 2.7. The counting and weighting bars hardly notice, because they were wrong already.
 
 ## When the plan is wrong
 
-The third line assumes the estimates are right. Real estimates are wrong, and wrong in a regular way: uploads, say, always take twice what you thought.
+The bar that forecasts from the plan has one more assumption: that the estimates are right. Real estimates are wrong, and wrong in a regular way: uploads, say, always take twice what you thought.
 
 <Instrument fig="05" title="scheduler / learn" caption="The slider is how wrong the estimates are: every task of one kind is wrong in the same direction by the same factor. Some jobs come out over-estimated and some under, which would cancel in an average, so this chart plots how many points the bar is off by, either way: lower is more honest. Turn the switch on and the bar looks at how long finished tasks really took and corrects the estimates of the tasks of that kind still to come.">
   <LearnLab />
@@ -131,7 +133,9 @@ It has a price too: **it goes backwards.** When a task outruns its estimate, the
 
 **The task sizes are a distribution I chose** (log-normal) at a spread I chose. I have not checked it against a public workload; your build or your CI may be more unequal, or less. That is what the slider in figure 03 is for.
 
-**The scheduling rule is the plainest there is**: whichever task is ready goes first, a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails, and no job needs four workers to start together. Clusters that train large models are the opposite: OpenAI wrote in 2021 that their jobs have to be scheduled as a whole gang or not at all. What to do downstream when a task is cancelled, and who should go first, are other articles too.
+**The scheduling rule is the plainest there is**: whichever task is ready goes first, and a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails, and no job needs four workers to start together. Those are exactly what real schedulers of the Kubernetes or Airflow kind have to deal with. Clusters that train large models more than most: OpenAI wrote in 2021 that their jobs have to be scheduled as a whole gang or not at all. What to do downstream when a task is cancelled, and who should go first, are other articles too.
+
+**The unit is a whole job of tasks that wait for each other, not a single request.** How one request queues, gets routed, and how long to wait before retrying it, Sam Rose has covered in three fine interactive essays (see the sources); this article does not repeat them.
 
 **Real systems often do not even know how many tasks there are**: the work grows as it goes. All four bars here assume the list is complete from the start.
 
