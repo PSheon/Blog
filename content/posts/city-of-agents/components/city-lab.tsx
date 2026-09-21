@@ -48,7 +48,7 @@ export function CityLab({ seed = 1, n = 8, agents = 300, modes = false }: { seed
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.mode}>
             <span className="label mr-1">{t.mode}</span>
-            {MODES.map((m) => <Button key={m} size="sm" variant={m === (panel?.mode ?? "utility") ? "secondary" : "ghost"} aria-pressed={m === (panel?.mode ?? "utility")} onClick={() => act(() => s?.setMode(m))} data-testid={`city-mode-${m}`}>{t.modes[m]}</Button>)}
+            {MODES.map((m) => <Button key={m} size="sm" variant={m === (panel?.mode ?? "utility") ? "default" : "ghost"} aria-pressed={m === (panel?.mode ?? "utility")} onClick={() => act(() => s?.setMode(m))} data-testid={`city-mode-${m}`}>{t.modes[m]}</Button>)}
           </div>
           <label className="label flex min-h-6 items-center gap-2">
             <input type="checkbox" className="size-4 accent-[var(--signal)]" checked={panel?.duty ?? true} onChange={(e) => act(() => s?.setDuty(e.target.checked))} />
@@ -62,7 +62,7 @@ export function CityLab({ seed = 1, n = 8, agents = 300, modes = false }: { seed
             {running ? <Pause aria-hidden /> : <Play aria-hidden />}
             {running ? t.pause : t.play}
           </Button>
-          {RATES.map((r) => <Button key={r} size="sm" variant={r === rate ? "secondary" : "ghost"} aria-pressed={r === rate} onClick={() => act(() => { if (s) s.rate = r; })}>{r}×</Button>)}
+          {RATES.map((r) => <Button key={r} size="sm" variant={r === rate ? "default" : "ghost"} aria-pressed={r === rate} onClick={() => act(() => { if (s) s.rate = r; })}>{r}×</Button>)}
           <Button size="sm" variant="ghost" disabled={!ready} onClick={() => act(() => s?.setFollow(follow >= 0 ? -1 : Math.floor(Math.random() * (s?.frame.count ?? 1))))} data-testid="city-follow">
             {follow >= 0 ? t.backToCity : t.followSomeone}
           </Button>

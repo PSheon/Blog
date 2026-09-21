@@ -485,7 +485,8 @@ html:not(.dark) {
     line-height: 1.8;
     counter-reset: sidenote;
   }
-  :lang(en) .prose-notebook {
+  /* The prose element itself, not its page: under /en a zh article that has no translation keeps the zh measure. */
+  .prose-notebook:lang(en) {
     font-size: 1.1875rem;
     line-height: 1.7;
   }
@@ -582,6 +583,14 @@ html:not(.dark) {
     padding-left: 1.25rem;
     color: var(--muted-foreground);
     font-style: italic;
+  }
+  /* Chinese has no italic: a browser slants the glyphs by itself, and it reads as a mistake. */
+  .prose-notebook:lang(zh) blockquote {
+    font-style: normal;
+  }
+  /* Negative tracking is for Latin display type; CJK glyphs are drawn to sit in their squares. */
+  :lang(zh) :where(h1, h2, h3, h4) {
+    letter-spacing: 0;
   }
   .prose-notebook hr {
     border: 0;

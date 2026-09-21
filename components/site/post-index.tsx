@@ -1,5 +1,6 @@
 "use client";
 
+import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
 import { ViewTransition, useState } from "react";
 import type { Locale } from "@/lib/i18n";
@@ -79,11 +80,11 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
                 </time>
                 <div className="min-w-0">
                   <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
-                    <Heading className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
+                    <Heading lang={row.langNote ? htmlLang.zh : undefined} className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
                       {row.title}
                     </Heading>
                   </ViewTransition>
-                  <p className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
+                  <p lang={row.langNote ? htmlLang.zh : undefined} className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
                     {row.description}
                   </p>
                   <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">

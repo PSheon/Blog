@@ -58,7 +58,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         <div className="max-lg:contents">
           {/* A title that says what is here, and a subtitle that says how: Paul asked for a technical blog's title,
               not a slogan. The see / think / generate / act words live on in the rail below. */}
-          <h1 style={{ "--i": 0 } as React.CSSProperties} className="reveal triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+          <h1 style={{ "--i": 0 } as React.CSSProperties} className="reveal triad-text order-1 w-fit font-heading text-[clamp(2.25rem,4.6vw,3.75rem)] leading-[1.12] font-semibold tracking-tight text-balance [&:lang(zh)]:tracking-normal [&:lang(zh)]:[word-break:keep-all]">
             {t.hero.title}
           </h1>
           <p style={{ "--i": 1 } as React.CSSProperties} className="reveal order-1 font-heading text-xl leading-snug font-medium text-foreground/90 max-lg:-mt-3 sm:text-2xl lg:mt-5">{t.hero.subtitle}</p>

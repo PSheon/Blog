@@ -23,7 +23,8 @@ const zh = {
   locale: { label: "語言", switch: "切換語言" },
   hero: {
     eyebrow: "實驗筆記",
-    title: "從零實作機器學習模型",
+    // U+200B marks the one place the H1 may break: a balanced wrap otherwise cuts 機｜器 in half on a phone
+    title: "從零實作\u200B機器學習模型",
     subtitle: "每一篇都能在瀏覽器裡訓練、拆開、弄壞",
     // The rail under the hero: one stop per kind of article, each a real tag.
     topics: [

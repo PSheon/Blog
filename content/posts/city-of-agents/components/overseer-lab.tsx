@@ -64,7 +64,7 @@ export function OverseerLab({ seed = 1, n = 8, agents = 300 }: { seed?: number; 
             </label>
           </div>
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t.mode}>
-            {MODES.map((m) => <Button key={m} size="sm" variant={m === (panel?.mode ?? "utility") ? "secondary" : "ghost"} aria-pressed={m === (panel?.mode ?? "utility")} onClick={() => act(() => s?.setMode(m))} data-testid={`overseer-mode-${m}`}>{t.modes[m]}</Button>)}
+            {MODES.map((m) => <Button key={m} size="sm" variant={m === (panel?.mode ?? "utility") ? "default" : "ghost"} aria-pressed={m === (panel?.mode ?? "utility")} onClick={() => act(() => s?.setMode(m))} data-testid={`overseer-mode-${m}`}>{t.modes[m]}</Button>)}
           </div>
           <Param label={t.rate} shown={`${s?.rate ?? 1}×`} value={s?.rate ?? 1} min={1} max={20} step={1} onChange={(v) => act(() => { if (s) s.rate = v; })} />
           <Param label={t.count} value={count ?? setup.agents} min={10} max={300} step={10} onChange={setCount} />

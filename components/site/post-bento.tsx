@@ -1,5 +1,6 @@
 "use client";
 
+import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
 import { ViewTransition, useState } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
@@ -85,12 +86,12 @@ export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
                       <span className="label">{row.minutesLabel}</span>
                     </p>
                     <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
-                      <h3 className={cn("font-heading leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline", big ? "text-2xl lg:text-3xl" : "text-lg")}>
+                      <h3 lang={row.langNote ? htmlLang.zh : undefined} className={cn("font-heading leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline", big ? "text-2xl lg:text-3xl" : "text-lg")}>
                         {row.title}
                       </h3>
                     </ViewTransition>
                     {/* Every tile says what the article is about while tiles are stacked; on the desktop grid only the roomy ones do. */}
-                    <p className={cn("max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted-foreground", !big && "line-clamp-2", !(big || wide) && "lg:hidden")}>{row.description}</p>
+                    <p lang={row.langNote ? htmlLang.zh : undefined} className={cn("max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted-foreground", !big && "line-clamp-2", !(big || wide) && "lg:hidden")}>{row.description}</p>
                     <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-xs text-muted-foreground">
                       {row.interactive && <InteractiveBadge label={labels.interactive} />}
                       {row.tags.map((name) => <span key={name}>#{name}</span>)}

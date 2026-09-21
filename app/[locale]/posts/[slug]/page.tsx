@@ -116,11 +116,11 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
             </p>
             {/* Same name as the title in the post index: the browser morphs one into the other. */}
             <ViewTransition name={`post-title-${slug}`} share="title-morph" default="none">
-              <h1 className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance">
+              <h1 lang={post.isFallback ? htmlLang[post.locale] : undefined} className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance [&:lang(zh)]:tracking-normal">
                 {post.title}
               </h1>
             </ViewTransition>
-            <p className="mt-5 font-serif text-xl leading-relaxed text-muted-foreground">{post.description}</p>
+            <p lang={post.isFallback ? htmlLang[post.locale] : undefined} className="mt-5 font-serif text-xl leading-relaxed text-muted-foreground">{post.description}</p>
             <dl className="mt-7 flex flex-wrap gap-x-8 gap-y-3 font-mono text-xs">
               <div>
                 <dt className="text-muted-foreground">{t.post.published}</dt>

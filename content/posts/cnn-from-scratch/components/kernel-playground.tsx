@@ -49,7 +49,7 @@ export function KernelPlayground() {
                 aria-label={`${t.kernel} [${Math.floor(i / 3)},${i % 3}]`}
                 onChange={(e) => setKernel(kernel.map((k, j) => (j === i ? Number(e.target.value) || 0 : k)))}
                 className={cn(
-                  "h-11 w-full rounded-sm border border-border bg-background text-center font-mono text-sm tabular [appearance:textfield]",
+                  "h-11 w-full rounded-sm border border-input bg-background text-center font-mono text-base tabular md:text-sm [appearance:textfield]", // 16 px on a phone: below that iOS zooms the page when the field is focused
                   "[&::-webkit-inner-spin-button]:appearance-none",
                   v > 0 && "text-signal",
                   v < 0 && "text-signal-2",
