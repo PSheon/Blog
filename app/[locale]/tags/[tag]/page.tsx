@@ -8,7 +8,8 @@ import { toRows } from "@/lib/content/rows";
 import { getDictionary, isLocale, locales } from "@/lib/i18n";
 import { sharedMetadata } from "@/lib/seo";
 
-export const dynamicParams = false;
+// An unknown value is rendered on demand and ends in notFound() below (see the note in app/[locale]/layout.tsx).
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   return locales.flatMap((locale) => getAllTags(locale).map(({ tag }) => ({ locale, tag })));
@@ -18,6 +19,7 @@ export async function generateMetadata({ params }: PageProps<"/[locale]/tags/[ta
   const { locale, tag } = await params;
   if (!isLocale(locale)) return {};
   const t = getDictionary(locale), posts = getAllPosts(locale).filter((p) => p.tags.includes(tag));
+  if (posts.length === 0) return {}; // no such tag: the page answers 404, and a 404 has no canonical URL to offer
   // One article under a tag is a thin page (the same entry as on /posts): readers can follow it, search engines skip it.
   return { title: t.tags.tagged(tag), description: t.tags.taggedLead(tag, posts.length), ...(posts.length < 2 && { robots: { index: false, follow: true } }), ...sharedMetadata(locale, `/tags/${tag}`, { siteCard: true }) };
 }

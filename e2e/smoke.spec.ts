@@ -159,19 +159,31 @@ for (const path of ["/zh", "/en/posts", "/zh/tags", "/en/tags/robotics", "/en/po
   });
 }
 
-test("a URL that matches nothing gets the site's own 404, not the framework's", async ({ page }) => {
-  const response = await page.goto("/zh/no-such-page/at-all");
-  expect(response?.status()).toBe(404);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
-  await expect(page.getByRole("banner")).toBeVisible();
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+test("a URL that matches nothing gets the site's own 404, in the language of the URL", async ({ page }) => {
+  // A page that matches no route, an article that does not exist, a tag nobody used: all three end in the same 404.
+  for (const [url, title, other, home] of [
+    ["/zh/no-such-page/at-all", "找不到這一頁", "Page not found", "/zh"],
+    ["/en/posts/pcb-flip-", "Page not found", "找不到這一頁", "/en"],
+    ["/en/tags/no-such-tag", "Page not found", "找不到這一頁", "/en"],
+  ] as const) {
+    const response = await page.goto(url);
+    expect(response?.status(), url).toBe(404);
+    const heading = page.getByRole("heading", { level: 1 });
+    await expect(heading).toHaveText(title);
+    await expect(heading).not.toContainText(other); // it used to say both at once
+    await expect(page.getByTestId("not-found").getByRole("link")).toHaveAttribute("href", home);
+    await expect(page.getByRole("banner")).toBeVisible();
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  }
 });
 
 test("URLs outside both locales get the site's own 404 too, styled and themed", async ({ page }) => {
   for (const url of ["/no-such-page", "/no-such/page/at-all"]) {
     const response = await page.goto(url);
     expect(response?.status()).toBe(404);
+    // Nothing in such a URL says which language the reader wants, so this one speaks both.
     await expect(page.getByRole("heading", { level: 1 })).toContainText("找不到這一頁");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Page not found");
     // The framework's fallback is black on white; ours carries the stylesheet and the default dark theme.
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe("rgb(7, 9, 24)");
   }

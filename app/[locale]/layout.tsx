@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { notFound } from "next/navigation";
 import "../globals.css";
 import { fontVariables } from "../fonts";
 import { SiteFooter } from "@/components/site/footer";
@@ -13,7 +12,7 @@ import { ServiceWorker } from "@/components/site/service-worker";
 import { Spotlight } from "@/components/site/spotlight";
 import { ThemeProvider } from "@/components/theme-provider";
 import { getAllTags } from "@/lib/content/posts";
-import { getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
+import { defaultLocale, getDictionary, htmlLang, isLocale, locales } from "@/lib/i18n";
 import { sharedMetadata } from "@/lib/seo";
 import { site } from "@/lib/site";
 
@@ -21,7 +20,10 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export const dynamicParams = false;
+// Not `dynamicParams = false`. It cascades to every route below, and Next then answers an unknown URL itself by
+// throwing "Internal: NoFallbackError": a full-screen runtime error in `next dev`, a log line in production, and
+// never our own 404. Unknown values are rendered on demand instead and end in notFound() in the page: for a
+// locale, a slug or a tag alike. Known pages are still prerendered (generateStaticParams).
 
 export const viewport: Viewport = {
   themeColor: [
@@ -55,8 +57,11 @@ export async function generateMetadata({ params }: LayoutProps<"/[locale]">): Pr
 }
 
 export default async function LocaleLayout({ children, params }: LayoutProps<"/[locale]">) {
-  const { locale } = await params;
-  if (!isLocale(locale)) notFound();
+  const { locale: asked } = await params;
+  // A first segment that is not a language ("/nope") still lands here. The layout must not throw for it: nothing
+  // sits above the root layout to catch that, and the reader got the framework's bare 404. It dresses the page in the
+  // default language instead, and the page below answers 404 itself (every page checks the locale).
+  const locale = isLocale(asked) ? asked : defaultLocale;
   const t = getDictionary(locale);
 
   return (
