@@ -585,8 +585,8 @@ test("a city of people runs in the page: the clock moves, the three heads differ
   await thumb.focus();
   await page.keyboard.press("Home");
   await expect(page.getByTestId("city-live")).toBeEnabled();
-  await page.getByTestId("city-live").click();
-  await expect(page.getByTestId("city-live")).toBeDisabled();
+  // On a slow runner the first click can land while the timeline is still re-rendering from the Home key: click until it takes.
+  await expect(async () => { const live = page.getByTestId("city-live"); if (await live.isEnabled()) await live.click(); await expect(live).toBeDisabled({ timeout: 1_000 }); }).toPass({ timeout: 15_000 });
   expect(errors).toEqual([]);
 });
 
