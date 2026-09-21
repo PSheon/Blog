@@ -241,6 +241,25 @@ block: a yellow block of the same size elsewhere on the bench (≥ 8 cm from the
 - A second block of another colour costs 18 points and splits the seeds (58–96). Which block is meant is exactly what
   an instruction would say: the natural door to the "L" of VLA.
 
+## Run 9 — vary the pixels in training too (`HC_PHOTO=1`: noise σ 0…0.1, light × 0.6…1.2, per picture)
+
+Same models and evaluation as run 8, aux on, 10 000 steps, seeds 11–15. Run 8's numbers in brackets.
+
+| | as trained | pitch 5° | pitch 20° | block moved | shoved | second block | noise 0.05 | noise 0.15 | light 70 % | light 70 % + pitch 5° |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| open, shaken + aux + photo | 64.8 [79.4] | 69.2 | 3.7 | 50.3 | 64.0 | 53.6 | 61.7 [26.0] | 34.1 [3.7] | 63.3 [45.8] | 64.1 |
+| closed, shaken + aux + photo | 93.2 [95.0] | 92.0 | 57.3 [72.4] | 96.5 | 94.9 | 72.1 [77.5] | **95.6 [50.7]** | **60.5 [8.6]** | **90.0 [64.5]** | **86.5 [62.9]** |
+
+- **Varying the pixels in training fixes what run 8 found.** Keep-looking: noise inside the trained range (0.05) costs
+  nothing now (95.6 %), light at 70 % costs 5 points instead of 30, and noise three times beyond anything trained (0.15)
+  still leaves 60 % instead of 9 %.
+- It is not free: 2 points untouched, 15 at 20° of pitch (outside the shaken range), 5 on the second block. More to learn
+  in the same 10 000 steps.
+- Look-once pays much more: 15 points untouched (79.4 → 64.8). Every added nuisance widens the gap (now 28 points
+  untouched). My reading, not measured: look-once must see through all of them from one picture, while keep-looking only has to find two
+  things in the same picture.
+- Recipe for the page, unless something beats it: closed + shaken + aux + photo, 10 000 steps.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

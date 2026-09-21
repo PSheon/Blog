@@ -1,0 +1,28 @@
+closed+shake seed 14: camera as trained 96.0 | pitch 2° 94.0 | pitch 5° 95.5 | pitch 10° 95.0 | pitch 20° 78.0 | yaw 2° 96.5 | yaw 5° 95.5 | yaw 10° 89.0 | yaw 20° 81.0 | moved 3 cm sideways 95.5 | block moved at step 8 99.0 | shoved 6 cm at step 8 96.0 | second block (yellow) 87.5 | pixel noise 0.05 99.0 | pixel noise 0.15 84.5 | light at 70 % 91.5 | light at 70 %, pitch 5° 91.5
+  what the keypoints follow (seed 14):
+    keypoint 0: hand R² 0.01, block R² 0.84, moves 0.209  → BLOCK
+    keypoint 1: hand R² 0.78, block R² 0.01, moves 0.174  → HAND
+    keypoint 2: hand R² 0.20, block R² 0.02, moves 0.060
+    keypoint 3: hand R² 0.11, block R² 0.02, moves 0.054
+    keypoint 4: hand R² 0.34, block R² 0.40, moves 0.172
+    keypoint 5: hand R² 0.57, block R² 0.00, moves 0.213
+    keypoint 6: hand R² 0.14, block R² 0.01, moves 0.001  (parked)
+    keypoint 7: hand R² 0.59, block R² 0.00, moves 0.229
+== closed+shake: 10000 steps of 16, 214 s a model, 1 seeds; mean (min–max)
+  camera as trained: 96.0% (96.0–96.0)
+  pitch 2°: 94.0% (94.0–94.0)
+  pitch 5°: 95.5% (95.5–95.5)
+  pitch 10°: 95.0% (95.0–95.0)
+  pitch 20°: 78.0% (78.0–78.0)
+  yaw 2°: 96.5% (96.5–96.5)
+  yaw 5°: 95.5% (95.5–95.5)
+  yaw 10°: 89.0% (89.0–89.0)
+  yaw 20°: 81.0% (81.0–81.0)
+  moved 3 cm sideways: 95.5% (95.5–95.5)
+  block moved at step 8: 99.0% (99.0–99.0)
+  shoved 6 cm at step 8: 96.0% (96.0–96.0)
+  second block (yellow): 87.5% (87.5–87.5)
+  pixel noise 0.05: 99.0% (99.0–99.0)
+  pixel noise 0.15: 84.5% (84.5–84.5)
+  light at 70 %: 91.5% (91.5–91.5)
+  light at 70 %, pitch 5°: 91.5% (91.5–91.5)
