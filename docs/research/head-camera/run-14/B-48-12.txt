@@ -1,0 +1,15 @@
+  closed seed 12 step 1000: loss 0.4064
+  closed seed 12 step 2000: loss 0.3608
+  closed seed 12 step 3000: loss 0.3064
+  closed seed 12 step 4000: loss 0.2428
+  closed seed 12 step 5000: loss 0.2000
+    diag @5000: mse dx 0.302 dy 0.179 dz 0.205 grip 0.075 | direction within 25°: fetching 39% carrying 63%
+  closed seed 12 step 6000: loss 0.1802
+  closed seed 12 step 7000: loss 0.1673
+  closed seed 12 step 8000: loss 0.1552
+  closed seed 12 step 9000: loss 0.1438
+  closed seed 12 step 10000: loss 0.1400
+    diag @10000: mse dx 0.200 dy 0.123 dz 0.166 grip 0.065 | direction within 25°: fetching 51% carrying 74%
+  closed seed 12 step 11000: loss 0.1316
+  closed seed 12 step 12000: loss 0.1242
+  closed seed 12 step 13000: loss 0.1211

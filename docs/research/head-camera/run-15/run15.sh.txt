@@ -1,0 +1,12 @@
+#!/bin/zsh
+# Run 15: grasp within 3 cm. A 32 px, B 48 px, S 32 px + shaken camera and photo. 20 000 steps, 2 seeds.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run15
+common="HP_DIAG=1 HP_TRACE=1 HP_TEACHER=0 HP_KINDS=closed HP_STEPS=20000 HP_EPISODES=100"
+for s in 11 12; do
+  env ${=common} HP_SHAKE=0 HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/A-base-$s.log 2>&1 &
+  env ${=common} HP_SHAKE=0 HP_SEEDS=$s HP_SIZE=48 pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/B-48-$s.log 2>&1 &
+  env ${=common} HP_SHAKE=1 HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/S-shake-$s.log 2>&1 &
+done
+wait
+echo DONE

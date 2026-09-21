@@ -1,0 +1,5 @@
+#!/bin/zsh
+# Run 13 trace: variant D (told hand x–y) again with a step-by-step episode printed, to see why 80–89 % right directions give no grasp.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+HP_TRACE=1 HP_DIAG=1 HP_TEACHER=0 HP_KINDS=closed HP_SHAKE=0 HP_STEPS=20000 HP_EPISODES=50 HP_SEEDS=11 HP_FEELXY=1 pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > /Users/paul_jiang/Desktop/Paul/vla-work/run13/D-trace-11.log 2>&1
+echo DONE

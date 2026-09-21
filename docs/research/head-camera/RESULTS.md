@@ -332,6 +332,33 @@ A step-by-step trace showed why: the hand never heads for the block (the teacher
 hangs in the air. The teacher gated travel on height ("rise first, then move"), so most samples' x–y labels were zero
 and the right one depended on height times direction: too much for this network. Run 13 replaces it with a funnel.
 
+## Runs 13–15 — pick and place: three reasons it did not learn, then it does (20 000 steps, 2 seeds, 100 episodes)
+
+Each run printed one episode step by step (`HP_TRACE=1`) and the error per output (`HP_DIAG=1`); the traces, not the
+success rates, said what was wrong.
+
+- **Run 13, a funnel teacher** (head for the goal always; hold a height that falls from 10 cm to 3.5 cm over the last
+  4 cm). Directions became 61–89 % right, **success still 0 %** in every variant (32 px, 48 px, fetch only, told the
+  hand's x–y, height following the teacher). Trace: the hand gets over the block (0.1–1 cm) and hovers at 5.5 cm. The
+  funnel came to a point, so 0.5 cm of sideways jitter moved the target height 0.8 cm; and "grip" was under 1 % of samples,
+  so its output never passed 0.1.
+- **Run 14, a flat-bottomed funnel (LOW within 1.5 cm) and a fifth of samples in the grip region.** Now it descends to
+  3.4–4 cm, and stalls 1.3–2.3 cm from the block, mostly in depth; grip output 0.2–0.3. 0–2 %. **Once the hand is low over
+  the block it hides the block from the head camera**: the last two centimetres cannot be seen. This is the reason
+  Figure 03 gives for its palm cameras ("when the main cameras are occluded").
+- **Run 15, grasp within 3 cm** (a self-centring gripper; the reaching task's own tolerance):
+
+| | as trained | pitch 5° | pitch 10° | pitch 20° | yaw 10° | block moved early |
+| --- | --- | --- | --- | --- | --- | --- |
+| closed, 32 px (seeds 11 / 12) | 89 / 69 | 0 / 0 | 0 / 0 | 0 / 0 | 6 / 0 | 92 / 72 |
+| closed, 48 px | 100 / 93 | 31 / 34 | 0 / 0 | 0 / 0 | 6 / 1 | 99 / 87 |
+| closed + shaken + photo, 32 px | 63 / 35 | 60 / 38 | 63 / 37 | 24 / 0 | 72 / 32 | 57 / 41 |
+
+  The reaching article's second and third acts again, sharper: never shaken, a tilt of 5° takes it from 89 % to 0 %;
+  shaken, it is flat across the range. But the shaken level is low and the seeds far apart: under-trained, as reaching
+  was at 5 000 steps. 20 000 steps cost 479 s (32 px) and 870 s (48 px) with six at once: outside a page's budget, so
+  pick and place would ship as checkpoints. Look-once + shaken was 13.5–17.5 % in run 12 (1.5 cm grasp); not rerun at 3 cm.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

@@ -1,0 +1,53 @@
+  closed seed 12 step 1000: loss 0.4240
+  closed seed 12 step 2000: loss 0.3827
+  closed seed 12 step 3000: loss 0.3161
+  closed seed 12 step 4000: loss 0.2743
+  closed seed 12 step 5000: loss 0.2385
+    diag @5000: mse dx 0.381 dy 0.184 dz 0.241 grip 0.105 | direction within 25°: fetching 33% carrying 54%
+  closed seed 12 step 6000: loss 0.2232
+  closed seed 12 step 7000: loss 0.2057
+  closed seed 12 step 8000: loss 0.1908
+  closed seed 12 step 9000: loss 0.1800
+  closed seed 12 step 10000: loss 0.1769
+    diag @10000: mse dx 0.267 dy 0.141 dz 0.179 grip 0.093 | direction within 25°: fetching 42% carrying 70%
+  closed seed 12 step 11000: loss 0.1703
+  closed seed 12 step 12000: loss 0.1607
+  closed seed 12 step 13000: loss 0.1592
+  closed seed 12 step 14000: loss 0.1529
+  closed seed 12 step 15000: loss 0.1413
+    diag @15000: mse dx 0.229 dy 0.102 dz 0.133 grip 0.077 | direction within 25°: fetching 47% carrying 78%
+  closed seed 12 step 16000: loss 0.1381
+  closed seed 12 step 17000: loss 0.1335
+  closed seed 12 step 18000: loss 0.1354
+  closed seed 12 step 19000: loss 0.1335
+  closed seed 12 step 20000: loss 0.1329
+    diag @20000: mse dx 0.221 dy 0.094 dz 0.123 grip 0.073 | direction within 25°: fetching 50% carrying 76%
+    t0 z 10.0 far 15.0 held 0 closed 0 | net -0.56 1.10 -0.15 0.02 | teacher -1.00 1.00 0.00 0.00
+    t1 z 9.7 far 12.1 held 0 closed 0 | net -0.56 0.96 -0.10 0.02 | teacher -1.00 1.00 0.15 0.00
+    t2 z 9.5 far 9.4 held 0 closed 0 | net -0.54 0.88 -0.13 0.02 | teacher -1.00 1.00 0.25 0.00
+    t3 z 9.2 far 6.8 held 0 closed 0 | net -0.33 0.92 -0.30 0.03 | teacher -1.00 1.00 0.38 0.00
+    t4 z 8.6 far 4.4 held 0 closed 0 | net -0.31 0.83 -0.31 0.06 | teacher -0.69 1.00 -1.00 0.00
+    t5 z 8.0 far 2.1 held 0 closed 0 | net -0.17 0.74 -0.41 0.05 | teacher -0.38 0.77 -1.00 0.00
+    t6 z 7.2 far 0.5 held 0 closed 0 | net -0.06 0.31 -0.84 0.04 | teacher -0.20 0.02 -1.00 0.00
+    t7 z 5.5 far 0.8 held 0 closed 0 | net -0.14 0.11 -0.90 0.07 | teacher -0.15 -0.28 -1.00 0.00
+    t8 z 3.7 far 1.0 held 0 closed 0 | net 0.21 -0.56 0.22 0.52 | teacher -0.01 -0.39 -0.10 1.00
+    t9 z 4.1 far 31.3 held 1 closed 1 | net -0.32 -0.76 0.95 -0.15 | teacher -1.00 -1.00 1.00 0.00
+    t10 z 6.0 far 29.2 held 1 closed 1 | net -0.47 -1.21 1.20 -0.03 | teacher -1.00 -1.00 1.00 0.00
+    t11 z 8.0 far 26.5 held 1 closed 1 | net -0.40 -0.91 0.76 -0.10 | teacher -1.00 -1.00 0.99 0.00
+    t12 z 9.5 far 24.1 held 1 closed 1 | net -0.42 -0.88 0.18 -0.05 | teacher -1.00 -1.00 0.23 0.00
+    t13 z 9.9 far 21.8 held 1 closed 1 | net -0.13 -1.11 -0.18 0.00 | teacher -1.00 -1.00 0.04 0.00
+    t14 z 9.6 far 19.3 held 1 closed 1 | net -0.03 -0.82 0.10 -0.05 | teacher -1.00 -1.00 0.22 0.00
+    t15 z 9.8 far 17.2 held 1 closed 1 | net 0.34 -1.00 -0.03 -0.03 | teacher -1.00 -1.00 0.12 0.00
+    t16 z 9.7 far 15.0 held 1 closed 1 | net 0.33 -0.92 0.16 -0.09 | teacher -1.00 -1.00 0.16 0.00
+    t17 z 10.0 far 13.0 held 1 closed 1 | net 0.61 -0.96 0.05 -0.11 | teacher -1.00 -1.00 -0.00 0.00
+    t18 z 10.1 far 11.6 held 1 closed 1 | net 0.68 -1.16 -0.17 -0.03 | teacher -1.00 -1.00 -0.06 0.00
+    t19 z 9.8 far 10.8 held 1 closed 1 | net 0.11 -1.02 -0.00 -0.07 | teacher -1.00 -1.00 0.12 0.00
+    t20 z 9.8 far 9.5 held 1 closed 1 | net 0.08 -1.13 -0.24 -0.01 | teacher -1.00 -1.00 0.12 0.00
+    t21 z 9.3 far 8.7 held 1 closed 1 | net -0.51 -0.96 -0.18 -0.07 | teacher -1.00 -0.89 0.36 0.00
+    t22 z 8.9 far 7.2 held 1 closed 1 | net -0.80 -0.71 -0.47 -0.00 | teacher -1.00 0.07 0.54 0.00
+    t23 z 8.0 far 5.5 held 1 closed 1 | net -0.85 0.48 -0.61 0.07 | teacher -1.00 0.78 0.19 0.00
+    t24 z 6.8 far 3.1 held 1 closed 1 | net -0.25 -0.09 -0.94 0.06 | teacher -1.00 0.30 -1.00 0.00
+    t25 z 4.9 far 2.6 held 1 closed 1 | net -0.09 -0.05 -0.70 -0.19 | teacher -0.96 0.39 -0.63 0.00
+    t26 z 3.5 far 2.5 held 1 closed 1 | net -0.32 0.11 0.05 -0.87 | teacher -0.87 0.44 -0.00 0.00
+closed seed 12: as trained 69.0 (grasped 73) | pitch 5° 0.0 (grasped 0) | pitch 10° 0.0 (grasped 0) | pitch 20° 0.0 (grasped 0) | yaw 10° 0.0 (grasped 0) | block moved early 72.0 (grasped 75) | pad moved while carrying 69.0 (grasped 73) | shoved 5 cm 78.0 (grasped 81)
+== closed: 20000 steps, 475 s, size 32
