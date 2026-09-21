@@ -745,6 +745,7 @@ test("the playground is a game: a character walks it, gets into a car, and the p
     return;
   }
   const stage = figure.getByTestId("playground-stage"), spp = async () => Number((await figure.getByTestId("playground-spp").textContent())!.replace(/\D/g, "") || 0);
+  await figure.getByTestId("playground-enter").click(); // the game is fetched when asked for, not by scrolling past
   await expect(stage).toHaveAttribute("data-ready", "true", { timeout: 30_000 });
   await expect.poll(spp, { timeout: 30_000 }).toBeGreaterThan(32); // standing still, it clears
   await stage.focus();

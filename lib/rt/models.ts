@@ -2,7 +2,7 @@ import type { Material, Vec3 } from "./scene";
 
 /**
  * The playground's vehicles: Sketchbook's car, helicopter and aeroplane (Jan Blaha / swift502, MIT), packed by
- * scripts/light/pack-models.mjs as geometry and a kind per triangle (paint, window, tyre). A model is a body and the
+ * scripts/light/pack-models.mjs as geometry and a kind per triangle (paint, window, tyre, interior). A model is a body and the
  * parts that move by themselves (wheels, rotors), each about its own origin with a rest transform onto the body.
  */
 export const MODELS_URL = "/posts/light-playground/models.bin";
@@ -23,10 +23,10 @@ export function parseModels(file: ArrayBuffer): Models {
 }
 
 /** Paint, window and tyre for each vehicle. Paint is a rough metal, so the sky and the ground show in it. */
-export const VEHICLE_MATERIALS: Record<ModelName, [Material, Material, Material]> = (() => {
-  const window: Material = { albedo: [0.55, 0.62, 0.68], emit: [0, 0, 0], metallic: true, roughness: 0.08 }, tyre: Material = { albedo: [0.03, 0.03, 0.035], emit: [0, 0, 0] };
+export const VEHICLE_MATERIALS: Record<ModelName, [Material, Material, Material, Material]> = (() => {
+  const window: Material = { albedo: [0.55, 0.62, 0.68], emit: [0, 0, 0], metallic: true, roughness: 0.08 }, tyre: Material = { albedo: [0.03, 0.03, 0.035], emit: [0, 0, 0] }, cabin: Material = { albedo: [0.13, 0.12, 0.12], emit: [0, 0, 0] }; // seats, floor, dashboard: dark cloth, so the paint is the car's colour and not everything in it
   const paint = (r: number, g: number, b: number): Material => ({ albedo: [r, g, b], emit: [0, 0, 0], metallic: true, roughness: 0.38 });
-  return { car: [paint(0.78, 0.07, 0.06), window, tyre], heli: [paint(0.93, 0.66, 0.08), window, tyre], airplane: [paint(0.86, 0.87, 0.9), window, tyre] };
+  return { car: [paint(0.78, 0.07, 0.06), window, tyre, cabin], heli: [paint(0.93, 0.66, 0.08), window, tyre, cabin], airplane: [paint(0.86, 0.87, 0.9), window, tyre, cabin] };
 })();
 
 /** More paints for the car park, so that five cars are not five red cars. */
@@ -52,7 +52,7 @@ export function fromPose(p: { x: number; y: number; z: number }, q: { x: number;
  * gives a part of its own a transform in the part's own frame (a wheel's spin, a rotor's turn), applied before its
  * rest transform. Returns the new cursor.
  */
-export function writeModel(all: Models, name: ModelName, /** where paint, window and tyre are in the scene's materials: a start index, or the three */ materialBase: number | [number, number, number], pose: Mat34, moving: (part: Part, index: number) => Mat34 | null, out: { positions: Float32Array; materials: Uint32Array }, cursor: number): number {
+export function writeModel(all: Models, name: ModelName, /** where paint, window, tyre and interior are in the scene's materials: a start index, or the four */ materialBase: number | [number, number, number, number], pose: Mat34, moving: (part: Part, index: number) => Mat34 | null, out: { positions: Float32Array; materials: Uint32Array }, cursor: number): number {
   const P = all.positions;
   all.models[name].parts.forEach((part, index) => {
     let m = pose;

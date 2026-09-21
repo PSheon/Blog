@@ -37,7 +37,7 @@ export class Renderer {
   private destroyed = false;
 
   private constructor(
-    readonly device: GPUDevice, readonly adapterName: string, private readonly context: GPUCanvasContext, readonly width: number, readonly height: number,
+    readonly device: GPUDevice, readonly adapterName: string, private readonly context: GPUCanvasContext, /** the size being rendered now: the canvas's own, or smaller (`setRenderSize`) */ public width: number, public height: number,
     private readonly params: GPUBuffer, private readonly paramData: ArrayBuffer, private readonly accum: GPUBuffer, private readonly counters: GPUBuffer, private readonly tiles: GPUBuffer, private readonly tileCount: number,
     private readonly tracePipe: GPUComputePipeline, private readonly traceBind: GPUBindGroup, private readonly measurePipe: GPUComputePipeline, private readonly measureBind: GPUBindGroup,
     private readonly presentPipe: GPURenderPipeline, private readonly presentBind: GPUBindGroup, private readonly owned: GPUBuffer[], private readonly mats: GPUBuffer,
@@ -45,6 +45,7 @@ export class Renderer {
     private readonly temporal: { commitPipe: GPUComputePipeline; commitBind: GPUBindGroup; reprojectPipe: GPUComputePipeline; reprojectBind: GPUBindGroup; gbuf: GPUBuffer; gprev: GPUBuffer; carried: GPUBuffer; movedFrom: GPUBuffer; bytes: number; mergePipe: GPUComputePipeline; mergeBind: GPUBindGroup; filterPipe: GPUComputePipeline; filterBinds: GPUBindGroup[] } | null,
   ) {}
   /** How many samples' worth a carried-over pixel may count for: higher is smoother and slower to notice that the light changed. */
+  readonly fullWidth = this.width; readonly fullHeight = this.height;
   historyCap = 12;
   /** Borrow from neighbouring pixels of the same surface before showing the picture (needs `temporal`). */
   denoise = false;
@@ -112,6 +113,18 @@ export class Renderer {
     if (tree.triangleCount > this.dynamicCapacity) throw new Error(`${tree.triangleCount} moving triangles, room for ${this.dynamicCapacity}`);
     this.device.queue.writeBuffer(this.nodes, this.nodeBase * 32, tree.nodes); this.device.queue.writeBuffer(this.tris, this.triangleBase * 48, tree.triangles);
     this.dynamicRoot = tree.triangleCount > 0 ? this.nodeBase : 0;
+  }
+
+  /**
+   * Render fewer pixels than the canvas has (never more: the buffers are the canvas's size) and let PRESENT stretch them,
+   * for a GPU that cannot keep up. Everything accumulated and carried is of the old grid and is dropped.
+   */
+  setRenderSize(width: number, height: number): void {
+    width = Math.max(16, Math.min(width, this.fullWidth)); height = Math.max(16, Math.min(height, this.fullHeight));
+    if (width === this.width && height === this.height) return;
+    this.width = width; this.height = height;
+    new Uint32Array(this.paramData, 0, 2).set([width, height]);
+    this.reset();
   }
 
   /** Look from somewhere else. What has been accumulated is of the old view: the caller resets. */

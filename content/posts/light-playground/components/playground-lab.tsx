@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine, CarFront, Maximize2, Minimize2, SlidersHorizontal } from "lucide-react";
+import { ArrowDownToLine, ArrowUpFromLine, CarFront, Loader2, Maximize2, Minimize2, Play, SlidersHorizontal } from "lucide-react";
 import { type KeyboardEvent, type MouseEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Stick } from "@/components/lab/stick";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { useLabels, type Labels } from "./labels";
 
 const W = 960, H = 540, EXPOSURE = 0.15, MAX_SAMPLES = 1024, DYNAMIC = 16_384; // room for the moving triangles: five cars, a helicopter, an aeroplane and a person are about 11,300
+/** What the renderer falls back to on a GPU that cannot keep up, in order: fewer pixels first, then fewer bounces. */
+const LEVELS: { size: [number, number]; bounces: number }[] = [{ size: [960, 540], bounces: 8 }, { size: [768, 432], bounces: 8 }, { size: [640, 360], bounces: 8 }, { size: [480, 270], bounces: 4 }, { size: [384, 216], bounces: 2 }];
 const MODES = ["raster", "direct", "full"] as const;
 type Mode = (typeof MODES)[number];
 /** Physical keys (`event.code`): an input method changes what a key TYPES (W is ㄊ in Zhuyin), never which key it is. */
@@ -49,7 +51,7 @@ function Hints({ t, seat, craft }: { t: Labels; seat: Seat; craft: ModelName | n
  */
 export function PlaygroundLab() {
   const t = useLabels(), root = useRef<HTMLDivElement>(null), canvas = useRef<HTMLCanvasElement>(null);
-  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [carry, setCarry] = useState(true), [denoise, setDenoise] = useState(true), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true), [locked, setLocked] = useState(false);
+  const [mode, setMode] = useState<Mode>("full"), [hour, setHour] = useState(16), [seen, setSeen] = useState<{ spp: number; ms: number; moving: number; tree: number } | null>(null), [ready, setReady] = useState(false), [entered, setEntered] = useState(false), [carry, setCarry] = useState(true), [denoise, setDenoise] = useState(true), [seat, setSeat] = useState<Seat>("foot"), [craft, setCraft] = useState<ModelName | null>(null), [expanded, setExpanded] = useState(false), [turned, setTurned] = useState(false), [tools, setTools] = useState(true), [locked, setLocked] = useState(false);
   const settings = useRef({ mode, hour, carry: true, denoise: true }), dirty = useRef(true), relit = useRef(true), mine = useRef<Renderer | null>(null), assets = useRef<Assets | null>(null);
   const orbit = useRef({ yaw: 0.6, pitch: -0.28, distance: 4.6 }), drag = useRef<{ x: number; y: number } | null>(null), stick = useRef<[number, number]>([0, 0]), held = useRef(new Set<string>()), jump = useRef(false), down = useRef(false), hover = useRef(false), interact = useRef(false), seatNow = useRef("foot");
   const stageElement = useRef<HTMLDivElement>(null), pressedAt = useRef({ x: 0, y: 0 }), lockedNow = useRef(false), releasedAt = useRef(-1e9);
@@ -58,7 +60,7 @@ export function PlaygroundLab() {
   useEffect(() => { lockedNow.current = locked; }, [locked]);
   const turnedNow = useRef(false);
   useEffect(() => { turnedNow.current = turned; }, [turned]);
-  const timing = useRef({ ms: 0, tree: 0, triangles: 0 });
+  const timing = useRef({ ms: 0, tree: 0, triangles: 0 }), quality = useRef({ level: 0, frame: 16, slow: 0, fast: 0, since: 0 }), [level, setLevel] = useState(0);
 
   const tracer = useTracer(root, canvas, {
     playground: PLAYGROUND_URL, dynamicTriangles: DYNAMIC, temporal: true, size: W, height: H, autostart: true, maxSamples: MAX_SAMPLES, budgetMs: 8,
@@ -70,7 +72,7 @@ export function PlaygroundLab() {
   // Everything that is not the renderer: the vehicles, the character, and the physics the character walks in.
   useEffect(() => {
     const park = built?.playground;
-    if (!park) return;
+    if (!park || !entered) return; // the game (models, animations, a megabyte of physics engine) is fetched when the reader asks for it, not by scrolling past
     let alive = true, made: World | null = null;
     void (async () => {
       const [modelsFile, manFile, groundFile] = await Promise.all([MODELS_URL, BOXMAN_URL, PLAYGROUND_URL].map((url) => fetch(url).then((r) => r.arrayBuffer())));
@@ -90,7 +92,7 @@ export function PlaygroundLab() {
       dirty.current = true; setReady(true);
     })().catch((error) => console.error("[playground] could not start the game", error));
     return () => { alive = false; assets.current = null; made?.destroy(); };
-  }, [built]);
+  }, [built, entered]);
 
   /** This frame's moving things into their tree, the camera behind the character, and a fresh picture. */
   const draw = useCallback((blend: number, lightChanged: boolean) => {
@@ -104,7 +106,7 @@ export function PlaygroundLab() {
     for (const v of a.world.vehicles) {
       objects.push({ prepared: a.prepared[v.name], first: cursor });
       const base = park.vehicleMaterials[v.name], paint = v.name === "car" && cars++ > 0 ? park.carPaints + ((cars - 2) % 4) : base; // the first car keeps the red
-      cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2], v.pose(), (part) => v.part(part), out, cursor);
+      cursor = writeModel(a.models, v.name, [paint, base + 1, base + 2, base + 3], v.pose(), (part) => v.part(part), out, cursor);
     }
     // the character is always there to be seen: walking, opening a door, sitting at the wheel
     const driven = a.world.seated() ? a.world.driving() : null;
@@ -115,7 +117,7 @@ export function PlaygroundLab() {
     const o = orbit.current, s = settings.current, light = sunAt(s.hour), at = driven ? driven.pose().slice(9) : person.at, head: Vec3 = [at[0], at[1] + (driven ? 1.1 : 0.95), at[2]], reach = driven ? (driven.craft ? 2.4 : 1.7) : 1;
     const back: Vec3 = [-Math.sin(o.yaw) * Math.cos(o.pitch), -Math.sin(o.pitch), Math.cos(o.yaw) * Math.cos(o.pitch)], distance = a.world.clearance(head, back, o.distance * reach);
     r.setCamera({ eye: [head[0] + back[0] * distance, head[1] + back[1] * distance, head[2] + back[2] * distance], target: head, fov: 55 });
-    r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? 8 : 1; r.historyCap = s.carry ? 12 : 0; r.denoise = s.denoise;
+    r.sun = light.sun; r.skyLevel = light.skyLevel; r.exposure = EXPOSURE; r.raster = s.mode === "raster"; r.bounces = s.mode === "full" ? LEVELS[quality.current.level].bounces : 1; r.historyCap = s.carry ? 12 : 0; r.denoise = s.denoise;
     r.sample(1); r.present();
     resume();
   }, [built, resume]);
@@ -127,6 +129,23 @@ export function PlaygroundLab() {
       if (!alive) return;
       const dt = Math.min(0.1, (now - last) / 1000); last = now;
       const a = assets.current;
+      // Keeping up: a smoothed frame time, judged only while something moves (standing still, a slow frame costs nothing).
+      // Over 26 ms for a second and the picture gets smaller; under 11 ms for three seconds at a reduced size and it gets a level back.
+      const q = quality.current, r0 = mine.current;
+      if (a && r0 && document.visibilityState === "visible" && (q.since += dt) > 3) { // (not in the first seconds: shaders and the physics engine are still warming up)
+        q.frame += (dt * 1000 - q.frame) * 0.1;
+        const forced = process.env.NODE_ENV !== "production" ? (window as unknown as { __slow?: number }).__slow : undefined; // for trying it on a fast GPU
+        const frame = forced ?? q.frame, moving = a.world.person.moving || a.world.vehicles.some((v) => v.moving());
+        q.slow = moving && frame > 26 ? q.slow + dt : 0; q.fast = moving && frame < 11 && q.level > 0 ? q.fast + dt : 0;
+        const next = q.slow > 1 && q.level < LEVELS.length - 1 ? q.level + 1 : q.fast > 3 ? q.level - 1 : q.level;
+        if (next !== q.level) { q.level = next; q.slow = q.fast = 0; q.frame = 16; r0.setRenderSize(...LEVELS[next].size); setLevel(next); relit.current = true; }
+      }
+      if (!a && r0 && (dirty.current || relit.current)) { // not entered yet: the playground from above, standing still, clearing
+        dirty.current = false; relit.current = false;
+        const s0 = settings.current, light = sunAt(s0.hour);
+        r0.setCamera({ eye: [60, 30, 70], target: [0, 14, -5], fov: 50 }); r0.sun = light.sun; r0.skyLevel = light.skyLevel; r0.exposure = EXPOSURE; r0.raster = s0.mode === "raster"; r0.bounces = s0.mode === "full" ? 8 : 1; r0.denoise = s0.denoise;
+        r0.reset(); r0.sample(1); r0.present(); resume();
+      }
       if (a && mine.current) {
         const move: [number, number] = [stick.current[0], stick.current[1]];
         for (const key of held.current) { const k = KEYS[key]; if (k) { move[0] += k[0]; move[1] += k[1]; } }
@@ -140,7 +159,7 @@ export function PlaygroundLab() {
     };
     requestAnimationFrame(tick);
     return () => { alive = false; };
-  }, [draw]);
+  }, [draw, resume]);
 
   // Expanded, the world covers the window (the same canvas: nothing is rebuilt). The page behind must not scroll and
   // Escape closes it. On a phone the game wants to be landscape: ask for fullscreen and an orientation lock (Android
@@ -234,13 +253,18 @@ export function PlaygroundLab() {
         // browser can. On the click and not on the press: a browser refuses a document that the press itself has only just focused.
         onClick={(e) => {
           const native = e.nativeEvent as globalThis.PointerEvent, moved = Math.hypot(e.clientX - pressedAt.current.x, e.clientY - pressedAt.current.y);
-          if (locked || moved > 4 || (native.pointerType && native.pointerType !== "mouse") || typeof e.currentTarget.requestPointerLock !== "function") return;
+          if (!ready || locked || moved > 4 || (native.pointerType && native.pointerType !== "mouse") || typeof e.currentTarget.requestPointerLock !== "function") return;
           void Promise.resolve(e.currentTarget.requestPointerLock()).catch(() => undefined); // refused: dragging still turns the camera
         }} onPointerMove={look} onPointerUp={() => (drag.current = null)} onPointerCancel={() => (drag.current = null)} data-testid="playground-stage" data-ready={ready} data-seat={seat}>
         <Stage canvas={canvas} status={tracer.status} label={t.picture} t={t} testid="playground-canvas" wide fill={expanded}>
+          {!ready && tracer.live && (
+            <div className="absolute inset-0 grid place-items-center" {...stop}>
+              <Button size="lg" disabled={entered} onClick={() => setEntered(true)} className="shadow-lg" data-testid="playground-enter">{entered ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Play className="size-4" aria-hidden />}{entered ? t.entering : t.enter}</Button>
+            </div>
+          )}
           {/* top right: what the renderer is doing, and the way out */}
           <div className="absolute top-2 right-2 flex items-center gap-2" {...stop}>
-            {expanded && seen && <span className="rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] text-white/85 backdrop-blur-sm tabular">{seen.spp.toLocaleString()} {t.sppShort} · {seen.ms.toFixed(1)} {t.ms}</span>}
+            {expanded && seen && <span className="rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] text-white/85 backdrop-blur-sm tabular">{seen.spp.toLocaleString()} {t.sppShort} · {seen.ms.toFixed(1)} {t.ms}{level > 0 && ` · ${LEVELS[level].size.join("×")}`}</span>}
             <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { if (!expanded) setTools(!window.matchMedia("(pointer: coarse)").matches); setExpanded(!expanded); }} aria-pressed={expanded} data-testid="playground-expand">{expanded ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}{expanded ? t.collapse : t.expand}</Button>
           </div>
           {/* top left, expanded only: the settings, folded away on a phone until asked for */}
@@ -251,27 +275,28 @@ export function PlaygroundLab() {
             </div>
           )}
           {/* bottom left: the site's thumb stick. Expanded on a machine with a mouse and a keyboard it would only be in the way. */}
-          <div className={cn("absolute bottom-2 left-2 opacity-80", expanded && "bottom-4 left-4 [@media(pointer:fine)]:hidden")} {...stop}>
+          <div className={cn("absolute bottom-2 left-2 opacity-80", expanded && "bottom-4 left-4 [@media(pointer:fine)]:hidden", !ready && "hidden")} {...stop}>
             <Stick label={t.stick} onChange={(x, y) => { stick.current = [x, y]; }} quarterTurn={turned} className={cn("bg-background/70 backdrop-blur-sm", expanded ? "size-28" : "size-24")} testId="playground-stick" />
           </div>
           {/* bottom right: what a stick cannot say (touch), or what the keys are right now (keyboard) */}
-          <div className={cn("absolute right-2 bottom-2 flex gap-2", expanded && "right-4 bottom-4 [@media(pointer:fine)]:hidden")} {...stop}>
+          <div className={cn("absolute right-2 bottom-2 flex gap-2", expanded && "right-4 bottom-4 [@media(pointer:fine)]:hidden", !ready && "hidden")} {...stop}>
             {seat !== "foot" && <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { interact.current = true; }} data-testid="playground-interact"><CarFront className="size-4" aria-hidden />{seat === "near" ? t.getIn : t.getOut}</Button>}
             {seat === "flying" && <Button size="sm" variant="secondary" className="opacity-90" {...holdDown} data-testid="playground-down"><ArrowDownToLine className="size-4" aria-hidden />{t.descend}</Button>}
             <Button size="sm" variant="secondary" className="opacity-90" onClick={() => { jump.current = true; }} {...(seat === "driving" || seat === "flying" ? holdUp : {})} data-testid="playground-jump"><ArrowUpFromLine className="size-4" aria-hidden />{seat === "driving" ? t.brake : seat === "flying" ? t.climb : t.jump}</Button>
           </div>
-          {expanded && <div className="absolute right-4 bottom-4 hidden [@media(pointer:fine)]:block"><Hints t={t} seat={seat} craft={craft} /></div>}
+          {expanded && ready && <div className="absolute right-4 bottom-4 hidden [@media(pointer:fine)]:block"><Hints t={t} seat={seat} craft={craft} /></div>}
           {/* what the mouse is doing, and how to get it back: at the bottom, clear of the settings */}
-          <p className={cn("pointer-events-none absolute left-1/2 hidden -translate-x-1/2 whitespace-nowrap", expanded ? "bottom-4" : "bottom-2", "rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs text-white/90 backdrop-blur-md [@media(pointer:fine)]:block")} data-testid="playground-lock" data-locked={locked}>{locked ? t.lockOn : expanded ? t.lockOff : t.lockOffArticle}</p>
+          {ready && <p className={cn("pointer-events-none absolute left-1/2 hidden -translate-x-1/2 whitespace-nowrap", expanded ? "bottom-4" : "bottom-2", "rounded-full border border-white/15 bg-black/70 px-3 py-1 text-xs text-white/90 backdrop-blur-md [@media(pointer:fine)]:block")} data-testid="playground-lock" data-locked={locked}>{locked ? t.lockOn : expanded ? t.lockOff : t.lockOffArticle}</p>}
         </Stage>
       </div>
       {!expanded && (
         <>
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             <Readout label={t.spp} value={<span data-testid="playground-spp">{seen ? seen.spp.toLocaleString() : "–"}</span>} />
             <Readout label={t.msPerSample} value={seen?.ms ? seen.ms.toFixed(1) : "–"} unit={t.ms} tone="plain" />
             <Readout label={t.movingTriangles} value={seen?.moving ? seen.moving.toLocaleString() : "–"} tone="plain" />
             <Readout label={t.treeMs} value={seen?.tree ? seen.tree.toFixed(1) : "–"} unit={t.ms} tone="plain" />
+            <Readout label={t.rendered} value={<span data-testid="playground-size">{LEVELS[level].size.join(" × ")}</span>} tone={level ? "alt" : "plain"} />
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4">{settings$}</div>
           <p className="text-muted-foreground">{t.hint}</p>

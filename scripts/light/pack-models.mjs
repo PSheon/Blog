@@ -11,7 +11,8 @@
 // colliders (boxes and spheres, for the physics), seats and the camera anchor.
 //
 // Layout (little endian): u32 jsonBytes, json (padded to 4), f32 positions[9·triangles], u8 kind[triangles]
-// kind: 0 paint, 1 window, 2 tyre.
+// kind: 0 paint, 1 window, 2 tyre, 3 interior (a triangle that the vehicle's own shell hides from nearly every side: seats,
+// floor, dashboard).
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
@@ -61,7 +62,7 @@ for (const name of ["car", "heli", "airplane"]) {
   }
 
   const parts = [{ name: "body", role: "body", rest: null, first: positions.length / 9, count: 0 }], colliders = [], seats = [], anchors = {}, entries = {};
-  const movers = [];
+  const movers = [], shell = [], bodyTriangles = [];
   const visit = (index, parent, part) => {
     const node = gltf.nodes[index], world = mul(parent, trs(node)), data = node.extras?.data;
     if (data === "collision") { const p = accessor(gltf.meshes[node.mesh].primitives[0].attributes.POSITION); let r = 0; const half = [0, 0, 0]; for (let k = 0; k < p.count; k++) { const v = [p.get(k, 0), p.get(k, 1), p.get(k, 2)].map((x, c) => Math.abs(x * Math.hypot(world[c * 4], world[c * 4 + 1], world[c * 4 + 2]))); r = Math.max(r, Math.hypot(...v)); for (let c = 0; c < 3; c++) half[c] = Math.max(half[c], v[c]); } colliders.push(node.extras.shape === "sphere" ? { shape: "sphere", at: [world[12], world[13], world[14]].map(round), radius: round(r) } : { shape: "box", at: [world[12], world[13], world[14]].map(round), half: half.map(round), rest: world.slice(0, 12).map(round) }); return; }
@@ -77,20 +78,34 @@ for (const name of ["car", "heli", "airplane"]) {
         const corners = [0, 1, 2].map((k) => (ix ? ix.get(t + k, 0) : t + k)), tri = corners.flatMap((k) => apply(world, [p.get(k, 0), p.get(k, 1), p.get(k, 2)]));
         let kind = tex?.tyre ? 2 : 0;
         if (tex && !tex.tyre && uv) { let sum = 0; for (const [a, b, c] of [[1 / 3, 1 / 3, 1 / 3], [0.6, 0.2, 0.2], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6]]) { const u = a * uv.get(corners[0], 0) + b * uv.get(corners[1], 0) + c * uv.get(corners[2], 0), v = a * uv.get(corners[0], 1) + b * uv.get(corners[1], 1) + c * uv.get(corners[2], 1); const x = Math.min(tex.w - 1, Math.max(0, Math.floor((u - Math.floor(u)) * tex.w))), y = Math.min(tex.h - 1, Math.max(0, Math.floor((v - Math.floor(v)) * tex.h))); sum += tex.data[y * tex.w + x]; } if (sum / 4 < 24) kind = 1; }
-        if (target === part) { positions.push(...tri); kinds.push(kind); parts[0].count++; } else target.triangles.push({ tri, kind });
+        const record = { tri, kind }; shell.push(record);
+        if (target === part) { bodyTriangles.push(record); parts[0].count++; } else target.triangles.push(record);
       }
     }
     for (const child of node.children ?? []) visit(child, world, target);
   };
   for (const rootNode of gltf.scenes[gltf.scene ?? 0].nodes) visit(rootNode, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], parts[0]);
+  // Interior: from a triangle's middle, look along its own normal and five other ways; if the vehicle itself is in the way nearly
+  // everywhere, it is inside. (The baked texture cannot tell: it is grey everywhere.)
+  const hits = (o, d, skip) => { for (const r of shell) { if (r === skip) continue; const t = r.tri, e1 = [t[3] - t[0], t[4] - t[1], t[5] - t[2]], e2 = [t[6] - t[0], t[7] - t[1], t[8] - t[2]], p = [d[1] * e2[2] - d[2] * e2[1], d[2] * e2[0] - d[0] * e2[2], d[0] * e2[1] - d[1] * e2[0]], det = e1[0] * p[0] + e1[1] * p[1] + e1[2] * p[2]; if (Math.abs(det) < 1e-12) continue; const sv = [o[0] - t[0], o[1] - t[1], o[2] - t[2]], u = (sv[0] * p[0] + sv[1] * p[1] + sv[2] * p[2]) / det; if (u < 0 || u > 1) continue; const q = [sv[1] * e1[2] - sv[2] * e1[1], sv[2] * e1[0] - sv[0] * e1[2], sv[0] * e1[1] - sv[1] * e1[0]], v = (d[0] * q[0] + d[1] * q[1] + d[2] * q[2]) / det; if (v < 0 || u + v > 1) continue; if ((e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) / det > 1e-4) return true; } return false; };
+  let interior = 0;
+  for (const r of bodyTriangles) {
+    if (r.kind !== 0) continue;
+    const t = r.tri, c = [(t[0] + t[3] + t[6]) / 3, (t[1] + t[4] + t[7]) / 3, (t[2] + t[5] + t[8]) / 3], e1 = [t[3] - t[0], t[4] - t[1], t[5] - t[2]], e2 = [t[6] - t[0], t[7] - t[1], t[8] - t[2]], n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]], l = Math.hypot(...n) || 1, N = n.map((x) => x / l);
+    const from = c.map((x, k) => x + N[k] * 0.01); let blocked = 0;
+    for (const d of [N, [1, 0.12, 0.07], [-1, 0.12, 0.07], [0.07, 0.12, 1], [0.07, 0.12, -1], [0.05, 1, 0.08]]) { const dl = Math.hypot(...d); if (hits(from, d.map((x) => x / dl), r)) blocked++; }
+    if (blocked >= (name === "heli" ? 4 : 5) && name !== "airplane") { r.kind = 3; interior++; } // the helicopter's cabin is a bubble with no glass in it: more of the sky gets in // (the aeroplane's cockpit is open to the sky and small; its wings would fool this)
+  }
+  for (const r of bodyTriangles) { positions.push(...r.tri); kinds.push(r.kind); }
   for (const m of movers) { // a mover's triangles go about its own origin
     const first = positions.length / 9;
-    for (const { tri, kind } of m.triangles) { for (let k = 0; k < 3; k++) positions.push(...apply(m.inverse, tri.slice(k * 3, k * 3 + 3))); kinds.push(kind); }
+    for (const { tri, kind } of m.triangles) { for (let k = 0; k < 3; k++) positions.push(...apply(m.inverse, tri.slice(k * 3, k * 3 + 3))); kinds.push(m.role === "rotor" ? 2 : kind); } // rotor blades are dark, like tyres
     parts.push({ name: m.name, role: m.role, steering: m.steering, drive: m.drive, rest: m.rest.slice(0, 3).concat(m.rest.slice(4, 7), m.rest.slice(8, 11), m.rest.slice(12, 15)).map(round), first, count: m.triangles.length });
   }
   const windows = kinds.slice(parts[0].first, parts[0].first + parts[0].count).filter((k) => k === 1).length;
   for (const seat of seats) seat.entries = seat.entries.map((e) => ({ name: e, at: entries[e] })).filter((e) => e.at);
   models[name] = { parts, colliders, seats, anchors };
+  console.log(`  ${interior} interior triangles`);
   console.log(`${name}: ${parts.map((p) => `${p.name}(${p.role}) ${p.count}`).join(", ")}; ${windows} window triangles; ${colliders.length} colliders; seats ${seats.map((s) => s.type).join("/")}`);
 }
 

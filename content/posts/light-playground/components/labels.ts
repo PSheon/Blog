@@ -18,9 +18,10 @@ const zh = {
     { id: "plane", title: "飛機", keys: [["Space", "油門（按住）"], ["S", "拉起機頭"], ["W", "壓低機頭"], ["A D", "壓坡度轉彎"], ["Shift", "煞車"], ["F", "跳機"]] },
   ] as { id: string; title: string; keys: [string, string][] }[],
   lockOff: "點一下畫面，滑鼠就用來轉鏡頭；Esc 收合", lockOffArticle: "點一下畫面，滑鼠就用來轉鏡頭", lockOn: "滑鼠轉鏡頭中　按 Esc 放開滑鼠",
+  enter: "進入遊樂園", entering: "正在下載人物、載具和物理引擎…",
   carry: "沿用上一幀", denoise: "向鄰居借（降噪）",
   place: "帶我去", placeCar: "車", placeHeli: "直升機", placePlane: "飛機",
-  hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", movingTriangles: "會動的三角形", treeMs: "每幀重蓋它們的樹", jump: "跳", getIn: "上去 (F)", getOut: "下來 (F)", brake: "煞車", climb: "上升／油門", descend: "下降／煞車",
+  hour: "太陽的時間", spp: "累積的樣本", msPerSample: "一個樣本", ms: "ms", movingTriangles: "會動的三角形", treeMs: "每幀重蓋它們的樹", rendered: "實際算的解析度", jump: "跳", getIn: "上去 (F)", getOut: "下來 (F)", brake: "煞車", climb: "上升／油門", descend: "下降／煞車",
   stick: "移動：拖曳搖桿，或選取它之後用方向鍵、W A S D",
   hint: "用滑鼠的話，點一下畫面，滑鼠就直接轉動鏡頭，按 Esc 放開；觸控則是拖曳。點過畫面之後，用 W A S D 或方向鍵走路，Shift 衝刺，空白鍵跳；走到車、直升機或飛機旁按 F 上去，再按一次下來。車：同樣的鍵是油門、方向，空白鍵煞車。直升機：空白鍵上升、Shift 下降，前後鍵前傾後仰，左右鍵轉向，放手就懸停。飛機：按住空白鍵加油門，速度夠了把後鍵（S）按住拉起機頭，左右鍵壓坡度轉彎，Shift 煞車；手機用左下角的搖桿和右下角的「跳」。人一動，累積的樣本就全部作廢，畫面回到雜訊；站著不動，它就慢慢變清楚。",
 };
@@ -41,9 +42,10 @@ const en: typeof zh = {
     { id: "plane", title: "Aeroplane", keys: [["Space", "throttle (hold)"], ["S", "nose up"], ["W", "nose down"], ["A D", "bank into a turn"], ["Shift", "brake"], ["F", "bail out"]] },
   ] as { id: string; title: string; keys: [string, string][] }[],
   lockOff: "Click the world and the mouse turns the camera; Esc collapses", lockOffArticle: "Click the world and the mouse turns the camera", lockOn: "The mouse turns the camera. Press Esc to release it",
+  enter: "Enter the playground", entering: "Fetching the character, the vehicles and the physics engine…",
   carry: "Carry the last frame over", denoise: "Borrow from neighbours (denoise)",
   place: "Take me to", placeCar: "a car", placeHeli: "the helicopter", placePlane: "the aeroplane",
-  hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", movingTriangles: "Triangles that move", treeMs: "Their tree, rebuilt per frame", jump: "Jump", getIn: "Get in (F)", getOut: "Get out (F)", brake: "Brake", climb: "Up / throttle", descend: "Down / brake",
+  hour: "Time of day", spp: "Samples so far", msPerSample: "One sample", ms: "ms", movingTriangles: "Triangles that move", treeMs: "Their tree, rebuilt per frame", rendered: "Pixels actually rendered", jump: "Jump", getIn: "Get in (F)", getOut: "Get out (F)", brake: "Brake", climb: "Up / throttle", descend: "Down / brake",
   stick: "Move: drag the stick, or focus it and use the arrow keys or W A S D",
   hint: "With a mouse, click the picture and the mouse turns the camera (Esc releases it); on touch, drag. Once it is clicked, walk with W A S D or the arrow keys, Shift to sprint, Space to jump; walk up to a car, the helicopter or the aeroplane and press F to get in, and again to get out. Car: the same keys are throttle and steering, Space brakes. Helicopter: Space climbs, Shift descends, forward and back tilt it, left and right turn it, and letting go hovers. Aeroplane: hold Space for throttle, at speed hold back (S) to lift the nose, left and right bank into a turn, Shift brakes; on a phone use the stick in the corner and the Jump button. Any movement throws away every sample so far and the picture is noise again; stand still and it clears.",
 };

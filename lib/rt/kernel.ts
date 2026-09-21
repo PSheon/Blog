@@ -344,13 +344,23 @@ struct Out { @builtin(position) position: vec4f, @location(0) uv: vec2f };
   let p = corners[i];
   return Out(vec4f(p, 0.0, 1.0), vec2f(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5));
 }
-@fragment fn fs(in: Out) -> @location(0) vec4f {
-  let x = min(u32(in.uv.x * f32(params.size.x)), params.size.x - 1u); let y = min(u32(in.uv.y * f32(params.size.y)), params.size.y - 1u);
+// One pixel of the picture as it stands: both accumulation buffers, what was carried over, or the filtered image.
+fn shown(x: u32, y: u32) -> vec3f {
   let half = params.size.x * params.size.y; let pixel = y * params.size.x + x;
   let a = accum[pixel]; let b = accum[half + pixel]; let n = max(a.w + b.w, 1.0);
   var c = (a.rgb + b.rgb) / n;
   if (params.temporal == 1u && params.view == 0u) { let old = carried[pixel]; c = (old.rgb * old.w + a.rgb + b.rgb) / max(old.w + a.w + b.w, 1.0); }
   if (params.filterOn == 1u && params.view == 0u) { c = filtered[pixel].rgb; }
+  return c;
+}
+@fragment fn fs(in: Out) -> @location(0) vec4f {
+  // The picture may have fewer pixels than the canvas (Renderer.setRenderSize): read it between its pixels, by weight.
+  // With as many pixels as the canvas the weights are exactly 1 and 0, and nothing is blurred.
+  let at = vec2f(in.uv.x * f32(params.size.x), in.uv.y * f32(params.size.y)) - vec2f(0.5); let base = floor(at); let w = at - base;
+  let x0 = u32(clamp(base.x, 0.0, f32(params.size.x - 1u))); let y0 = u32(clamp(base.y, 0.0, f32(params.size.y - 1u)));
+  let x1 = min(x0 + 1u, params.size.x - 1u); let y1 = min(y0 + 1u, params.size.y - 1u);
+  var c = shown(x0, y0);
+  if (params.view != 1u) { c = mix(mix(c, shown(x1, y0), w.x), mix(shown(x0, y1), shown(x1, y1), w.x), w.y); }
   if (params.view == 1u) {
     // Node visits as heat: black → violet → pink → yellow → white, linear in the count up to heatMax.
     let t = clamp(c.x / f32(params.heatMax), 0.0, 1.0);
