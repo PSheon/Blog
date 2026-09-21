@@ -398,6 +398,17 @@ Per seed, as trained (11…15): closed 100 / 92.5 / 12 / 64 / 87; closed + shake
   seed 11): slow, not stuck. Run 18 gives them 40 000.
 - Look-once tops out near 60 % even untouched: two positions read from one 48 × 48 picture, each needed to 3 cm.
 
+## The blind strip (found by Paul in the page, 2026-09-21)
+
+Paul reported that a block at the edges of the area is never grasped. Measured with the shipped checkpoints (seed 11), 6
+random pads per block position on an 8 × 8 grid: everywhere 6/6 except the edge **away from the head camera**
+(y = −0.22: 0–2 of 6 at most x; −0.16 only at the corners). The mirror edge (y = +0.22) is 6/6. A trace explains it: going
+to (0.26, −0.22) the block's red pixels are gone by step 6, with the hand still 8 cm off, because the hand and forearm
+come in from the camera's side and stand between camera and block; the network has no memory and wanders. Going to
+(0.26, +0.22) the hand arrives from behind the block and grasps at step 12. The whole edge is inside the frame at every
+shake, so it is not cropping. The page tints the strip (y < −0.17) and says so when the block is in it. One head camera,
+one arm on its far side: this is what stereo and palm cameras are for.
+
 ## What this means for the article
 
 0. **Read run 6 first.** Runs 1–4's sizes were one or three seeds at unequal budgets; run 6 has five seeds at one

@@ -2,6 +2,8 @@ import type { Vec3 } from "./model";
 import { AREA, HEAD } from "./model";
 
 type Three = typeof import("@/lib/three");
+/** Blocks with y below this are in the arm's shadow as the head camera sees it (pick and place; see RESULTS.md, run 17). */
+export const BLIND = -0.17;
 export type Mode = "reach" | "pick";
 export type Target = "block" | "pad";
 /** One drawn moment. `block` is its centre (it rides in the hand when held); `jaws` runs 0 (open) to 1 (closed). */
@@ -154,6 +156,11 @@ export class BenchView {
     this.ghost.visible = false;
     scene.add(this.ghost);
     if (mode === "pick") {
+      // The blind strip: on the side of the bench away from the head camera, the reaching arm stands between the camera and
+      // the block (measured: the block's pixels go to zero with the hand still 8 cm off). Tinted, so a failure there explains itself.
+      const strip = new T.Mesh(new T.PlaneGeometry(AREA.x[1] - AREA.x[0], BLIND - AREA.y[0]), new T.MeshBasicMaterial({ color: colours.act, transparent: true, opacity: 0.16, depthWrite: false }));
+      strip.position.set((AREA.x[0] + AREA.x[1]) / 2, (AREA.y[0] + BLIND) / 2, 0.0012);
+      scene.add(strip);
       this.padMaterial = mat(0x46be5a, 0.7);
       this.pad = shadowy(new T.Mesh(new T.BoxGeometry(0.07, 0.07, 0.003), this.padMaterial), false);
       scene.add(this.pad);

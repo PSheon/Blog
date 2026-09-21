@@ -9,7 +9,7 @@ import { useLabels } from "./labels";
 import { NO_SHIFT, type Vec3, type XY } from "./model";
 import { Param } from "./param";
 import { K, PICK_HOME, PICK_SIZE, PickPolicy, type PickState, STEP_XY, STEP_Z, apart, decide, pickAct, pickBones, pickPicture, pickView, usable } from "./pick";
-import type { BenchView, Target } from "./view3d";
+import { BLIND, type BenchView, type Target } from "./view3d";
 
 const STEP_MS = 150;
 const DOTS = ["#ffff00", "#00ff00", "#ff00ff", "#ffffff", "#000000", "#ff8000", "#00a0ff", "#a0ffa0"];
@@ -47,7 +47,7 @@ export function PickLab() {
   const [policies, setPolicies] = useState<Record<Driver, PickPolicy> | null>(null), [failed, setFailed] = useState(false);
   const [driver, setDriver] = useState<Driver>("shaken"), [pitch, setPitch] = useState(0), [yaw, setYaw] = useState(0);
   const [noise, setNoise] = useState(0), [light, setLight] = useState(1), [playing, setPlaying] = useState<boolean | null>(null), [touched, setTouched] = useState(false);
-  const [status, setStatus] = useState({ what: "fetch" as "fetch" | "carry" | "placed" | "home", placed: 0, keys: [] as XY[] });
+  const [status, setStatus] = useState({ what: "fetch" as "fetch" | "carry" | "placed" | "home", placed: 0, keys: [] as XY[], blind: false });
   const running = playing ?? !reduced;
   const world = useRef<World>(fresh()), placed = useRef(0);
   const knobs = useRef({ driver, pitch, yaw, noise, light, running });
@@ -94,7 +94,7 @@ export function PickLab() {
         if (Math.hypot(...d) > 1e-6) pickAct(s, [s.hand[2] > 0.08 ? d[0] / STEP_XY : 0, s.hand[2] > 0.08 ? d[1] / STEP_XY : 0, d[2] / STEP_Z, 0]);
       }
       if (w.seen) paint(eye.current, w.seen);
-      setStatus({ what: w.done ? "placed" : policy.kind === "open" && w.phase === "home" ? "home" : s.holding ? "carry" : "fetch", placed: placed.current, keys: w.keys });
+      setStatus({ what: w.done ? "placed" : policy.kind === "open" && w.phase === "home" ? "home" : s.holding ? "carry" : "fetch", placed: placed.current, keys: w.keys, blind: !s.holding && !w.done && s.block[1] < BLIND });
     };
 
     const tick = (now: number) => {
@@ -183,7 +183,7 @@ export function PickLab() {
         </figure>
         <div className={`absolute bottom-3 left-3 flex items-center gap-3 px-3 py-1.5 ${panel}`} role="status">
           <span className={`size-2 rounded-full ${status.what === "placed" ? "bg-signal" : "animate-pulse bg-signal-2"}`} aria-hidden />
-          <span className="font-sans text-[13px]" data-testid="headcam-pick-status">{words[status.what]}</span>
+          <span className="font-sans text-[13px]" data-testid="headcam-pick-status">{status.blind ? t.pickBlind : words[status.what]}</span>
           <span className="font-mono text-[13px] tabular text-muted-foreground" data-testid="headcam-pick-count">{t.pickCount(status.placed)}</span>
         </div>
         <div className="absolute right-3 bottom-3 flex gap-1.5">
