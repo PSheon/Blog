@@ -22,7 +22,7 @@ Choose your fruit and press Train.
   <TrainLab />
 </Instrument>
 
-At first nothing happens: an untrained model has no idea what fruit is, so after 40 steps the noise is still noise. Once training runs, colour comes first: after about five seconds the left cloud leans towards one colour and the right cloud towards another. At around ten seconds you can make out shapes, and after half a minute the apple has its leaf.<Sidenote>That is the pace on my machine (M-series Mac, Chrome), about 90 training steps per second. Yours will differ. Training and sampling both run in a Web Worker, so scrolling stays smooth; the price is that the two take turns on one core, and the steps/s under the instrument counts only training's share of the time, so it reads higher.</Sidenote>
+At first nothing happens: an untrained model has no idea what fruit is, so after 40 steps the noise is still noise. Once training runs, colour comes first: after about five seconds the left cloud leans towards one colour and the right cloud towards another. At around ten seconds you can make out shapes, and after half a minute the apple has its leaf.<Sidenote>That is the pace on my machine (M-series Mac, Chrome), about 90 training steps per second. Yours will differ. Training and sampling both run in a Web Worker, so scrolling stays smooth; the price is that the two take turns on one core, and the steps/s under the figure counts only training's share of the time, so it reads higher.</Sidenote>
 
 Let me be clear about what this is and is not. **This model cannot "draw fruit". It has memorised the two fruit you picked.** Those are the only two things it has ever seen, so they are all it can produce, along with things in between. A real image model has seen billions of pictures, and that is what lets it draw combinations it never saw.
 
@@ -94,11 +94,11 @@ And ask again from the new position.<Sidenote>This is the DDIM way of stepping: 
 
 Here is one complete run of the model you trained, which you can scrub back and forth. Do try "the model's guess of the result" on the right:
 
-<Instrument fig="04" title="diffusion / steps" caption="One fruit on each side, from the same model as instrument 01. Where the points are is x_t; the model's guess of the result is the x̂₀ of the formula above.">
+<Instrument fig="04" title="diffusion / steps" caption="One fruit on each side, from the same model as figure 01. Where the points are is x_t; the model's guess of the result is the x̂₀ of the formula above.">
   <StepsLab />
 </Instrument>
 
-Pull the slider to about step 4 or 5 and switch to the model's guess. You will see two fuzzy balls, roughly the right colours and with no shape at all. (In the first two or three steps you see not balls but points stuck to the sides of a box: $\bar\alpha_t$ is almost 0 there, so the formula above amounts to dividing by zero, and the smallest error in the model's answer is blown up to the ±1.5 limit. That is a numerical problem, not the model's answer.) **Nothing is broken; this is its best answer at that moment**, the average from the previous section: while the noise is large, the model's guess at the result is the average of the whole fruit, a blob of average colour sitting in the middle.
+Pull the slider to about step 4 or 5 and switch to the model's guess. You will see two fuzzy balls, roughly the right colours and with no shape at all.<Sidenote>In the first two or three steps you see not balls but points stuck to the sides of a box: $\bar\alpha_t$ is almost 0 there, so the formula above divides by a number very close to zero, and the smallest error in the model's answer is blown up to the ±1.5 limit. That is a numerical problem, not the model's answer.</Sidenote> **Nothing is broken; this is its best answer at that moment**, the average from the previous section: while the noise is large, the model's guess at the result is the average of the whole fruit, a blob of average colour sitting in the middle.
 
 This is also why it cannot be done in one step. Trust the model's guess completely on the first step and that average blob is what you get. Taking many small steps means trusting it only a little each time and moving to where the noise is smaller, where the range of possible answers is narrower, their average less blurred, and so the next guess more specific. That is how the shape goes from fuzzy to sharp, round after round.
 
@@ -108,7 +108,7 @@ Set the total number of steps to 3 or 5 to see what too few does: every step is 
 
 Each point is not three numbers but six: **x, y, z, red, green, blue**. To the model, colour and position are the same kind of thing, numbers to be recovered from noise, and every $x$ in the formulas above means all six.
 
-So what it learns is not a shape plus a paint job but one object in six dimensions: "a point at this position should have this colour". The points at the top of the apple are green because, in those six dimensions, that position combined with green is where the fruit is. It is also why the colours scramble along with the positions when you raise the noise in instrument 02.
+So what it learns is not a shape plus a paint job but one object in six dimensions: "a point at this position should have this colour". The points at the top of the apple are green because, in those six dimensions, that position combined with green is where the fruit is. It is also why the colours scramble along with the positions when you raise the noise in figure 02.
 
 ## How it knows which one to grow
 
@@ -116,7 +116,7 @@ One model sculpts two fruit because it is shown two more numbers, $c$: `[1, 0]` 
 
 Text-to-image models do the same thing, except that $c$ is a long list of numbers computed from a piece of text.
 
-And the third cloud in instrument 01? It is given `[0.5, 0.5]`, **numbers the model never saw in training**. Nobody taught it what "half apple, half banana" looks like, so it has to find a compromise between its two answers by itself. The time I trained apple and banana, what grew was something apple-shaped, banana-coloured, with the leaf still on top. A different pair compromises differently.
+And the third cloud in figure 01? It is given `[0.5, 0.5]`, **numbers the model never saw in training**. Nobody taught it what "half apple, half banana" looks like, so it has to find a compromise between its two answers by itself. The time I trained apple and banana, what grew was something apple-shaped, banana-coloured, with the leaf still on top. A different pair compromises differently.
 
 ### Telling it to listen harder
 
@@ -137,12 +137,13 @@ The difference between knowing and not knowing is the part of the direction that
 
 Pull $w$ down to 0 and the two clouds grow into the same thing, an average fruit somewhere between the two, because the model is not listening to which one you want at all. $w = 1$ is the normal look. Going up, the fruit first becomes more typical and the points tighter, and then it starts to deform: in my run, at $w = 4$ the apple was down to a red rim and the banana had shrunk to a sliver.
 
-Real models face the same trade-off: stronger guidance gives results closer to the textbook answer with less variety, and too much breaks them. In that training run of mine it looked best between 1 and 2; image models commonly default to around 7, because their condition (a piece of text) is far vaguer than "one of two fruit" and has to be listened to much harder.
+Real models face the same trade-off: stronger guidance gives results closer to the textbook answer with less variety, and too much breaks them. Mine looked best between 1 and 2; image models commonly default to around 7, because their condition (a piece of text) is far vaguer than "one of two fruit" and has to be listened to much harder.
 
 ## How this differs from a real image model
 
-- **It works on points, not pictures.** One piece of data here is a point, six numbers, so a fully connected network of some twenty thousand parameters is enough. For an image model one piece of data is a whole picture, hundreds of thousands of numbers whose relationships matter, so it takes a far larger convolutional or Transformer network, usually not on the pixels themselves but on a compressed latent version of the picture.
-- **It has seen two things.** As said at the start: this is recitation, not invention. The difference comes from the amount of data, not from the method.
+- **It works on points, not pictures.** One piece of data here is a point, six numbers, so a fully connected network of some twenty thousand parameters is enough. For an image model one piece of data is a whole picture, hundreds of thousands of numbers whose relationships matter, so it takes a far larger convolutional or Transformer network.
+- **It doesn't work on pixels.** Image models usually compress the picture into a small latent space first and run the diffusion there.
+- **It has seen two things.** The difference comes from the amount of data, not from the method.
 - **Everything else is the same.** The noising formula, the guess-the-noise loss, stepping back a little at a time, steering with a condition, strengthening it with guidance: those five things are the ones inside the image models you use.
 
 ## Sources
