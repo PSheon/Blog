@@ -13,7 +13,7 @@ export function useReplay<T>(near: RefObject<Element | null>, key: unknown, buil
 
   useEffect(() => {
     if (!near.current) return;
-    const io = new IntersectionObserver(([entry]) => { if (entry.isIntersecting) { setWanted(true); io.disconnect(); } }, { rootMargin: "1200px" });
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => { if (entry.isIntersecting) { setWanted(true); io.disconnect(); } }, { rootMargin: "1200px" });
     io.observe(near.current);
     return () => io.disconnect();
   }, [near]);

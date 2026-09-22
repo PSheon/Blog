@@ -109,7 +109,7 @@ export function TrainingLab() {
       if (++ticks % 4 === 0) paint();
     };
 
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => (visible = entry.isIntersecting));
     if (rootRef.current) io.observe(rootRef.current);
     const first = window.setTimeout(paint, 0);
     if (running) frame = requestAnimationFrame(loop);

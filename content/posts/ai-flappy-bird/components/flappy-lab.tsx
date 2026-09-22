@@ -92,7 +92,7 @@ export function FlappyLab() {
 
     // Don't burn a core on an instrument nobody is looking at. Watch the whole instrument,
     // not the canvas: on a phone the controls and readouts sit a screen below it.
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => (visible = entry.isIntersecting));
     io.observe(rootRef.current ?? canvas);
     paint();
     if (playing) frame = requestAnimationFrame(loop);

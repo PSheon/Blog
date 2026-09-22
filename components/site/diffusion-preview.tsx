@@ -109,7 +109,7 @@ export default function DiffusionPreview({ className = "block aspect-[8/5] w-ful
       if (want && !raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
       else if (!want && raf) { cancelAnimationFrame(raf); raf = 0; }
     };
-    const io = new IntersectionObserver(([e]) => { visible = e.isIntersecting; run(); });
+    const io = new IntersectionObserver((entries, _observer, e = entries[entries.length - 1]) => { visible = e.isIntersecting; run(); });
     io.observe(canvas);
     document.addEventListener("visibilitychange", run);
     draw(0, 0);

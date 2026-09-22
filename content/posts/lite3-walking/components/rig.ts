@@ -124,7 +124,7 @@ function step(ms: number) {
 export function mountPanel(id: string, host: HTMLElement, knobs: Partial<Knobs>): () => void {
   const panel: Panel = { host, knobs, visible: 0 };
   panels.set(id, panel);
-  const seen = new IntersectionObserver(([entry]) => {
+  const seen = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => {
     panel.visible = entry.intersectionRatio;
     if (state.status === "ready") activate(pick());
   }, { threshold: [0, CLAIM_RATIO, 0.6, 0.9] });

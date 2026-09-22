@@ -147,7 +147,7 @@ export function TrainingLab() {
       s.trainMs += performance.now() - t0;
     };
 
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => (visible = entry.isIntersecting));
     if (rootRef.current) io.observe(rootRef.current);
     frame = requestAnimationFrame(loop);
     return () => {
