@@ -1,17 +1,18 @@
-# paul.notebook — machine learning models built from scratch, trained in your browser
+# paul.notebook — models and systems built from scratch, running in your browser
 
 [![CI](https://github.com/PSheon/Blog/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PSheon/Blog/actions/workflows/ci.yml)
-[![Live site](https://img.shields.io/badge/live-paul--notebook.vercel.app-79dafa)](https://blog.psheon.me)
+[![Live site](https://img.shields.io/badge/live-blog.psheon.me-79dafa)](https://blog.psheon.me)
 
 **[blog.psheon.me](https://blog.psheon.me)** · [English](https://blog.psheon.me/en) · [中文](https://blog.psheon.me/zh) · [RSS](https://blog.psheon.me/en/feed.xml)
 
-An interactive machine-learning blog. Every article takes one model apart — a CNN, a Transformer, a
-diffusion model, neuroevolution, a quadruped's walking policy — and ships with instruments you can train,
-open up and break right in the page. The models are written from scratch in TypeScript: no TensorFlow.js,
-no ONNX Runtime, no server. Bilingual (繁體中文 / English).
+An interactive blog. Every article builds one thing from scratch — a CNN, a Transformer, a diffusion model,
+neuroevolution, a quadruped's walking policy, a SLAM system, a city of autonomous agents, a task scheduler, a path tracer — and
+ships with instruments you can train, open up and break right in the page. Apart from MuJoCo's physics in article 006,
+everything is written in TypeScript and runs in the reader's tab: no TensorFlow.js, no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 
-從零實作機器學習模型的互動部落格：每一篇都能在瀏覽器裡訓練、拆開、弄壞。CNN、Transformer、擴散模型、
-神經演化、機器狗走路策略，全部用 TypeScript 從零寫起，不靠任何機器學習函式庫。
+從零實作的互動部落格：每一篇都能在瀏覽器裡訓練、拆開、弄壞。CNN、Transformer、擴散模型、神經演化、
+機器狗走路策略、SLAM、自己過日子的小鎮居民、任務排程器、路徑追蹤器，全部用 TypeScript 從零寫起，不靠任何機器學習函式庫，
+也不靠伺服器。
 
 ![paul.notebook](https://blog.psheon.me/en/opengraph-image)
 
@@ -33,23 +34,26 @@ no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 | 001 | [A CNN from scratch: watching a convolutional network see](https://blog.psheon.me/en/posts/cnn-from-scratch) | [從零開始的 CNN](https://blog.psheon.me/zh/posts/cnn-from-scratch) |
 
 Built with Next.js 16 (App Router, static generation) · MDX · shadcn/ui (Base UI) · Tailwind v4 · TypeScript ·
-Three.js and MuJoCo WebAssembly where an article needs them.
+Three.js, MuJoCo WebAssembly and WebGPU where an article needs them. The site is a PWA: a hand-written
+service worker (`public/sw.js`) keeps articles readable offline.
 
 ## Develop
 
 ```bash
 pnpm install
 pnpm dev          # http://localhost:3000
-pnpm test         # vitest: lib/ml, lib/content, lib/search, article models
+pnpm test         # vitest (tests/): lib/ml gradients and golden values, content and search, every article's simulation
 pnpm e2e          # playwright: builds, serves and tests the site, incl. axe on every page in both themes
 pnpm lint && pnpm typecheck && pnpm build
 ```
 
 The canonical origin (RSS, sitemap, metadata, OG images) comes from `NEXT_PUBLIC_SITE_URL` if set,
-otherwise from the production domain Vercel assigns. Set the variable once a custom domain is attached.
+otherwise from the production domain Vercel assigns (`lib/site.ts`). Production sets it to
+`https://blog.psheon.me`; preview deployments take their origin from Vercel.
 
 Branches: work on `dev`; `main` changes only through a pull request. Vercel deploys `main` to
-production and gives every pull request a preview.
+production and gives every pull request a preview. Where the project stands and what is in flight:
+[`docs/HANDOFF.md`](docs/HANDOFF.md).
 
 ## Write a post
 
@@ -95,18 +99,28 @@ Conventions that keep pages fast and honest:
 
 | Path | What lives there |
 | --- | --- |
+| `content/posts` | The articles; each one's interactive components live beside it |
 | `lib/ml` | Dependency-free ML: tensor ops and an inference `Sequential`; neuroevolution; a reverse-mode autodiff engine (matrix and image ops, every one checked against finite differences); a decoder-only Transformer; Adam |
-| `lib/content` | Post index, frontmatter schema, table of contents, reading time |
+| `lib/rt` | The path tracer for the light series: scene, BVH, a CPU reference and the WebGPU kernel |
+| `lib/content` | Post index, frontmatter schema, table of contents, reading time, the operator count on the home page |
 | `lib/search.ts` | Full-text index builder and ranking (substring matching, so Chinese works) |
+| `lib/seo.ts`, `lib/site.ts` | Canonical URLs, hreflang and Open Graph basics; the site's origin |
 | `lib/og` | Open Graph card renderer (subsets a CJK font at build time) |
 | `lib/i18n` | Locales and typed UI dictionaries |
+| `lib/three.ts` | The named three.js exports the 3D figures use, so the bundle can be trimmed |
+| `components/site` | Header, home page (hero, post bento, previews), search palette, PWA install and service worker |
+| `components/article` | Article chrome: table of contents, reading progress, footer |
 | `components/lab` | The `Instrument` frame and shared instrument parts |
+| `components/rt` | The path tracer's stage, worker and React hook |
 | `components/mdx` | Prose components |
 | `components/ui` | shadcn/ui components, plus layout primitives ported from Launch UI |
 | `styles/launch-ui.css` | Glass, fade and hairline utilities from Launch UI |
+| `public/sw.js` | The service worker (network first for pages, cache first for immutable assets) |
 | `scripts/train-mnist` | One-off PyTorch training for article 001; exports weights and golden values for the tests |
-| `docs/research` | Measurements and notes behind article design decisions |
+| `scripts/light` | Packs the light series' assets (the playground, the vehicles, the character and its clips) into `public/posts/light-playground/*.bin`: geometry, skeleton and names only, never a texture |
+| `tests` | Vitest suites, grouped by library and by article |
 | `e2e` | Playwright smoke tests and axe accessibility checks |
+| `docs/research`, `docs/reviews` | Measurements and notes behind article decisions; editorial and external reviews |
 
 Retrain the digit classifier with:
 
@@ -124,4 +138,7 @@ render-blocking CSS and took first paint from 1.2 s to 14 s.
 ## Credits
 
 Layout primitives and CSS utilities adapted from [Launch UI](https://www.launchuicomponents.com).
-AAPL price data in the trading article is daily closing prices for 2024.
+AAPL price data in the trading article is daily closing prices for 2024. The Lite3 robot model and
+walking policy in article 006 come from DEEP Robotics; their licences are in `public/lite3/`. The light
+series' playground is the geometry of [Sketchbook](https://github.com/swift502/Sketchbook)'s world by
+Jan Blaha (MIT); its textures are not used and `world.glb` is never committed.
