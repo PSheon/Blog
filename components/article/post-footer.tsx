@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Pencil, ArrowUp } from "lucide-react";
+import { ArrowLeft, ArrowRight, Pencil } from "lucide-react";
 import Link from "next/link";
 import { EntryNo, TagLink } from "@/components/site/post-meta";
 import type { PostMeta } from "@/lib/content/posts";
@@ -52,10 +52,6 @@ export function PostFooter({ locale, post, newer, older, related, t }: Props) {
         >
           <Pencil className="size-3.5" aria-hidden />
           {t.edit}
-        </a>
-        <a href="#top" className="tap flex min-h-6 items-center gap-1.5 text-sm text-muted-foreground hover:text-signal">
-          <ArrowUp className="size-3.5" aria-hidden />
-          {t.backToTop}
         </a>
       </div>
 
