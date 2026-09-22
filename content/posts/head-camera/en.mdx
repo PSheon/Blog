@@ -112,13 +112,13 @@ The first extra thing in the recipe has to do with this. In training, besides sa
 
 ## How it breaks
 
-The three models of fig. 01, given light and noise they never saw in training (200 layouts each). The sliders in fig. 01 do the same thing, and the small picture top right is exactly what the model is shown.
+The three models of fig. 01, given light and noise they never saw in training (200 layouts each). The noise is random, so the noise columns are the range over three draws. The sliders in fig. 01 do the same thing, and the small picture top right is exactly what the model is shown.
 
 | | normal | light 80% | light 70% | light 50% | noise 0.05 | noise 0.15 |
 | --- | --- | --- | --- | --- | --- | --- |
-| Look once | 71% | 72% | 58% | 11% | 15% | 0% |
+| Look once | 71% | 72% | 58% | 11% | 17–22% | 0–2% |
 | Keep looking | 99.5% | 79% | 34% | 0% | 0% | 0% |
-| + shaken, noise, light | 100% | 100% | 100% | 97% | 96.5% | 44.5% |
+| + shaken, noise, light | 100% | 100% | 100% | 97% | 98.5–100% | 47.5–50.5% |
 
 The middle row is down to a third when the light drops by three tenths, and to 0% with a little noise. In its training no pixel's value ever changed, so it was free to lean on exact colours. It is the lesson of the fixed camera again: **what training never varies, the network will come to depend on.** So the second extra thing in the recipe is noise (up to 0.1) and brightness (60% to 120%) at random on every training picture. Inside that range the last row hardly notices; noise of 0.15, outside it, still breaks it.
 
