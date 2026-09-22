@@ -1,0 +1,10 @@
+#!/bin/zsh
+# Run 5: which change makes closed+shake training dependable? 5 variants × 5 seeds, one process each.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run5
+jobs=()
+for seed in 11 12 13 14 15; do
+  jobs+=("base 5000 step 0 $seed" "cosine 5000 cosine 0 $seed" "aux 5000 step 1 $seed" "auxcos 5000 cosine 1 $seed" "long 10000 step 0 $seed")
+done
+printf '%s\n' "${jobs[@]}" | xargs -P 12 -L 1 zsh -c 'HC_STEPS=$1 HC_LR=$2 HC_AUX=$3 HC_SEEDS=$4 HC_TAG=-$0-$4 HC_ANALYTIC=0 HC_KINDS=closed+shake HC_OUT='$OUT' pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept > '$OUT'/$0-$4.log 2>&1'
+echo DONE

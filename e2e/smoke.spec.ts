@@ -613,14 +613,6 @@ test("the hero is four stations: each tab shows a different live model and the p
   await expect(page.getByTestId("hero-tab-act")).toHaveAttribute("aria-selected", "true");
   await expect(figure.locator("figcaption a")).toHaveAttribute("href", "/zh/posts/ai-flappy-bird");
   expect(await height()).toBe(before);
-  // The rail under the hero is the same control: a stop switches the instrument, and the instrument's tabs light the stop.
-  await page.getByTestId("rail-think").click();
-  await expect(page.getByTestId("hero-tab-think")).toHaveAttribute("aria-selected", "true");
-  await expect(figure).toBeInViewport();
-  await page.getByTestId("hero-tab-act").click();
-  await expect(page.getByTestId("rail-act")).toHaveAttribute("aria-pressed", "true");
-  // A stop is still a way to the articles of its kind.
-  await expect(page.locator('nav a[href="/zh/tags/ai-agent"]')).toHaveCount(1);
   // Back to the classifier: it kept its state underneath.
   await page.getByTestId("hero-tab-see").click();
   await expect(page.getByTestId("hero-prediction")).toHaveText("7");

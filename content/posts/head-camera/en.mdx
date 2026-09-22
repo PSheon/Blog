@@ -1,0 +1,142 @@
+---
+title: "A mini Figure AI in three minutes: one camera, one arm"
+description: "Figure's humanoids work from the cameras in their heads. This is the smallest version I could build from scratch: an arm made of boxes that picks a block up and puts it where you say, from one 48 × 48 camera. Knock the camera and it still gets there; a cut-down version trains in your browser in three minutes."
+seoTitle: "A mini Figure AI in 3 minutes: one camera"
+seoDescription: "The smallest Figure, from scratch: an arm picks a block up and puts it where you say from one 48×48 head camera, even with the camera knocked. In your browser."
+date: 2026-09-22
+tags: [robotics, computer-vision, from-scratch]
+no: 13
+interactive: true
+---
+
+import { KeypointsLab, OffsetLab, PickLab, TrainLab } from "./components";
+
+Figure's humanoid robots sort parcels in a warehouse, and their eyes are the cameras in their heads.<Sidenote>Figure's Helix model takes "monocular robot images and robot state information (consisting of wrist pose and finger positions)" and puts out continuous actions for 35 joints, among them **where the head turns**. It was trained on about 500 hours of people teleoperating the robot.</Sidenote> A head turns and a body sways; however firmly the camera is mounted, it does not spend the day exactly where it was calibrated. So how does the hand keep finding things?
+
+Here is that problem shrunk as far as it will go: one arm, a red block, a green pad, and a camera mounted in a "head" whose picture is 48 × 48 pixels. The arm's job is to pick the block up and put it on the pad.
+
+<Instrument fig="01" title="head camera / pick and place" size="wide" caption="Drag the red block and the green pad (a ring and an arrow appear when the pointer is over them), then knock the head camera with the sliders. The blue lines are what the camera can see; top right is its picture. Top left switches between three models trained beforehand: “look once” takes one picture, works out where the block and the pad are, and then does the job with its eyes shut; the dashed pink outlines are where it believes they are. The block can only go inside the dashed violet outline; the reason comes later.">
+  <PickLab />
+</Instrument>
+
+Let it place the block once. Then pull “tilt” to 10°, ask for another layout, and try the three models in turn. “Look once” closes its gripper, quite sure of itself, on empty bench. “Keep looking” circles near the block. “Keep looking + shaken camera” works with its camera askew as if nothing had happened. Try dragging the pad away while the block is on its way, too.
+
+This article is about the difference between those three. The answer is not a better calibration. It is to **look again at every step, and to look at the gap between the hand and where it is going**, and to train in a way that makes the network actually do that.
+
+First, what this is not. It is not Figure: the world is drawn in boxes, the gripper holds anything within 3 cm of it, and the network has a few thousand parameters. One thing survives the shrinking: **learning demonstrated actions from a camera in the head, and nothing else**.
+
+## Look once: work out the position, then go with your eyes shut
+
+The obvious way splits the problem in two. First work out from the picture where on the bench the block and the pad are; then let the arm's joints take the hand there. The second half is accurate, because the arm knows how far each of its joints has turned.
+
+The trouble is the first half. Going from a pixel back to a place on the bench uses the camera's position and direction. Let the camera point 5° lower than you believe, and the same pixel lands **8.8 cm** away on the bench, twice the width of the block.
+
+<Instrument fig="02" title="head camera / one look" caption="The bench from above. Red is where each block really is; dashed pink is where “pixel back to bench” puts it. The arithmetic is perfect. All that is wrong is its belief that the camera has not moved.">
+  <OffsetLab />
+</Instrument>
+
+How far off depends on where the block is; add a little turn and even the direction differs from place to place, so no fixed correction can be added afterwards.
+
+## Keep looking: mind only the gap between the hand and the goal
+
+The other way never works out where anything is. At every step it looks at the picture, finds the hand, finds the goal, sees how far apart they are in the picture, and moves a little in the direction that closes the gap.
+
+Its error has one very good property: **when the hand really is on the goal, the gap in the picture is zero, however crooked the camera.** A crooked camera makes each step a little off, but the next step sees the new gap and corrects. This is visual servoing, an old method in robotics. On a cut-down task (just touch the block), with true pixel positions and no learning at all, it arrives every time with the camera 20° off; working out positions, under the same conditions, is down to one try in ten at 2°.
+
+What the rest of this article asks is: will a network that learns from demonstrations turn into that by itself?
+
+## A learned “keep looking” is fooled all the same
+
+A script is the teacher: it knows where the block and the pad are, and at every step says which way to move, whether to go down, and whether to grip. The network sees only the 48 × 48 picture at every step, plus the hand's height and whether the gripper is open, and learns to say the same.<Sidenote>It is deliberately not told where its hand is over the bench. If it were, it could find its way back to working out absolute positions, the road that breaks when the camera moves. Helix does read wrist pose; at its scale the data can settle this. This little network cannot.</Sidenote> In training the camera never moves.
+
+The result is not visual servoing. The “keep looking” in fig. 01 was trained this way: with the camera untouched it places nearly every block, at 5° of tilt half of them, and **at 10° one in a hundred**.
+
+In training the camera never moved, so "where the block is in the picture" and "how far the hand is from the block" always changed together, and either one explains everything the teacher ever said. The network has no reason to prefer the second; once the camera tilts, the first, which it leaned on, is wrong.
+
+## The fix: shake the camera in training
+
+So make the first one useless in training. Every training picture is taken by a camera knocked at random: ±10° up, down and sideways, ±3 cm in position. Now "where things are in the picture" no longer predicts which way to move; only "how far the hand is from its goal" still does.
+
+Four ways of doing it, each the mean of five random seeds:
+
+| | untouched | tilt 10° | turn 10° | block moved | pad moved |
+| --- | --- | --- | --- | --- | --- |
+| Look once | 66% | 0% | 0% | 18% | 12% |
+| Look once + shaken | 51% | 53% | 46% | 16% | 11% |
+| Keep looking | 96% | 1% | 9% | 94% | 96% |
+| Keep looking + shaken | 95% | 93% | 92% | 95% | 96% |
+
+Read across: the two rows that never saw a shaken camera go to almost nothing the moment it tilts; the two that did barely notice. Read down: when something is moved halfway through, “look once” cannot follow and “keep looking” does not care, because it was looking again at every step anyway.
+
+The last two rows both trained for 60,000 steps and are equally good with the camera untouched (96% and 95%); they differ only once it tilts. In the last row all five seeds are above 92%, and that number was hard won: at 20,000 steps the five seeds were 100, 97, 59, 37 and 2.5. The method was the same; some seeds simply learn slowly, and three times the steps brought every one of them in.<Sidenote>The two “look once” rows trained for only 10,000 steps: it sees one picture an episode, and more training does not give it a second look.</Sidenote>
+
+## Why picking up is harder than touching
+
+I failed at this task three times before it trained.
+
+**The teacher has to speak smoothly.** The first teacher said "rise, then travel, then descend". "Should I be travelling now" then hangs on whether the height has crossed a threshold, a small network does not learn a switch like that, and the hand hung in the air without moving. "Always head for the goal, and let the height fall smoothly as it comes near" is what trained.
+
+**A rare action needs extra practice.** "Grip" only comes up when the hand is low and right over the block: under 1% of training pictures drawn at random. The network learned "almost never grip". With a fifth of the training pictures drawn from that region, it dared to.
+
+**The hand hides the block.** Once the hand is low over the block, seen from the head, it covers the block, and there is nothing left to line up on for the last two centimetres. That is why this gripper forgives 3 cm. The same thing has a bigger version, which is why fig. 01's dashed outline does not cover the whole bench: outside it, on the side away from the camera, the reaching hand and forearm come between the camera and the block, and with the hand still 8 cm away not one pixel of the block is left in the picture. The network has no memory; what it cannot see, it cannot head for. I measured the bench every 2 cm: in every cell inside the outline it places at least 19 blocks in 20; outside there is a large patch where it never places one, so the page does not let the block go there. The pad is large and flat and is fine anywhere.
+
+Figure 03 put cameras in the palms, and the stated reason is close-range pictures "when the main cameras are occluded". Here you can see why.
+
+Resolution only became a problem here, too. At 32 × 32 a pixel is 1 to 2 cm of bench, and this job needs 3 cm twice over: it stalled around seven in ten after 40,000 steps, while 48 × 48 reached nine in ten in 20,000 (two seeds each).
+
+## Train one yourself
+
+The pick-and-place model takes tens of minutes to train, which is not something to do in a web page. But the same story has a three-minute version: the task shrinks to "move the hand onto the block", the picture to 32 × 32, the network to 2,138 parameters. The recipe is the first model's in fig. 01: keep looking, a shaken camera, and two more things the next two sections explain. 160,000 pictures, all of it in JavaScript in your browser, no GPU.
+
+<Instrument fig="03" title="head camera / train" caption="10,000 steps of 16 random pictures, each with its own camera, noise and brightness. The picture on the left is fixed; the coloured dots are the network's eight keypoints at this moment. When it is trained it is tested on 100 random places, and then it is your turn: the picture starts running your model, episode after episode, and the slider knocks its camera.">
+  <TrainLab />
+</Instrument>
+
+On my machine (an M4 Pro, Chromium) it takes 190 seconds. The seed is random, so every run differs: five runs of the same recipe gave me 88% to 98.5% with the camera untouched.
+
+## What it looks at
+
+The network's last convolution squeezes the picture into the coordinates of eight points, the coloured dots in the figures. The rest of the network gets only those 16 numbers, so those eight points are what it "looks at".
+
+<Instrument fig="04" title="head camera / keypoints" caption="One picture, two cut-down networks, and where each puts its eight keypoints. The one on the left never had its camera moved in training; the one on the right was shaken (fig. 03's recipe). Ask for a few scenes and see which colours follow the red block and which follow the cyan hand.">
+  <KeypointsLab />
+</Instrument>
+
+On the right the yellow and magenta dots follow the block and the blue one follows the hand; on the left only the black dot follows the hand, and none follows the block.
+
+It is not always this tidy. Of five never-shaken seeds, one grew a point that follows the block; of five shaken ones, three did, and the two that did not still score 91% and 92.5%. So a point sitting on the block is **clear evidence** that it is looking at the block, not a requirement.<Sidenote>"Follows the block" is measured over 300 random scenes: regress the point's coordinates on the block's place in the picture, and call it following when R² is above 0.6. Hand and block are placed independently, so a point cannot score high on both by accident.</Sidenote>
+
+The first extra thing in the recipe has to do with this. In training, besides saying "which way", the network also has to say, from those eight points, "where in the picture the hand and the block are". That question exists only in training and is thrown away afterwards, but on the cut-down task it lifted the worst seed at 5,000 steps from 43% to 70%. Figure has something it calls visual proprioception, estimating where the robot's own hands are from its own cameras alone; this is a miniature of it.
+
+## How it breaks
+
+The three models of fig. 01, given light and noise they never saw in training (200 layouts each). The sliders in fig. 01 do the same thing, and the small picture top right is exactly what the model is shown.
+
+| | normal | light 80% | light 70% | light 50% | noise 0.05 | noise 0.15 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Look once | 71% | 72% | 58% | 11% | 15% | 0% |
+| Keep looking | 99.5% | 79% | 34% | 0% | 0% | 0% |
+| + shaken, noise, light | 100% | 100% | 100% | 97% | 96.5% | 44.5% |
+
+The middle row is down to a third when the light drops by three tenths, and to 0% with a little noise. In its training no pixel's value ever changed, so it was free to lean on exact colours. It is the lesson of the fixed camera again: **what training never varies, the network will come to depend on.** So the second extra thing in the recipe is noise (up to 0.1) and brightness (60% to 120%) at random on every training picture. Inside that range the last row hardly notices; noise of 0.15, outside it, still breaks it.
+
+## What is really different from Figure
+
+- **Scale**: 35 joints, 200 outputs a second, an 80-million-parameter action network under a 7-billion-parameter language model that understands the instruction; here, four numbers, a few thousand parameters, and no language.
+- **Cameras**: Figure later went to stereo and added cameras in the palms. Both blind spots in this article, the hand covering the block and the arm hiding the far side, are the price of a single camera in the head.<Sidenote>The camera sits 22 cm beside the shoulder and 62 cm up. My first version had it straight above the arm, where the forearm hid the hand completely, and even the cut-down task only got there six times in ten.</Sidenote>
+- **Language**: Helix understands a sentence. On the cut-down task I tried naming the red or the yellow block with one word: letting the word modulate the convolution's channels (FiLM, as RT-1 does) reached 75% after 20,000 steps and was still improving, so it is not in this page.
+- **The head moves**: Helix's outputs include where the head points, so the robot decides where to look. This head only gets knocked; it never turns itself.
+
+But the heart of it is the same: do not compute a precise map of the world and then act with your eyes shut. **Look at every step, at the gap between the hand and its goal**, and let the camera, the light and the noise in the training data all be a little wild, so that the gap is the only thing the network can use.
+
+## How the numbers were measured
+
+Figs. 02 and 03 are computed live in your browser; every other number was measured offline on my machine. The pick-and-place table: each cell is the mean of five training seeds, 200 layouts a seed, the block only where fig. 01 allows it, and success means the block released within 3 cm of the pad inside 90 steps; the cut-down task's numbers are 200 to 300 episodes a condition. Every model in this page has a test that checks it computes exactly what the research script computed. The scripts, the per-seed logs, the three failures and every experiment that did not make it into the article are in `docs/research/head-camera/`.
+
+## Sources
+
+- Figure AI, [*Helix: A Vision-Language-Action Model for Generalist Humanoid Control*](https://www.figure.ai/news/helix), 2025; [*Helix logistics*](https://www.figure.ai/news/helix-logistics) (stereo, visual proprioception); [*Introducing Figure 03*](https://www.figure.ai/news/introducing-figure-03) (palm cameras).
+- Visual servoing: Hutchinson, Hager, Corke, [*A Tutorial on Visual Servo Control*](https://doi.org/10.1109/70.538972), IEEE Transactions on Robotics and Automation, 1996.
+- Spatial-softmax keypoints: Levine, Finn, Darrell, Abbeel, [*End-to-End Training of Deep Visuomotor Policies*](https://arxiv.org/abs/1504.00702), JMLR 2016.
+- Scrambling the training pictures: Tobin et al., [*Domain Randomization for Transferring Deep Neural Networks from Simulation to the Real World*](https://arxiv.org/abs/1703.06907), IROS 2017.
+- FiLM: Perez et al., [*FiLM: Visual Reasoning with a General Conditioning Layer*](https://arxiv.org/abs/1709.07871), AAAI 2018; RT-1: Brohan et al., [*RT-1: Robotics Transformer for Real-World Control at Scale*](https://arxiv.org/abs/2212.06817), 2022.

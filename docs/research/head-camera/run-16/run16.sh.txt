@@ -1,0 +1,11 @@
+#!/bin/zsh
+# Run 16: make the shaken pick-and-place dependable. S48: 48 px, 20 000 steps. S40: 32 px, 40 000 steps. 2 seeds each.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run16
+common="HP_DIAG=1 HP_TEACHER=0 HP_KINDS=closed HP_SHAKE=1 HP_EPISODES=100"
+for s in 11 12; do
+  env ${=common} HP_STEPS=20000 HP_SIZE=48 HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/S48-20k-$s.log 2>&1 &
+  env ${=common} HP_STEPS=40000 HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/S32-40k-$s.log 2>&1 &
+done
+wait
+echo DONE

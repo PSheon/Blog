@@ -1,0 +1,22 @@
+closed+shake seed 15: camera as trained 97.5 | pitch 2° 99.0 | pitch 5° 98.0 | pitch 10° 99.0 | pitch 20° 72.0 | yaw 2° 97.5 | yaw 5° 97.5 | yaw 10° 92.0 | yaw 20° 55.5 | moved 3 cm sideways 97.0 | block moved at step 8 97.5
+  what the keypoints follow (seed 15):
+    keypoint 0: hand R² 0.36, block R² 0.02, moves 0.147
+    keypoint 1: hand R² 0.02, block R² 0.58, moves 0.215
+    keypoint 2: hand R² 0.21, block R² 0.53, moves 0.167
+    keypoint 3: hand R² 0.01, block R² 0.75, moves 0.179  → BLOCK
+    keypoint 4: hand R² 0.65, block R² 0.14, moves 0.199  → HAND
+    keypoint 5: hand R² 0.29, block R² 0.52, moves 0.179
+    keypoint 6: hand R² 0.45, block R² 0.00, moves 0.219
+    keypoint 7: hand R² 0.73, block R² 0.04, moves 0.124  → HAND
+== closed+shake: 10000 steps of 16, 178 s a model, 1 seeds; mean (min–max)
+  camera as trained: 97.5% (97.5–97.5)
+  pitch 2°: 99.0% (99.0–99.0)
+  pitch 5°: 98.0% (98.0–98.0)
+  pitch 10°: 99.0% (99.0–99.0)
+  pitch 20°: 72.0% (72.0–72.0)
+  yaw 2°: 97.5% (97.5–97.5)
+  yaw 5°: 97.5% (97.5–97.5)
+  yaw 10°: 92.0% (92.0–92.0)
+  yaw 20°: 55.5% (55.5–55.5)
+  moved 3 cm sideways: 97.0% (97.0–97.0)
+  block moved at step 8: 97.5% (97.5–97.5)

@@ -1,0 +1,2 @@
+late seed 14: as trained 30.5 (wrong 2.0) | only the named block 36.5 (wrong 1.5) | instruction switched at step 8 38.5 (wrong 2.0) | named block moved at step 8 35.5 (wrong 3.0) | pitch 5° 31.5 (wrong 2.5) | yaw 10° 27.0 (wrong 2.5) | noise 0.05 30.5 (wrong 3.0) | light 70 % 24.0 (wrong 3.0)
+== late: 10000 steps of 16, 298 s, 2478 parameters

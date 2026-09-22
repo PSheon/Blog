@@ -1,0 +1,13 @@
+open+shake seed 13: camera as trained 76.0 | pitch 2° 65.0 | pitch 5° 75.5 | pitch 10° 78.0 | pitch 20° 11.0 | yaw 2° 73.5 | yaw 5° 73.5 | yaw 10° 53.5 | yaw 20° 15.5 | moved 3 cm sideways 72.0 | block moved at step 8 60.5
+== open+shake: 10000 steps of 16, 221 s a model, 1 seeds; mean (min–max)
+  camera as trained: 76.0% (76.0–76.0)
+  pitch 2°: 65.0% (65.0–65.0)
+  pitch 5°: 75.5% (75.5–75.5)
+  pitch 10°: 78.0% (78.0–78.0)
+  pitch 20°: 11.0% (11.0–11.0)
+  yaw 2°: 73.5% (73.5–73.5)
+  yaw 5°: 73.5% (73.5–73.5)
+  yaw 10°: 53.5% (53.5–53.5)
+  yaw 20°: 15.5% (15.5–15.5)
+  moved 3 cm sideways: 72.0% (72.0–72.0)
+  block moved at step 8: 60.5% (60.5–60.5)

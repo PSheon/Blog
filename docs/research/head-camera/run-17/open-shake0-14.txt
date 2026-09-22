@@ -1,0 +1,12 @@
+  open seed 14 step 1000: loss 0.1637
+  open seed 14 step 2000: loss 0.0386
+  open seed 14 step 3000: loss 0.0332
+  open seed 14 step 4000: loss 0.0391
+  open seed 14 step 5000: loss 0.0505
+  open seed 14 step 6000: loss 0.0320
+  open seed 14 step 7000: loss 0.0275
+  open seed 14 step 8000: loss 0.0217
+  open seed 14 step 9000: loss 0.0210
+  open seed 14 step 10000: loss 0.0209
+open seed 14: as trained 63.0 (grasped 75) | pitch 5° 0.0 (grasped 1) | pitch 10° 0.0 (grasped 2) | pitch 20° 0.0 (grasped 0) | yaw 10° 0.0 (grasped 0) | block moved early 17.0 (grasped 20) | pad moved while carrying 9.5 (grasped 73) | shoved 5 cm 64.5 (grasped 75)
+== open: 10000 steps, 434 s, size 48

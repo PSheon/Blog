@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { type ComponentType, ViewTransition } from "react";
 import { PostFooter } from "@/components/article/post-footer";
 import { ReadingProgress } from "@/components/article/progress";
+import { BackToTop } from "@/components/article/back-to-top";
 import { ScrollableMath } from "@/components/article/scrollable-math";
 import { Toc, TocDisclosure } from "@/components/article/toc";
 import { EntryNo, InteractiveBadge, TagLink } from "@/components/site/post-meta";
@@ -84,6 +85,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
     <>
       <ReadingProgress />
       <ScrollableMath label={t.post.mathLabel} tableLabel={t.post.tableLabel} codeLabel={t.post.codeLabel} />
+      <BackToTop label={t.post.backToTop} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
@@ -92,7 +94,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
       >
         <aside className="hidden xl:block">
           <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-8">
-            <Toc items={toc} label={t.post.toc} top={t.post.backToTop} />
+            <Toc items={toc} label={t.post.toc} />
           </div>
         </aside>
 

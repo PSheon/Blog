@@ -91,6 +91,17 @@ describe("Tape gradients match finite differences", () => {
 });
 
 describe("Tape forward values", () => {
+  it("causalSoftmax with a prefix lets the prefix see itself whole, keeps the rest causal, and its gradient is right", () => {
+    const s = rand(6, 6, 11), w = rand(6, 6, 12), p = new Tape().causalSoftmax(s, 3);
+    for (let i = 0; i < 6; i++) {
+      const last = i < 3 ? 2 : i;
+      let sum = 0;
+      for (let j = 0; j < 6; j++) { sum += p.data[i * 6 + j]; if (j > last) expect(p.data[i * 6 + j]).toBe(0); else expect(p.data[i * 6 + j]).toBeGreaterThan(0); }
+      expect(sum).toBeCloseTo(1, 12);
+    }
+    check([s], (t) => weightedSum(t, t.causalSoftmax(s, 3), w));
+  });
+
   it("causalSoftmax never looks ahead and each row sums to 1", () => {
     const p = new Tape().causalSoftmax(rand(4, 4, 3));
     for (let i = 0; i < 4; i++) {

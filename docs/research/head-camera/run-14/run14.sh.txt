@@ -1,0 +1,12 @@
+#!/bin/zsh
+# Run 14: flat-bottomed funnel + oversampled grip states. A 32 px, B 48 px, D told hand x–y (learnability check). 20 000 steps.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run14
+common="HP_DIAG=1 HP_TRACE=1 HP_TEACHER=0 HP_KINDS=closed HP_SHAKE=0 HP_STEPS=20000 HP_EPISODES=100"
+for s in 11 12; do
+  env ${=common} HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/A-base-$s.log 2>&1 &
+  env ${=common} HP_SEEDS=$s HP_SIZE=48 pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/B-48-$s.log 2>&1 &
+  env ${=common} HP_SEEDS=$s HP_FEELXY=1 pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/D-feelxy-$s.log 2>&1 &
+done
+wait
+echo DONE

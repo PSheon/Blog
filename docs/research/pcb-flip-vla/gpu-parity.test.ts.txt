@@ -1,0 +1,77 @@
+// The WebGPU kernels against lib/ml (f64, the reference), and what a training step costs on this GPU.
+// Needs a browser with WebGPU: launches Playwright's Chromium with --enable-unsafe-webgpu. No adapter → says so and stops.
+// Run: cp docs/research/pcb-flip-vla/gpu-parity.test.ts.txt tests/vla/gpu-parity.test.ts
+//      pnpm exec vitest run tests/vla/gpu-parity.test.ts --disable-console-intercept ; rm tests/vla/gpu-parity.test.ts
+import { readFileSync } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
+import { chromium } from "@playwright/test";
+import { expect, it } from "vitest";
+import { Mat, mulberry32, Tape } from "@/lib/ml";
+
+const rng = mulberry32(5), noise = (n: number) => Float64Array.from({ length: n }, () => rng() * 2 - 1);
+const worst = (got: number[], want: Float64Array) => { let e = 0; want.forEach((w, i) => { e = Math.max(e, Math.abs(got[i] - w) / Math.max(1, Math.abs(w))); }); return e; };
+
+it("kernels agree with lib/ml, and a training step is timed", async () => {
+  const source = stripTypeScriptTypes(readFileSync("content/posts/pcb-flip-vla/components/gpu/kernels.ts", "utf8")).replace(/^export /gm, "");
+  const browser = await chromium.launch({ args: ["--enable-unsafe-webgpu", "--enable-features=WebGPU", "--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"] });
+  const page = await browser.newPage();
+  page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") console.log("[page]", m.text()); });
+  await page.goto("http://localhost:" + (process.env.VLA_PORT ?? "3109") + "/zh"); // any secure context will do
+  await page.addScriptTag({ content: `${source}\nglobalThis.__gpu = { Gpu, timeTrainingStep };` });
+  const adapter = await page.evaluate(async () => { const g = await (globalThis as any).__gpu.Gpu.create(); (globalThis as any).__g = g; return g ? g.adapterName : null; });
+  if (!adapter) { console.log("NO WEBGPU ADAPTER: parity and timing were NOT run"); await browser.close(); return; }
+  console.log("adapter:", adapter);
+
+  // ── matmul: forward, and both gradients through the transposed forms ──
+  const m = 37, k = 29, n = 23, A = new Mat(m, k, noise(m * k)), B = new Mat(k, n, noise(k * n)), tape = new Tape(), C = tape.matmul(A, B), dC = noise(m * n);
+  C.grad.set(dC); tape.backward();
+  const mm = await page.evaluate(async ({ a, b, dc, m, k, n }) => {
+    const g = (globalThis as any).__g, f = (x: number[]) => new Float32Array(x), T = (x: number[]) => g.tensor(x.length, f(x));
+    const ta = T(a), tb = T(b), tdc = T(dc), c = g.tensor(m * n), da = g.tensor(m * k), db = g.tensor(k * n);
+    g.matmul(ta, tb, c, { m, k, n }); g.matmul(tdc, tb, da, { m, k: n, n: k, transposeB: true }); g.matmul(ta, tdc, db, { m: k, k: m, n, transposeA: true });
+    return { c: [...(await g.read(c))], da: [...(await g.read(da))], db: [...(await g.read(db))] };
+  }, { a: [...A.data], b: [...B.data], dc: [...dC], m, k, n });
+  console.log(`matmul ${m}x${k}x${n}: forward ${worst(mm.c, C.data).toExponential(1)}, dA ${worst(mm.da, A.grad).toExponential(1)}, dB ${worst(mm.db, B.grad).toExponential(1)}`);
+  expect(worst(mm.c, C.data)).toBeLessThan(1e-4); expect(worst(mm.da, A.grad)).toBeLessThan(1e-4); expect(worst(mm.db, B.grad)).toBeLessThan(1e-4);
+
+  // ── batched matmul with a batched right-hand side (attention) ──
+  const bt = 5, T_ = 11, dh = 7, Q = noise(bt * T_ * dh), K = noise(bt * T_ * dh), want = new Float64Array(bt * T_ * T_);
+  for (let z = 0; z < bt; z++) for (let i = 0; i < T_; i++) for (let j = 0; j < T_; j++) for (let p = 0; p < dh; p++) want[z * T_ * T_ + i * T_ + j] += Q[z * T_ * dh + i * dh + p] * K[z * T_ * dh + j * dh + p];
+  const qk = await page.evaluate(async ({ q, kk, bt, T_, dh }) => { const g = (globalThis as any).__g, out = g.tensor(bt * T_ * T_); g.matmul(g.tensor(q.length, new Float32Array(q)), g.tensor(kk.length, new Float32Array(kk)), out, { m: T_, k: dh, n: T_, transposeB: true, batch: bt, batchedB: true }); return [...(await g.read(out))]; }, { q: [...Q], kk: [...K], bt, T_, dh });
+  console.log(`batched q·kT: ${worst(qk, want).toExponential(1)}`); expect(worst(qk, want)).toBeLessThan(1e-4);
+
+  // ── layer norm ──
+  const rows = 19, d = 24, X = new Mat(rows, d, noise(rows * d)), G = new Mat(1, d, noise(d)), Bi = new Mat(1, d, noise(d)), t2 = new Tape(), Y = t2.layerNorm(X, G, Bi), dY = noise(rows * d);
+  Y.grad.set(dY); t2.backward();
+  const ln = await page.evaluate(async ({ x, gn, bi, dy, rows, d }) => {
+    const g = (globalThis as any).__g, T = (v: number[]) => g.tensor(v.length, new Float32Array(v)), tx = T(x), tg = T(gn), y = g.tensor(rows * d), dx = g.tensor(rows * d), dg = g.tensor(d), db = g.tensor(d);
+    g.layerNorm(tx, tg, T(bi), y, rows, d); g.layerNormBackward(tx, tg, T(dy), dx, dg, db, g.tensor(rows * d), rows, d);
+    return { y: [...(await g.read(y))], dx: [...(await g.read(dx))], dg: [...(await g.read(dg))], db: [...(await g.read(db))] };
+  }, { x: [...X.data], gn: [...G.data], bi: [...Bi.data], dy: [...dY], rows, d });
+  console.log(`layer norm ${rows}x${d}: forward ${worst(ln.y, Y.data).toExponential(1)}, dx ${worst(ln.dx, X.grad).toExponential(1)}, dgain ${worst(ln.dg, G.grad).toExponential(1)}, dbias ${worst(ln.db, Bi.grad).toExponential(1)}`);
+  for (const [got, ref] of [[ln.y, Y.data], [ln.dx, X.grad], [ln.dg, G.grad], [ln.db, Bi.grad]] as const) expect(worst(got, ref)).toBeLessThan(1e-3);
+
+  // ── softmax: causal against lib/ml, then the prefix mask against a plain reference ──
+  const t = 13, S = new Mat(t, t, noise(t * t)), t3 = new Tape(), P = t3.causalSoftmax(S), dP = noise(t * t);
+  P.grad.set(dP); t3.backward();
+  const prefix = 5, wantPrefix = new Float64Array(t * t);
+  for (let i = 0; i < t; i++) { const last = i < prefix ? Math.max(i, prefix - 1) : i; let sum = 0; for (let j = 0; j <= last; j++) sum += Math.exp(S.data[i * t + j]); for (let j = 0; j <= last; j++) wantPrefix[i * t + j] = Math.exp(S.data[i * t + j]) / sum; }
+  const sm = await page.evaluate(async ({ s, dp, t, prefix }) => {
+    const g = (globalThis as any).__g, T = (v: number[]) => g.tensor(v.length, new Float32Array(v)), ts = T(s), y = g.tensor(t * t), dx = g.tensor(t * t), yp = g.tensor(t * t);
+    g.softmax(ts, y, 1, t, 0); g.softmaxBackward(y, T(dp), dx, 1, t); g.softmax(ts, yp, 1, t, prefix);
+    return { y: [...(await g.read(y))], dx: [...(await g.read(dx))], yp: [...(await g.read(yp))] };
+  }, { s: [...S.data], dp: [...dP], t, prefix });
+  console.log(`softmax ${t}x${t}: causal forward ${worst(sm.y, P.data).toExponential(1)}, backward ${worst(sm.dx, S.grad).toExponential(1)}, prefix-${prefix} forward ${worst(sm.yp, wantPrefix).toExponential(1)}`);
+  expect(worst(sm.y, P.data)).toBeLessThan(1e-5); expect(worst(sm.dx, S.grad)).toBeLessThan(1e-5); expect(worst(sm.yp, wantPrefix)).toBeLessThan(1e-5);
+
+  // ── what a step costs ──
+  for (const [label, shape] of [
+    ["the model as trained in stage 0.2: 4 frames, 170 tokens", { batch: 128, tokens: 170, d: 96, heads: 6, layers: 4, prefix: 151, vocab: 35 }],
+    ["2 frames, 98 tokens", { batch: 128, tokens: 98, d: 96, heads: 6, layers: 4, prefix: 79, vocab: 35 }],
+    ["4 frames, batch 32", { batch: 32, tokens: 170, d: 96, heads: 6, layers: 4, prefix: 151, vocab: 35 }],
+  ] as const) {
+    const r = await page.evaluate(async (shape) => (globalThis as any).__gpu.timeTrainingStep((globalThis as any).__g, shape, 5), shape);
+    console.log(`${label}: ${r.msPerStep.toFixed(0)} ms per step, ${(r.flopsPerStep / r.msPerStep / 1e6).toFixed(0)} GFLOP/s effective; 3000 steps = ${((3000 * r.msPerStep) / 60000).toFixed(1)} min`);
+  }
+  await browser.close();
+}, 600_000);

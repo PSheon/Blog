@@ -9,7 +9,6 @@ import { EntryNo, InteractiveBadge } from "@/components/site/post-meta";
 import { PostPreview } from "@/components/site/post-previews";
 import { NumberTicker } from "@/components/site/number-ticker";
 import { SectionHeading } from "@/components/site/section-heading";
-import { TriadRail } from "@/components/site/triad-rail";
 import { countOperators } from "@/lib/content/ml-stats";
 import { hasPreview } from "@/lib/content/previews";
 import { buttonVariants } from "@/components/ui/button";
@@ -102,13 +101,6 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
         />
         </div>
       </section>
-
-      <TriadRail
-        locale={locale}
-        label={t.home.topics}
-        show={t.hero.railShow}
-        stops={t.hero.topics.map((s, i) => ({ ...s, color: RAIL_COLORS[i], count: posts.filter((p) => p.tags.includes(s.tag)).length }))}
-      />
 
       {latest && (
         <section aria-labelledby="latest" className="border-t border-rule py-12">

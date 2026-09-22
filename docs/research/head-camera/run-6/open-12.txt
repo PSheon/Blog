@@ -1,0 +1,13 @@
+open seed 12: camera as trained 81.0 | pitch 2° 13.5 | pitch 5° 15.5 | pitch 10° 2.0 | pitch 20° 1.5 | yaw 2° 10.5 | yaw 5° 3.0 | yaw 10° 1.5 | yaw 20° 0.0 | moved 3 cm sideways 2.5 | block moved at step 8 61.5
+== open: 10000 steps of 16, 217 s a model, 1 seeds; mean (min–max)
+  camera as trained: 81.0% (81.0–81.0)
+  pitch 2°: 13.5% (13.5–13.5)
+  pitch 5°: 15.5% (15.5–15.5)
+  pitch 10°: 2.0% (2.0–2.0)
+  pitch 20°: 1.5% (1.5–1.5)
+  yaw 2°: 10.5% (10.5–10.5)
+  yaw 5°: 3.0% (3.0–3.0)
+  yaw 10°: 1.5% (1.5–1.5)
+  yaw 20°: 0.0% (0.0–0.0)
+  moved 3 cm sideways: 2.5% (2.5–2.5)
+  block moved at step 8: 61.5% (61.5–61.5)

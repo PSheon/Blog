@@ -44,7 +44,6 @@ const en: Dictionary = {
     instrumentCaption: "A ~9,000-parameter CNN running in your browser. No server, no libraries.",
     instrumentMore: "How does it do that?",
     stationsLabel: "Choose the model on show",
-    railShow: "Show the {word} model in the instrument above",
     stations: {
       think: { title: "live · transformer", caption: "A one-layer Transformer, starting from random weights, learning to write six digits backwards. A few seconds in, an anti-diagonal grows on its attention map.", more: "Watch attention grow by itself" },
       generate: { title: "replay · diffusion", caption: "A cloud of coloured noise settles into an apple, step by step. This replays the diffusion process itself; the real model is in the article, trained by you in the browser.", more: "Go and train one" },
@@ -57,7 +56,6 @@ const en: Dictionary = {
   home: {
     latest: "Latest",
     readouts: { posts: "articles", figures: "figures you can play with", operators: "hand-written operators" },
-    topics: "Browse by theme: see, think, generate, act",
     index: "Notebook index",
     indexLead: "Newest first.",
     all: "All",

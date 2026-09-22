@@ -1,0 +1,9 @@
+#!/bin/zsh
+# Run 20: closed+shake, 48 px, 60 000 steps, all five seeds, weights saved. Does every seed get there?
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run20
+for s in 11 12 13 14 15; do
+  HP_SAVE=$OUT HP_TEACHER=0 HP_SIZE=48 HP_EPISODES=200 HP_KINDS=closed HP_SHAKE=1 HP_STEPS=60000 HP_SEEDS=$s pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept > $OUT/closed-shake1-60k-$s.log 2>&1 &
+done
+wait
+echo DONE

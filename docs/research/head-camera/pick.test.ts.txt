@@ -1,0 +1,304 @@
+/**
+ * Pick-and-place spike (runs 12–13): does "keep looking + a shaken camera" still beat "look once" when the job is to pick a
+ * block up and put it down on a target pad, not only to reach it?
+ *
+ *   mkdir -p tests/headcam && cp docs/research/head-camera/pick.test.ts.txt tests/headcam/pick.test.ts
+ *   HP_KINDS=open,closed HP_SEEDS=11 HP_STEPS=10000 HP_SHAKE=1 HP_SIZE=32 HP_OUT=/some/dir \
+ *     pnpm exec vitest run tests/headcam/pick.test.ts --disable-console-intercept; rm -r tests/headcam
+ *
+ * The world. The head camera of the reaching spike (content/posts/head-camera/components/model.ts). A 4 cm red block and a
+ * 7 cm green pad on the bench, at least 12 cm apart. The hand moves in x, y and z and has a gripper: two jaws, open or
+ * closed. Closing with the jaws around the block (within 2 cm in x–y (run 12: 1.5), the hand no higher than 1 cm above grasp height)
+ * picks it up; opening puts it down where the hand is. Success: the block released with its centre within 3 cm of the
+ * pad's centre, inside 90 steps.
+ *
+ * The teacher knows everything and says, at any state: rise, travel, descend, close; rise, travel, descend, open.
+ * Training samples are STATES drawn all over that task (not the teacher's own trajectories), each labelled with what the
+ * teacher would do there, so the network sees its own mistakes' states too.
+ *
+ *   open    one picture with the arm parked says where the block and the pad are; the teacher then does the job with
+ *           those beliefs and perfect joints, never looking again
+ *   closed  every step: the picture plus the hand's height and whether the gripper is closed (Helix also reads wrist
+ *           pose and finger positions), and says a move in x, y, z and a gripper command. It is NOT told the hand's
+ *           x–y: with that it could compute absolute positions, the shortcut run 2 showed breaks under a turned camera.
+ */
+import { writeFileSync } from "node:fs";
+import { describe, it } from "vitest";
+import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
+import { HEAD, NO_SHIFT, type CameraShift, type Vec3, project } from "@/content/posts/head-camera/components/model";
+import { type Box, renderBoxes, skeleton, solveIK } from "@/content/posts/head-camera/components/sim";
+
+type XY = [number, number];
+type Rng = () => number;
+const SIZE = Number(process.env.HP_SIZE ?? 32), HALF = SIZE / 2, K = 8, HIDDEN = 48;
+const HIGH = 0.1, LOW = 0.035, STEP_XY = 0.025, STEP_Z = 0.02, GRAB_XY = 0.03, GRAB_Z = 0.01, TOL = 0.03, MAX_STEPS = 90;
+const AREA = { x: [0.22, 0.5], y: [-0.22, 0.22] } as const, CENTRE = [0.36, 0], SPAN = [0.14, 0.22];
+const HOME: [number, number, number] = [0.36, 0, HIGH];
+const deg = Math.PI / 180;
+
+const unit = (a: Vec3): Vec3 => { const l = Math.hypot(...a) || 1; return [a[0] / l, a[1] / l, a[2] / l]; };
+const cross = (a: Vec3, b: Vec3): Vec3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const flat = (c: Vec3, h: Vec3, top: [number, number, number]): Box => ({ c, u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1], h, top });
+const clip = (v: number, m = 1) => Math.max(-m, Math.min(m, v));
+const reach = (x: number, y: number, z: number) => solveIK([x, y, z], 0) !== null;
+/** Reachable both high and low, so every place on the bench can be picked from and put down on. */
+const usable = (p: XY) => reach(p[0], p[1], HIGH) && reach(p[0], p[1], LOW);
+const somewhere = (rng: Rng): XY => { for (;;) { const p: XY = [AREA.x[0] + rng() * (AREA.x[1] - AREA.x[0]), AREA.y[0] + rng() * (AREA.y[1] - AREA.y[0])]; if (usable(p)) return p; } };
+function apart(rng: Rng): [XY, XY] { const b = somewhere(rng); for (;;) { const t = somewhere(rng); if (Math.hypot(t[0] - b[0], t[1] - b[1]) > 0.12) return [b, t]; } }
+
+interface State { hand: Vec3; closed: boolean; holding: boolean; block: XY; pad: XY }
+
+function scene(s: State): Box[] {
+  const boxes: Box[] = [flat([0.34, 0, -0.01], [0.4, 0.36, 0.01], [196, 198, 208]), flat([s.pad[0], s.pad[1], 0.001], [0.035, 0.035, 0.001], [70, 190, 90])];
+  const q = solveIK(s.hand, 0);
+  if (q) {
+    const [shoulder, elbow, wrist, end] = skeleton(q), up: Vec3 = [0, 0, 1];
+    const link = (from: Vec3, to: Vec3, thick: number) => {
+      const u = unit([to[0] - from[0], to[1] - from[1], to[2] - from[2]]), v = unit(cross(up, u)), n = cross(u, v);
+      boxes.push({ c: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2, (from[2] + to[2]) / 2], u, v, n, h: [Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]) / 2, thick, thick], top: [240, 140, 40] });
+    };
+    boxes.push(flat([0, 0, shoulder[2] / 2], [0.035, 0.035, shoulder[2] / 2], [52, 56, 70]));
+    link(shoulder, elbow, 0.016); link(elbow, wrist, 0.014);
+    // The hand: a cyan palm above two jaws, 5 cm apart when open and 4 cm (touching the block) when closed.
+    const [x, y, z] = end, gap = s.closed ? 0.022 : 0.034;
+    boxes.push(flat([x, y, z + 0.03], [0.022, 0.03, 0.008], [60, 200, 230]));
+    boxes.push(flat([x, y - gap, z + 0.01], [0.012, 0.004, 0.022], [60, 200, 230]), flat([x, y + gap, z + 0.01], [0.012, 0.004, 0.022], [60, 200, 230]));
+    link(wrist, [x, y, z + 0.035], 0.014);
+  }
+  const b: Vec3 = s.holding ? [s.hand[0], s.hand[1], s.hand[2] - 0.0] : [s.block[0], s.block[1], 0.02];
+  boxes.push(flat(b, [0.02, 0.02, 0.02], [214, 60, 60]));
+  return boxes;
+}
+const view = (s: State, shift: CameraShift) => renderBoxes(scene(s), HEAD, shift, SIZE, 2);
+/** model.ts's picture() at this spike's SIZE (it is fixed at 32 there): channel-first 0…1, noise and light applied. */
+function picture(bytes: Uint8Array, noise = 0, dim = 1, rng: Rng = Math.random): Float64Array {
+  const n = SIZE * SIZE, out = new Float64Array(3 * n), gauss = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) { let v = (bytes[i * 3 + c] / 255) * dim; if (noise) v += noise * gauss(); out[c * n + i] = Math.max(0, Math.min(1, v)); }
+  return out;
+}
+
+/**
+ * What the teacher does: [dx, dy, dz, grip] in −1…1, grip > 0.5 closes and < −0.5 opens. A funnel (run 13): always head
+ * for the goal in x–y, and hold a height that falls from HIGH to LOW over the last FUNNEL of distance, so every label is
+ * a smooth function of where the hand is. Close (or open, when carrying) once low and within GRIP_XY. Run 12's teacher
+ * gated travel on height ("rise first, then move"), and the network never learnt the gate: the hand hung in the air.
+ */
+// Run 15: grasping within 3 cm (a self-centring gripper), since run 14 stalled 1.3–2.3 cm out: once the hand is low over
+// the block it hides the block from the head camera, and the last two centimetres cannot be seen.
+const FUNNEL = 0.04, FLAT = 0.025, GRIP_XY = 0.022;
+function teacher(s: State): [number, number, number, number] {
+  const goal = s.holding ? s.pad : s.block, gx = goal[0] - s.hand[0], gy = goal[1] - s.hand[1], far = Math.hypot(gx, gy);
+  if (!s.holding && s.closed) return [0, 0, 1, -1]; // closed on nothing: open and back up
+  // Run 14: within FLAT of the goal the height is simply LOW. Run 13's funnel came to a point, so half a centimetre of
+  // sideways jitter moved the target height by 0.8 cm and the hand hovered at 5.5 cm, never low enough to grip.
+  const height = LOW + (HIGH - LOW) * Math.min(1, Math.max(0, (far - FLAT) / FUNNEL));
+  const move: [number, number, number, number] = [clip(gx / STEP_XY), clip(gy / STEP_XY), clip((height - s.hand[2]) / STEP_Z), 0];
+  if (far < GRIP_XY && s.hand[2] < LOW + 0.008) move[3] = s.holding ? -1 : 1;
+  return move;
+}
+
+/** One step of the world. Returns "placed" when the block is let go on the pad, "dropped" when let go elsewhere. */
+function act(s: State, a: number[]): "placed" | "dropped" | null {
+  const next: Vec3 = [s.hand[0] + clip(a[0]) * STEP_XY, s.hand[1] + clip(a[1]) * STEP_XY, Math.max(LOW - 0.005, Math.min(HIGH + 0.02, s.hand[2] + clip(a[2]) * STEP_Z))];
+  if (reach(...next)) s.hand = next;
+  if (s.holding) s.block = [s.hand[0], s.hand[1]];
+  if (a[3] > 0.5 && !s.closed) {
+    s.closed = true;
+    if (Math.hypot(s.hand[0] - s.block[0], s.hand[1] - s.block[1]) < GRAB_XY && s.hand[2] < LOW + GRAB_Z) s.holding = true;
+  } else if (a[3] < -0.5 && s.closed) {
+    s.closed = false;
+    if (s.holding) { s.holding = false; return Math.hypot(s.block[0] - s.pad[0], s.block[1] - s.pad[1]) < TOL ? "placed" : "dropped"; }
+  }
+  return null;
+}
+
+/** A state anywhere in the task, for training: half before the grasp, half carrying; a third of hands near their goal. */
+function anyState(rng: Rng): State {
+  const [block, pad] = apart(rng), holding = process.env.HP_FETCH === "1" ? false : rng() < 0.5, goal = holding ? pad : block;
+  let hand: Vec3 = [0, 0, 0];
+  // Run 14: a fifth of the states sit right over the goal and low, where the label is "grip". Drawn uniformly they were
+  // under 1 % of samples and the grip output never got past 0.1.
+  if (rng() < 0.2) {
+    for (;;) {
+      hand = [goal[0] + (rng() - 0.5) * 0.04, goal[1] + (rng() - 0.5) * 0.04, LOW - 0.005 + rng() * 0.025];
+      if (reach(...hand)) return { hand, closed: holding, holding, block: holding ? [hand[0], hand[1]] : block, pad };
+    }
+  }
+  for (;;) {
+    const near = rng() < 0.5, xy = near ? [goal[0] + (rng() - 0.5) * 0.06, goal[1] + (rng() - 0.5) * 0.06] : somewhere(rng);
+    // HP_ZFOLLOW=1 (run 13 E): the hand's height near where the teacher would hold it at this distance, ±1.5 cm, instead
+    // of anywhere from 3 to 12 cm. One camera cannot tell a higher hand from a farther one; this narrows the question.
+    if (process.env.HP_ZFOLLOW === "1") {
+      const far = Math.hypot(goal[0] - xy[0], goal[1] - xy[1]), zt = LOW + (HIGH - LOW) * Math.min(1, Math.max(0, (far - FLAT) / FUNNEL));
+      hand = [xy[0], xy[1], Math.max(LOW - 0.005, Math.min(HIGH + 0.02, zt + (rng() * 2 - 1) * 0.015))];
+    } else hand = [xy[0], xy[1], LOW - 0.005 + rng() * (HIGH + 0.02 - LOW + 0.005)];
+    if (reach(...hand)) break;
+  }
+  const closed = holding ? true : rng() < 0.15;
+  return { hand, closed, holding, block: holding ? [hand[0], hand[1]] : block, pad };
+}
+
+class Net {
+  readonly params: Record<string, Mat> = {};
+  private readonly adam: Adam;
+  private readonly pos = new Mat(HALF, 1, Float64Array.from({ length: HALF }, (_, i) => ((i + 0.5) / HALF) * 2 - 1));
+  constructor(readonly kind: "open" | "closed", rng: Rng) {
+    const he = (rows: number, fanIn: number, scale = 1) => { const m = new Mat(rows, fanIn), s = Math.sqrt(6 / fanIn) * scale; for (let i = 0; i < m.data.length; i++) m.data[i] = (rng() * 2 - 1) * s; return m; };
+    const P = this.params, inputs = 2 * K + (kind === "closed" ? (FEELXY ? 4 : 2) : 0), outs = kind === "closed" ? 4 : 4;
+    P.k1 = he(8, 27); P.b1 = new Mat(1, 8); P.k2 = he(16, 72); P.b2 = new Mat(1, 16); P.k3 = he(K, 16); P.b3 = new Mat(1, K);
+    P.w1 = he(inputs, HIDDEN, Math.sqrt(HIDDEN / inputs)); P.c1 = new Mat(1, HIDDEN);
+    P.w2 = he(HIDDEN, outs, Math.sqrt(outs / HIDDEN)); P.c2 = new Mat(1, outs);
+    P.wa = he(2 * K, 6, Math.sqrt(6 / (2 * K))); P.ca = new Mat(1, 6);
+    this.adam = new Adam(P);
+  }
+  forward(t: Tape, image: Float64Array, feel: number[]) {
+    const P = this.params, x = new Mat(3, SIZE * SIZE, image);
+    const f1 = t.maxPool2(t.relu(t.conv2d(x, P.k1, P.b1, { h: SIZE, w: SIZE, k: 3, inputGrad: false })), { h: SIZE, w: SIZE });
+    const f2 = t.relu(t.conv2d(f1, P.k2, P.b2, { h: HALF, w: HALF, k: 3 }));
+    const maps = t.scale(t.conv2d(f2, P.k3, P.b3, { h: HALF, w: HALF, k: 1 }), HALF);
+    const kx = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "x" })), this.pos), ky = t.matmul(t.softmax(t.marginal(maps, { h: HALF, w: HALF, axis: "y" })), this.pos);
+    const keys = t.concatCols([t.transpose(kx), t.transpose(ky)]);
+    const input = this.kind === "closed" ? t.concatCols([keys, new Mat(1, feel.length, Float64Array.from(feel))]) : keys;
+    const h = t.relu(t.addRow(t.matmul(input, P.w1), P.c1));
+    return { out: t.addRow(t.matmul(h, P.w2), P.c2), seen: t.addRow(t.matmul(keys, P.wa), P.ca) };
+  }
+  step(batch: { image: Float64Array; feel: number[]; want: number[]; where: number[] }[], lr: number): number {
+    for (const p of Object.values(this.params)) p.grad.fill(0);
+    let loss = 0;
+    for (const s of batch) {
+      const t = new Tape(), f = this.forward(t, s.image, s.feel);
+      loss += t.mse(f.out, s.want, undefined, 1 / batch.length);
+      t.mse(f.seen, s.where, undefined, 1 / batch.length);
+      t.backward();
+    }
+    this.adam.step(lr);
+    return loss / batch.length;
+  }
+  run(image: Float64Array, feel: number[]): number[] { return Array.from(this.forward(new Tape(), image, feel).out.data); }
+}
+
+const FEELXY = process.env.HP_FEELXY === "1";
+/** The hand's height and the gripper; with HP_FEELXY=1 also its x–y (a check of learnability, not the article's recipe). */
+const feelOf = (s: State): number[] => [(s.hand[2] - (LOW + HIGH) / 2) / ((HIGH - LOW) / 2), s.closed ? 1 : -1, ...(FEELXY ? [(s.hand[0] - CENTRE[0]) / SPAN[0], (s.hand[1] - CENTRE[1]) / SPAN[1]] : [])];
+const norm = (p: XY) => [(p[0] - CENTRE[0]) / SPAN[0], (p[1] - CENTRE[1]) / SPAN[1]];
+const unnorm = (o: number[]): XY => [CENTRE[0] + o[0] * SPAN[0], CENTRE[1] + o[1] * SPAN[1]];
+const SHAKE = process.env.HP_SHAKE === "1";
+const shaken = (rng: Rng): CameraShift => SHAKE ? { yaw: (rng() * 2 - 1) * 10 * deg, pitch: (rng() * 2 - 1) * 10 * deg, dx: 0, dy: (rng() * 2 - 1) * 0.03, dz: (rng() * 2 - 1) * 0.03 } : NO_SHIFT;
+function where(s: State, shift: CameraShift): number[] {
+  const h = project(s.hand, shift), b = project(s.holding ? s.hand : [s.block[0], s.block[1], 0.04], shift), p = project([s.pad[0], s.pad[1], 0], shift);
+  return [h[0], -h[1], b[0], -b[1], p[0], -p[1]];
+}
+function sample(kind: "open" | "closed", rng: Rng) {
+  const shift = shaken(rng), noise = SHAKE ? rng() * 0.1 : 0, dim = SHAKE ? 0.6 + rng() * 0.6 : 1;
+  if (kind === "open") {
+    const [block, pad] = apart(rng), s: State = { hand: [...HOME], closed: false, holding: false, block, pad };
+    return { image: picture(view(s, shift), noise, dim, rng), feel: [] as number[], want: [...norm(block), ...norm(pad)], where: where(s, shift) };
+  }
+  const s = anyState(rng);
+  return { image: picture(view(s, shift), noise, dim, rng), feel: feelOf(s), want: teacher(s), where: where(s, shift) };
+}
+
+type Condition = { name: string; shift: CameraShift; moveBlock?: boolean; movePad?: boolean; shove?: boolean };
+function evaluate(net: Net | "teacher", condition: Condition, episodes: number, seed: number) {
+  const rng = mulberry32(seed);
+  let wins = 0, grasped = 0, steps = 0;
+  for (let e = 0; e < episodes; e++) {
+    const [block, pad] = apart(rng), s: State = { hand: [...HOME], closed: false, holding: false, block, pad };
+    let belief: State | null = null, done = false, t = 0, everHeld = false, padMoved = false;
+    if (net !== "teacher" && net.kind === "open") { const o = net.run(picture(view(s, condition.shift)), []); belief = { ...s, block: unnorm(o), pad: unnorm(o.slice(2)) }; }
+    for (; t < MAX_STEPS && !done; t++) {
+      if (condition.moveBlock && t === 3 && !s.holding) { const [b] = apart(rng); if (Math.hypot(b[0] - s.pad[0], b[1] - s.pad[1]) > 0.12) s.block = b; }
+      // Once per episode, the step after the grasp. (Until run 17 this cleared the flag on `condition` itself, so only the
+      // first episode ever moved its pad and the column repeated "as trained": those numbers are void.)
+      if (condition.movePad && s.holding && !padMoved) { padMoved = true; const [, p] = apart(rng); if (Math.hypot(p[0] - s.hand[0], p[1] - s.hand[1]) > 0.08) s.pad = p; }
+      if (condition.shove && t === 12) { const a = rng() * 2 * Math.PI, h: Vec3 = [s.hand[0] + 0.05 * Math.cos(a), s.hand[1] + 0.05 * Math.sin(a), s.hand[2]]; if (reach(...h)) { s.hand = h; if (s.holding) s.block = [h[0], h[1]]; } }
+      let a: number[];
+      if (net === "teacher") a = teacher(s);
+      else if (belief) { belief.hand = s.hand; belief.closed = s.closed; belief.holding = s.holding; if (s.holding) belief.block = [s.hand[0], s.hand[1]]; a = teacher(belief); }
+      else a = net.run(picture(view(s, condition.shift)), feelOf(s));
+      const r = act(s, a);
+      everHeld ||= s.holding;
+      if (r === "placed") { wins++; steps += t + 1; done = true; } else if (r === "dropped") done = true;
+    }
+    if (everHeld) grasped++;
+  }
+  return { success: wins / episodes, grasped: grasped / episodes, steps: wins ? steps / wins : 0 };
+}
+
+/**
+ * HP_SAVE=<dir>: the weights as JSON plus golden outputs on six fixed states (fetching, low over the block, carrying, over
+ * the pad, closed on nothing, camera tilted), so the page's port (components/pick.ts) can prove it computes the same.
+ */
+function save(net: Net, file: string, meta: Record<string, unknown>) {
+  const params = Object.fromEntries(Object.entries(net.params).map(([k, m]) => [k, { rows: m.rows, cols: m.cols, data: Array.from(m.data) }]));
+  const block: XY = [0.3, -0.12], pad: XY = [0.46, 0.14];
+  const states: { s: State; pitch: number }[] = [
+    { s: { hand: [...HOME], closed: false, holding: false, block, pad }, pitch: 0 },
+    { s: { hand: [0.31, -0.11, 0.04], closed: false, holding: false, block, pad }, pitch: 0 },
+    { s: { hand: [0.38, 0.02, HIGH], closed: true, holding: true, block: [0.38, 0.02], pad }, pitch: 0 },
+    { s: { hand: [0.455, 0.135, 0.04], closed: true, holding: true, block: [0.455, 0.135], pad }, pitch: 0 },
+    { s: { hand: [0.4, 0.0, 0.05], closed: true, holding: false, block, pad }, pitch: 0 },
+    { s: { hand: [0.34, -0.05, 0.08], closed: false, holding: false, block, pad }, pitch: 7 },
+  ];
+  const golden = states.map(({ s: st, pitch }) => ({ state: st, pitch, out: net.run(picture(view(st, { ...NO_SHIFT, pitch: pitch * deg })), net.kind === "closed" ? feelOf(st) : []) }));
+  writeFileSync(file, JSON.stringify({ meta: { kind: net.kind, size: SIZE, ...meta }, params, golden }));
+}
+
+/** Per output: mean squared error on fresh training-like states, and how often the x–y direction is right. */
+function diag(net: Net): string {
+  const r3 = mulberry32(5), se = [0, 0, 0, 0], split = { carry: [0, 0], fetch: [0, 0] };
+  for (let i = 0; i < 500; i++) {
+    const st = anyState(r3), o = net.run(picture(view(st, NO_SHIFT)), feelOf(st)), want = teacher(st);
+    o.forEach((v, j) => (se[j] += (v - want[j]) ** 2 / 500));
+    const n1 = Math.hypot(o[0], o[1]), n2 = Math.hypot(want[0], want[1]);
+    if (n2 > 0.5) { const ok = (o[0] * want[0] + o[1] * want[1]) / (n1 * n2 || 1) > 0.9 ? 1 : 0, k = st.holding ? split.carry : split.fetch; k[0] += ok; k[1]++; }
+  }
+  const pct = (k: number[]) => (k[1] ? `${((100 * k[0]) / k[1]).toFixed(0)}%` : "–");
+  return `mse dx ${se[0].toFixed(3)} dy ${se[1].toFixed(3)} dz ${se[2].toFixed(3)} grip ${se[3].toFixed(3)} | direction within 25°: fetching ${pct(split.fetch)} carrying ${pct(split.carry)}`;
+}
+
+describe("pick and place", () => {
+  it("measures look-once and keep-looking", () => {
+    const STEPS = Number(process.env.HP_STEPS ?? 5000), BATCH = 16, EPISODES = Number(process.env.HP_EPISODES ?? 200);
+    const conditions: Condition[] = [
+      { name: "as trained", shift: NO_SHIFT },
+      { name: "pitch 5°", shift: { ...NO_SHIFT, pitch: 5 * deg } },
+      { name: "pitch 10°", shift: { ...NO_SHIFT, pitch: 10 * deg } },
+      { name: "pitch 20°", shift: { ...NO_SHIFT, pitch: 20 * deg } },
+      { name: "yaw 10°", shift: { ...NO_SHIFT, yaw: 10 * deg } },
+      { name: "block moved early", shift: NO_SHIFT, moveBlock: true },
+      { name: "pad moved while carrying", shift: NO_SHIFT, movePad: true },
+      { name: "shoved 5 cm", shift: NO_SHIFT, shove: true },
+    ];
+    if (process.env.HP_TEACHER !== "0") console.log(`teacher: ${conditions.map((c) => { const r = evaluate("teacher", c, EPISODES, 99); return `${c.name} ${(r.success * 100).toFixed(1)} (${r.steps.toFixed(0)} steps)`; }).join(" | ")}`);
+    const out = process.env.HP_OUT ?? ".";
+    if (process.env.HP_PICTURES === "1") for (const [name, s] of [["reach", { hand: [0.4, 0.05, HIGH], closed: false, holding: false, block: [0.3, -0.12], pad: [0.46, 0.14] }], ["carry", { hand: [0.38, 0.02, HIGH], closed: true, holding: true, block: [0.38, 0.02], pad: [0.46, 0.14] }]] as [string, State][]) {
+      writeFileSync(`${out}/pick-${name}.ppm`, Buffer.concat([Buffer.from("P6 128 128 255\n"), Buffer.from(renderBoxes(scene(s), HEAD, NO_SHIFT, 128, 2))]));
+    }
+    for (const kind of (process.env.HP_KINDS ?? "open,closed").split(",") as ("open" | "closed")[]) {
+      for (const seed of (process.env.HP_SEEDS ?? "11").split(",").map(Number)) {
+        const rng = mulberry32(7 + seed), net = new Net(kind, mulberry32(seed)), t0 = performance.now();
+        let loss = 0;
+        for (let step = 1; step <= STEPS; step++) {
+          loss += net.step(Array.from({ length: BATCH }, () => sample(kind, rng)), step < STEPS * 0.7 ? 3e-3 : 1e-3);
+          if (step % 1000 === 0) { console.log(`  ${kind} seed ${seed} step ${step}: loss ${(loss / 1000).toFixed(4)}`); loss = 0; }
+          if (step % 5000 === 0 && kind === "closed" && process.env.HP_DIAG === "1") console.log(`    diag @${step}: ${diag(net)}`);
+        }
+        const seconds = (performance.now() - t0) / 1000;
+        if (process.env.HP_TRACE === "1") {
+          // One episode, step by step: where the hand is, how far from its goal, what the net says and what the teacher would.
+          const rng2 = mulberry32(99), [block, pad] = apart(rng2), st: State = { hand: [...HOME], closed: false, holding: false, block, pad };
+          for (let t = 0; t < 40; t++) {
+            const o = net.run(picture(view(st, NO_SHIFT)), feelOf(st)), want = teacher(st), goal = st.holding ? st.pad : st.block;
+            console.log(`    t${t} z ${(st.hand[2] * 100).toFixed(1)} far ${(Math.hypot(goal[0] - st.hand[0], goal[1] - st.hand[1]) * 100).toFixed(1)} held ${st.holding ? 1 : 0} closed ${st.closed ? 1 : 0} | net ${o.map((v) => v.toFixed(2)).join(" ")} | teacher ${want.map((v) => v.toFixed(2)).join(" ")}`);
+            if (act(st, o)) break;
+          }
+        }
+        const cells = conditions.map((c) => { const r = evaluate(net, c, EPISODES, 99); return `${c.name} ${(r.success * 100).toFixed(1)} (grasped ${(r.grasped * 100).toFixed(0)})`; });
+        console.log(`${kind}${SHAKE ? "+shake" : ""} seed ${seed}: ${cells.join(" | ")}`);
+        if (process.env.HP_SAVE) save(net, `${process.env.HP_SAVE}/${kind}${SHAKE ? "-shake" : ""}-${SIZE}-${seed}.json`, { seed, steps: STEPS, shake: SHAKE, asTrained: evaluate(net, conditions[0], EPISODES, 99).success });
+        console.log(`== ${kind}${SHAKE ? "+shake" : ""}: ${STEPS} steps, ${seconds.toFixed(0)} s, size ${SIZE}`);
+      }
+    }
+  }, 14_400_000);
+});

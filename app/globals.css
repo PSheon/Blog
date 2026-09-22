@@ -5,6 +5,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The floating way back up: above the install hint while that is showing, and gone under the expanded playground. */
+body:has([data-testid="install-hint"]) .back-to-top { bottom: 5rem; }
+body:has([data-expanded="true"]) .back-to-top { display: none; }
+
 /* A control smaller than a fingertip gets a 44 px area to press where the pointer is a finger, without moving a pixel of
    layout: an invisible ::before, centred on it. (Not for an element that already uses its ::before.) */
 @utility tap {
@@ -479,26 +483,6 @@ html:not(.dark) {
   }
   :root:not(.dark) .card-glow {
     opacity: 0.35;
-  }
-
-  /* A packet travelling the see → act rail. Transform only, so it never touches layout; still for reduced motion. */
-  .rail-pulse {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 7rem;
-    height: 1px;
-    translate: 0 -50%;
-    background: linear-gradient(90deg, transparent, var(--signal-3), transparent);
-    animation: rail-pulse 7s linear infinite;
-  }
-  @keyframes rail-pulse {
-    from { transform: translateX(-7rem); opacity: 0; }
-    8%, 92% { opacity: 1; }
-    to { transform: translateX(var(--rail-w, 80rem)); opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .rail-pulse { display: none; }
   }
 
   /* ---------- Long-form prose ----------

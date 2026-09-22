@@ -1,0 +1,10 @@
+#!/bin/zsh
+# Run 7: (a) one model alone, as a reader's page would train it; (b) open + shaken + aux, five seeds.
+cd /Users/paul_jiang/Desktop/Paul/Blog-vla
+OUT=/Users/paul_jiang/Desktop/Paul/vla-work/run7
+HC_STEPS=10000 HC_AUX=1 HC_SEEDS=11 HC_TAG=-alone-10k-aux HC_ANALYTIC=0 HC_EPISODES=50 HC_KINDS=closed+shake HC_OUT=$OUT pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept > $OUT/alone-10k-aux.log 2>&1
+HC_STEPS=15000 HC_SEEDS=11 HC_TAG=-alone-15k HC_ANALYTIC=0 HC_EPISODES=50 HC_KINDS=closed+shake HC_OUT=$OUT pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept > $OUT/alone-15k.log 2>&1
+HC_STEPS=10000 HC_SEEDS=11 HC_TAG=-alone-open HC_ANALYTIC=0 HC_EPISODES=50 HC_KINDS=open+shake HC_OUT=$OUT pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept > $OUT/alone-open-10k.log 2>&1
+echo ALONE-DONE
+printf '%s\n' 11 12 13 14 15 | xargs -P 5 -I{} zsh -c "HC_STEPS=10000 HC_AUX=1 HC_SEEDS={} HC_TAG=-openshakeaux-{} HC_ANALYTIC=0 HC_KINDS=open+shake HC_OUT=$OUT pnpm exec vitest run tests/headcam/spike.test.ts --disable-console-intercept > $OUT/openshakeaux-{}.log 2>&1"
+echo DONE

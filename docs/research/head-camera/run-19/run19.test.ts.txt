@@ -1,0 +1,27 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { it } from "vitest";
+import { mulberry32 } from "@/lib/ml";
+import { NO_SHIFT, type CameraShift } from "@/content/posts/head-camera/components/model";
+import { MAX_STEPS, PICK_HOME, PickPolicy, type PickState, anywhere, decide, layout, pickAct, pickPicture, pickView } from "@/content/posts/head-camera/components/pick";
+/** Run 19: a saved checkpoint on the page's own layouts (block inside BLOCK_AREA), 200 episodes a condition, seed 99. */
+it("run 19", () => {
+  const file = process.env.R19_FILE!, policy = new PickPolicy(JSON.parse(readFileSync(file, "utf8"))), deg = Math.PI / 180;
+  const conditions: [string, CameraShift, "block" | "pad" | null][] = [["as trained", NO_SHIFT, null], ["pitch 5", { ...NO_SHIFT, pitch: 5 * deg }, null], ["pitch 10", { ...NO_SHIFT, pitch: 10 * deg }, null], ["pitch 20", { ...NO_SHIFT, pitch: 20 * deg }, null], ["yaw 10", { ...NO_SHIFT, yaw: 10 * deg }, null], ["block moved", NO_SHIFT, "block"], ["pad moved", NO_SHIFT, "pad"]];
+  const out: Record<string, number> = {};
+  for (const [name, shift, move] of conditions) {
+    const rng = mulberry32(99); let wins = 0;
+    for (let e = 0; e < 200; e++) {
+      const s: PickState = { hand: [...PICK_HOME], closed: false, holding: false, ...layout(rng) };
+      const belief = policy.kind === "open" ? PickPolicy.believed(policy.run(pickPicture(pickView(s, shift)), []).out) : null;
+      let padMoved = false;
+      for (let t = 0; t < MAX_STEPS; t++) {
+        if (move === "block" && t === 3 && !s.holding) { const b = layout(rng).block; if (Math.hypot(b[0] - s.pad[0], b[1] - s.pad[1]) > 0.12) s.block = b; }
+        if (move === "pad" && s.holding && !padMoved) { padMoved = true; const p = anywhere(rng); if (Math.hypot(p[0] - s.hand[0], p[1] - s.hand[1]) > 0.08) s.pad = p; }
+        const r = pickAct(s, decide(policy, s, shift, belief).action);
+        if (r === "placed") { wins++; break; } if (r === "dropped") break;
+      }
+    }
+    out[name] = wins / 2;
+  }
+  writeFileSync(process.env.R19_OUT!, JSON.stringify({ file, meta: policy.saved.meta, out }));
+}, 7_200_000);

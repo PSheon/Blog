@@ -85,7 +85,10 @@ describe("nav", () => {
 
   it("never routes through a building, and A* finds the way between far corners", () => {
     const city = generateCity(3, 8), { nav } = city;
-    nav.edges.forEach((list, a) => list.forEach((b) => { for (const building of city.buildings) expect(crosses(nav.nodes[a], nav.nodes[b], building.rect)).toBe(false); }));
+    // Counted, then asserted once: 1 726 edge ends × 373 buildings is 640 000 checks, and an `expect` apiece timed out on a busy machine.
+    let through = 0;
+    nav.edges.forEach((list, a) => list.forEach((b) => { for (const building of city.buildings) if (crosses(nav.nodes[a], nav.nodes[b], building.rect)) through++; }));
+    expect(through).toBe(0);
     const first = city.places[0].node, last = city.places[city.places.length - 1].node, path = findPath(nav, first, last);
     expect(path?.[0]).toBe(first);
     expect(path?.[path.length - 1]).toBe(last);

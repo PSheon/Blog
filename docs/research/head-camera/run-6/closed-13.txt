@@ -1,0 +1,22 @@
+closed seed 13: camera as trained 90.0 | pitch 2° 80.0 | pitch 5° 6.5 | pitch 10° 1.5 | pitch 20° 0.0 | yaw 2° 29.0 | yaw 5° 26.0 | yaw 10° 32.5 | yaw 20° 0.0 | moved 3 cm sideways 84.0 | block moved at step 8 96.0
+  what the keypoints follow (seed 13):
+    keypoint 0: hand R² 0.34, block R² 0.01, moves 0.201
+    keypoint 1: hand R² 0.43, block R² 0.01, moves 0.091
+    keypoint 2: hand R² 0.07, block R² 0.00, moves 0.000  (parked)
+    keypoint 3: hand R² 0.18, block R² 0.32, moves 0.171
+    keypoint 4: hand R² 0.23, block R² 0.45, moves 0.149
+    keypoint 5: hand R² 0.27, block R² 0.34, moves 0.163
+    keypoint 6: hand R² 0.01, block R² 0.21, moves 0.000  (parked)
+    keypoint 7: hand R² 0.51, block R² 0.02, moves 0.122
+== closed: 10000 steps of 16, 233 s a model, 1 seeds; mean (min–max)
+  camera as trained: 90.0% (90.0–90.0)
+  pitch 2°: 80.0% (80.0–80.0)
+  pitch 5°: 6.5% (6.5–6.5)
+  pitch 10°: 1.5% (1.5–1.5)
+  pitch 20°: 0.0% (0.0–0.0)
+  yaw 2°: 29.0% (29.0–29.0)
+  yaw 5°: 26.0% (26.0–26.0)
+  yaw 10°: 32.5% (32.5–32.5)
+  yaw 20°: 0.0% (0.0–0.0)
+  moved 3 cm sideways: 84.0% (84.0–84.0)
+  block moved at step 8: 96.0% (96.0–96.0)

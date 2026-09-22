@@ -1,0 +1,48 @@
+// Closed-loop success of a PyTorch checkpoint: the world, the rules and the pixels are TypeScript; the model answers over a pipe.
+// Run: cp docs/research/pcb-flip-vla/closed-loop.test.ts.txt tests/vla/closed-loop.test.ts
+//      VLA_MODEL=/path/model.pt VLA_FRAMES=4 VLA_EPISODES=200 pnpm exec vitest run tests/vla/closed-loop.test.ts --disable-console-intercept ; rm tests/vla/closed-loop.test.ts
+import { spawn } from "node:child_process";
+import { createInterface } from "node:readline";
+import { it } from "vitest";
+import { type Action, encode, proprioOf, PARAMS, render, STILL, World } from "@/content/posts/pcb-flip-vla/components/sim";
+
+const BINS = PARAMS.bins, IDLE = [STILL, STILL, STILL, STILL, BINS];
+type Level = { name: string; slip: number; disturb?: (w: World, k: number) => void; yaw?: number };
+const LEVELS: Level[] = [
+  { name: "nothing", slip: 0 },
+  { name: "default slip 1 %", slip: PARAMS.slip },
+  { name: "one shove at step 10", slip: 0, disturb: (w, k) => { if (k === 10) w.shoveArm(); } },
+  { name: "board turned back once it is right", slip: 0 },
+  { name: "camera 5 degrees off", slip: 0, yaw: (5 * Math.PI) / 180 },
+];
+
+it("closed loop", async () => {
+  const child = spawn("uv", ["run", "--with", "torch", "--with", "numpy", "python", "serve.py", process.env.VLA_MODEL as string], { cwd: "scripts/train-vla", stdio: ["pipe", "pipe", "inherit"] });
+  const lines = createInterface({ input: child.stdout }), queue: ((line: string) => void)[] = [];
+  lines.on("line", (line) => queue.shift()?.(line));
+  const next = () => new Promise<string>((resolve) => queue.push(resolve));
+  await next(); // "ready"
+  const k = Number(process.env.VLA_FRAMES ?? 4), episodes = Number(process.env.VLA_EPISODES ?? 100);
+  for (const level of LEVELS) {
+    let ok = 0, steps = 0, lost = 0, noopOk = 0, noops = 0; const stuck: Record<string, number> = {};
+    for (let e = 0; e < episodes; e++) {
+      const w = new World(100001 + e); w.slipRate = level.slip;
+      const noop = w.boards[w.task.nest].up === w.wanted, frames: Uint8Array[] = [], history: number[][] = [IDLE, IDLE, IDLE];
+      let turnedBack = false;
+      for (let step = 0; !w.failed && !(w.success && (level.name !== "board turned back once it is right" || turnedBack || noop)); step++) {
+        if (w.success && !turnedBack) { w.turnBoard(w.task.nest); turnedBack = true; }
+        level.disturb?.(w, step);
+        frames.push(render(w, { yaw: level.yaw ?? 0, pitch: 0, dx: 0, dy: 0, dz: 0 }));
+        const window = Array.from({ length: k }, (_, i) => frames[Math.max(0, frames.length - k + i)]);
+        child.stdin.write(`${JSON.stringify({ frames: Buffer.concat(window).toString("base64"), words: encode(w.task), history: history.slice(-3), proprio: proprioOf(w) })}\n`);
+        const tokens = JSON.parse(await next()) as number[];
+        w.step([tokens[0], tokens[1], tokens[2], tokens[3], tokens[4] - BINS] as Action);
+        history.push(tokens);
+      }
+      if (noop) noops++;
+      if (w.success) { ok++; steps += w.t; if (noop) noopOk++; } else if (w.boards[w.task.nest].lost) lost++; else { const key = w.hold ? "holding" : w.closed ? "closed, empty" : "open, empty"; stuck[key] = (stuck[key] ?? 0) + 1; }
+    }
+    console.log(`${level.name}: success ${((100 * ok) / episodes).toFixed(1)}% (${ok}/${episodes}), mean steps ${(steps / Math.max(1, ok)).toFixed(1)}, nothing-to-do ${noopOk}/${noops}, lost ${lost}, ran out of steps ${JSON.stringify(stuck)}`);
+  }
+  child.stdin.end();
+}, 7_200_000);
