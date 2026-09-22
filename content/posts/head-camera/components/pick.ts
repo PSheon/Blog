@@ -4,7 +4,7 @@
  * the script saved with each checkpoint, and that evaluate() reproduces the script's success rate.
  */
 import { Mat, Tape, mulberry32 } from "@/lib/ml";
-import { type Box, renderBoxes, skeleton, solveIK } from "@/content/posts/pcb-flip-vla/components/sim";
+import { type Box, renderBoxes, skeleton, solveIK } from "@/content/posts/head-camera/components/sim";
 import { AREA, type CameraShift, HEAD, NO_SHIFT, type Vec3, type XY } from "./model";
 
 export const PICK_SIZE = 48, K = 8;

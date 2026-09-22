@@ -18,11 +18,11 @@ For whoever picks this up next. Read this, then the memory files under
 
 Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
 007 point-cloud diffusion, 008 2D SLAM, 009 city of agents, 010 a task scheduler from scratch (published 2026-09-21;
-built on `feat/sche` by another session). A
-VLA article was started as 010 and is parked on the branch `feat/vla` (pushed): the PCB-flip draft, its training
-pipeline, and the head-camera study in `docs/research/head-camera/` that would replace it. A draft shows only in
-`next dev`, with a mark in the page's language ("草稿" / "DRAFT").
-it dull.
+built on `feat/sche` by another session), 011 and 012 the light series (2026-09-22). On `dev` as a draft:
+013 `head-camera` (merged from `feat/vla` on 2026-09-22; that branch and its worktree are gone). The earlier PCB-flip
+VLA draft was dropped the same day, Paul found it dull; its simulation (arm, rasteriser, world) lives on as
+`content/posts/head-camera/components/sim`, which 013 imports, with its tests in `tests/head-camera/`; its notes stay
+in `docs/research/pcb-flip-vla/`. A draft shows only in `next dev`, with a mark in the page's language ("草稿" / "DRAFT").
 
 ### The light series (two articles, published 2026-09-22)
 

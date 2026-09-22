@@ -14,7 +14,7 @@
  */
 import { describe, it } from "vitest";
 import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
-import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/pcb-flip-vla/components/sim";
+import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/head-camera/components/sim";
 const SIZE = 32, HALF = SIZE / 2, K = 8, HIDDEN = 32;
 // A humanoid's arm hangs from a shoulder beside its head, not under it: the camera is 22 cm to the arm's left. Seen from
 // straight above the base (the first run), the forearm hid the hand.

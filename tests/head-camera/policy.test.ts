@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { collect, encode, IDLE_TOKENS, type Manifest, PARAMS, PolicyNet, proprioOf, render, World } from "@/content/posts/pcb-flip-vla/components/sim";
+import { collect, encode, IDLE_TOKENS, type Manifest, PARAMS, PolicyNet, proprioOf, render, World } from "@/content/posts/head-camera/components/sim";
 
 const golden = JSON.parse(readFileSync("tests/fixtures/vla-golden.json", "utf8")) as { checkpoint: string; cases: { seed: number; step: number; logits: number[]; tokens: number[] }[] };
 const manifest = JSON.parse(readFileSync(`public/vla/${golden.checkpoint}.json`, "utf8")) as Manifest, bin = readFileSync(`public/vla/${golden.checkpoint}.bin`);

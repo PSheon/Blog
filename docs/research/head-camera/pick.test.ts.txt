@@ -26,7 +26,7 @@ import { writeFileSync } from "node:fs";
 import { describe, it } from "vitest";
 import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
 import { HEAD, NO_SHIFT, type CameraShift, type Vec3, project } from "@/content/posts/head-camera/components/model";
-import { type Box, renderBoxes, skeleton, solveIK } from "@/content/posts/pcb-flip-vla/components/sim";
+import { type Box, renderBoxes, skeleton, solveIK } from "@/content/posts/head-camera/components/sim";
 
 type XY = [number, number];
 type Rng = () => number;

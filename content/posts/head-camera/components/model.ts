@@ -4,7 +4,7 @@
  * weights and checks this file reproduces the script's outputs to 1e-9.
  */
 import { Adam, Mat, Tape, mulberry32 } from "@/lib/ml";
-import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/pcb-flip-vla/components/sim";
+import { type Box, type CameraShift, type Joints, NO_SHIFT, PARAMS, renderBoxes, skeleton, solveIK, tipOf, type Vec3 } from "@/content/posts/head-camera/components/sim";
 
 export { NO_SHIFT, type CameraShift, type Joints, type Vec3 };
 export const SIZE = 32, K = 8;

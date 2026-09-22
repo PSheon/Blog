@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   type Action, binOf, deltaOf, encode, expert, nestCentre, NO_SHIFT, PARAMS, render, sentence, solveIK, STILL, tipOf, VOCAB, World,
-} from "@/content/posts/pcb-flip-vla/components/sim";
+} from "@/content/posts/head-camera/components/sim";
 
 const run = (seed: number, slip: number, each?: (w: World) => void) => {
   const w = new World(seed); w.slipRate = slip;
