@@ -149,7 +149,7 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
             </SectionHeading>
             <p className="mt-1 text-sm text-muted-foreground">{t.home.indexLead}</p>
           </div>
-          <Link href={`/${locale}/posts`} className="inline-flex min-h-6 items-center text-sm text-signal underline-offset-4 hover:underline">
+          <Link href={`/${locale}/posts`} className="tap inline-flex min-h-6 items-center text-sm text-signal underline-offset-4 hover:underline">
             {t.home.viewAll}
           </Link>
         </div>

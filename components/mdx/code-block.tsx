@@ -22,7 +22,7 @@ export function CodeBlock(props: ComponentProps<"pre">) {
         type="button"
         onClick={copy}
         aria-label={copied ? t.copied : t.copy}
-        className="absolute right-2 top-2 grid size-7 place-items-center rounded-md border border-border bg-background/80 text-muted-foreground transition-opacity before:absolute before:-inset-2 hover:text-foreground focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/code:opacity-100"
+        className="absolute right-2 top-2 grid size-7 place-items-center rounded-md border border-border bg-background/80 text-muted-foreground transition-opacity before:absolute before:-inset-[9px] hover:text-foreground focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/code:opacity-100"
       >
         {copied ? <Check className="size-3.5 text-signal" /> : <Copy className="size-3.5" />}
       </button>
