@@ -30,7 +30,13 @@ First, what this is not: **there is no machine learning here.** No training, no 
 
 The whole city comes from one number, the seed. The same seed always grows the same city.
 
-Lay out 8 × 8 blocks, every fourth road a wider arterial. The east column is the riverside; every other block is zoned by its distance from the centre: commercial nearest, then restaurant streets and more offices, residential outside, a few parks at random. A building's height is a random number times how close it is to the centre. Seed 1 grows 373 buildings: 248 houses, 29 office blocks and 96 shopfronts, the tallest 80 metres.
+Lay out 8 × 8 blocks, then decide, in order:
+
+- **Roads.** Every fourth road is a wider arterial, and the east column is the riverside.
+- **Zones.** By distance from the centre: commercial nearest, then restaurant streets and more offices, residential outside, a few parks at random (two for seed 1).
+- **Height.** A random number times how close the block is to the centre, so the middle is tall and the edges low.
+
+Seed 1 grows 373 buildings: 248 houses, 29 office blocks and 96 shopfronts, the tallest 80 metres.
 
 People walk on pavements and zebra crossings only. Each block is ringed by a pavement, joined to its neighbours at the corners, and every building has a door on it. Those points and lines are a graph of 639 nodes and 863 edges; going somewhere is a shortest path on it, found with A\* and remembered for the next person.
 
@@ -73,7 +79,7 @@ The square makes urgent things matter out of proportion: a hunger of 0.9 is not 
   <UtilityLab />
 </Instrument>
 
-To begin with, A is more urgent but forty minutes away, B milder but next door, and A wins (0.573 to 0.482). Drag B's need from 0.70 to 0.77 and B overtakes: seven points of urgency are worth thirty-five minutes on foot. The median trip in this city is 15 minutes, so distance mostly decides between things about equally urgent — which restaurant, for instance.
+To begin with, A is more urgent but forty minutes away, B milder but next door, and A wins (0.573 to 0.482). Drag B's need from 0.70 to 0.77 and B overtakes: seven points of urgency are worth thirty-five minutes on foot. Most trips in this city are short, so distance mostly decides between things about equally urgent — which restaurant, for instance.
 
 The formula alone is not enough. Two things go wrong:
 
@@ -97,7 +103,7 @@ The timetable's day is cut with a knife. At eight sharp, 100% of people leave wi
 
 The random day is flat: three in the morning looks like three in the afternoon.
 
-The one in the middle keeps hours: most people asleep at night, the cyan of work rising through the morning and ebbing through the evening, meals and company scattered across the day. Nobody drew up that rota; it is what three hundred slightly different sets of numbers work out separately. In its busiest ten minutes only 12% of people set off together, much like random's 10% — but random has no shape.
+The one in the middle keeps hours: most people asleep at night, the cyan of work rising through the morning and ebbing through the evening, meals and company scattered across the day. Nobody drew up that rota; it is what three hundred slightly different sets of numbers work out separately. In its busiest ten minutes only 11% of people set off together, much like random's 9% — but random has no shape.
 
 Switch the backlog off and measure again (offline: 300 people, seed 1, the last of five days): sleeping, eating and company barely change, and free time goes from 11% to 40%. People do not find themselves something to do, and that is the most honest thing about this model: **it only answers the needs you give it.** If you want them to shop or exercise, that is another number.
 
@@ -115,7 +121,7 @@ Drag the timeline back. The picture returns to that moment, but the simulation i
 
 **Need bars.** Between two events nothing about a person changes, so every need is a straight line. Each event notes the person's four numbers, and any later value is that number plus rate times elapsed time.
 
-**Positions.** A "departed" event says where the walk started and where it is going, so the route can be found again (same start, same goal: A\* always gives the same path); the time of arrival then says how far along it the person is at this moment. A replay does not reproduce people stepping around each other, so positions are slightly off: measured over people who were walking, the median gap between the replayed and the real position is 6 units, about forty seconds of walking.
+**Positions.** A "departed" event says where the walk started and where it is going, so the route can be found again (same start, same goal: A\* always gives the same path); the time of arrival then says how far along it the person is at this moment. A replay does not reproduce people stepping around each other, so positions are slightly off: the gap is a few tens of seconds of walking.
 
 The record keeps at most 5000 events, about ten hours of three hundred people. Older events are not simply dropped: they are folded into a snapshot of "the state when the record begins", so the start of the timeline is always a known state.
 
