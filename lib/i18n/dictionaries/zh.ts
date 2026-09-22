@@ -44,7 +44,6 @@ const zh = {
     instrumentCaption: "約 9,000 個參數的 CNN，正在你的瀏覽器裡執行。沒有伺服器，沒有函式庫。",
     instrumentMore: "它是怎麼做到的？",
     stationsLabel: "切換示範的模型",
-    railShow: "在上面的儀器顯示「{word}」的模型",
     // The hero's four stations: one live model per kind of article. `see` reuses the strings above.
     stations: {
       think: { title: "live · transformer", caption: "一層 Transformer，從隨機權重開始，正在學把六個數字倒過來寫。幾秒鐘後，注意力圖上會長出一條反對角線。", more: "看注意力怎麼自己長出來" },
@@ -58,7 +57,6 @@ const zh = {
   home: {
     latest: "最新文章",
     readouts: { posts: "篇文章", figures: "張可以動手玩的圖", operators: "個手寫運算子" },
-    topics: "依主題瀏覽：看見、思考、生成、行動",
     index: "筆記索引",
     indexLead: "依時間排序，新的在上面。",
     all: "全部",

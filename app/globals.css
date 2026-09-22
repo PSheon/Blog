@@ -485,26 +485,6 @@ html:not(.dark) {
     opacity: 0.35;
   }
 
-  /* A packet travelling the see → act rail. Transform only, so it never touches layout; still for reduced motion. */
-  .rail-pulse {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    width: 7rem;
-    height: 1px;
-    translate: 0 -50%;
-    background: linear-gradient(90deg, transparent, var(--signal-3), transparent);
-    animation: rail-pulse 7s linear infinite;
-  }
-  @keyframes rail-pulse {
-    from { transform: translateX(-7rem); opacity: 0; }
-    8%, 92% { opacity: 1; }
-    to { transform: translateX(var(--rail-w, 80rem)); opacity: 0; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .rail-pulse { display: none; }
-  }
-
   /* ---------- Long-form prose ----------
    * Figures and instruments opt out with .not-prose, so list and link rules stop at their border.
    */
