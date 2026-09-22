@@ -1,0 +1,34 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { it } from "vitest";
+import { mulberry32 } from "@/lib/ml";
+import { NO_SHIFT } from "@/content/posts/head-camera/components/model";
+import { MAX_STEPS, PICK_HOME, PickPolicy, type PickState, decide, layout, pickAct, pickPicture, pickView } from "@/content/posts/head-camera/components/pick";
+
+/**
+ * Run 25: the article's light-and-noise table for the three checkpoints the page ships, on the page's current layouts
+ * (block inside the cut BLOCK_AREA), 200 episodes a condition from layout() with mulberry32(99), camera untouched.
+ * Look-once's first picture gets the same light and noise as every later one, as the page does (pick-lab.tsx).
+ * The run-19 loop, with { noise, dim } passed to decide().
+ */
+it("run 25", () => {
+  const conditions: [string, number, number][] = [["normal", 0, 1], ["light 80%", 0, 0.8], ["light 70%", 0, 0.7], ["light 50%", 0, 0.5], ["noise 0.05", 0.05, 1], ["noise 0.15", 0.15, 1]];
+  const lines: string[] = [];
+  for (const name of ["pick-open", "pick-fixed", "pick-shaken"]) {
+    const policy = new PickPolicy(JSON.parse(readFileSync(`public/posts/head-camera/${name}.json`, "utf8")));
+    const row: string[] = [];
+    for (const [label, noise, dim] of conditions) {
+      const rng = mulberry32(99); let wins = 0;
+      for (let e = 0; e < 200; e++) {
+        const s: PickState = { hand: [...PICK_HOME], closed: false, holding: false, ...layout(rng) };
+        const belief = policy.kind === "open" ? PickPolicy.believed(policy.run(pickPicture(pickView(s, NO_SHIFT), noise, dim), []).out) : null;
+        for (let t = 0; t < MAX_STEPS; t++) {
+          const r = pickAct(s, decide(policy, s, NO_SHIFT, belief, { noise, dim }).action);
+          if (r === "placed") { wins++; break; } if (r === "dropped") break;
+        }
+      }
+      row.push(`${label} ${(wins / 2).toFixed(1)}`);
+    }
+    lines.push(`${name}: ${row.join(" | ")}`);
+  }
+  writeFileSync("docs/research/head-camera/run-25/output.txt", lines.join("\n") + "\n\n2026-09-22, Node via vitest. Noise is drawn from Math.random, so a noisy column moves by a point or two between runs.\n");
+}, 1_800_000);
