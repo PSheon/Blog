@@ -28,7 +28,7 @@ Nothing in this dog's program says what to do when pushed, or how to lift a foot
 
 ## The brain is four matrix multiplications
 
-The published policy is a 758 KB ONNX file. Open it and there is nothing special inside:
+The published policy is an ONNX file whose weights come to 757 KB (189,324 32-bit floats). Open it and there is nothing special inside:
 
 | | This dog's brain |
 | --- | --- |
@@ -55,7 +55,7 @@ ELU differs from ReLU only on the negative side: ReLU cuts to zero, ELU is a smo
 
 I took the actions ONNX Runtime computes from the original ONNX file as the reference and compared them with this code's output: they differ in the sixth decimal place.<Sidenote>The physics was checked too: from the same starting pose and the same command, MuJoCo as WebAssembly (run in Node) and MuJoCo in Python both end a ten-second walk at 4.69 m. With the collision meshes replaced by convex hulls, the version on this page ends at 4.70.</Sidenote>
 
-The network is called 83 times a second and each call takes under 0.2 ms (measured in Node). The physics is what costs time.
+Each call of the network takes about 0.15 ms (measured in Node); the physics is what costs time.<Sidenote>M4 Pro, Node 22, the mean of 5,000 calls in a row, three runs at 151.8 to 154.6 µs; script and output in `docs/research/lite3-spike/`.</Sidenote>
 
 ## What it can feel
 
@@ -112,7 +112,7 @@ The price is that the network grew up in a body with $K_p = 30$ and $K_d = 1$, a
   <GainsLab />
 </Instrument>
 
-Pull $K_p$ down to 10 and the solid line cannot keep up with the dashed one; the dog slowly sinks to the floor. Push it to 100 and the solid line hugs the dashed one, and the dog walks faster than you asked. The forward speeds I measured (averages over 10 s, `docs/research/lite3-spike/shipped-build-output.txt`; the instrument's readout also counts sideways drift and leaves out the start, so it reads higher than this table):
+Pull $K_p$ down to 10 and the solid line cannot keep up with the dashed one; the dog slowly sinks to the floor. Push it to 100 and the solid line hugs the dashed one, and the dog walks faster than you asked. The forward speeds I measured:<Sidenote>Averages over 10 s, `docs/research/lite3-spike/shipped-build-output.txt`. The figure's readout also counts sideways drift and leaves out the start, so it reads higher than this table.</Sidenote>
 
 | $K_p$ | $K_d$ | Actual speed when asked for 0.5 |
 | --- | --- | --- |
@@ -136,7 +136,7 @@ Push it and see. Every shove comes from the side and lasts a tenth of a second; 
 
 I swept the force from 100 N to 400 N, and at each force shoved it once from each side at 8 different moments of its stride:
 
-| Force | Pushed away: falls out of 8 | Pushed towards you |
+| Force | Pushed left: falls out of 8 | Pushed right |
 | --- | --- | --- |
 | 175 N and below | 0 | 0 |
 | 200 N | 1 | 0 |
@@ -144,7 +144,7 @@ I swept the force from 100 N to 400 N, and at each force shoved it once from eac
 | 250 N | 7 | 4 |
 | 275 N and above | 8 | 8 |
 
-There is no clean threshold in the middle. At the same 225 N in the same direction, moving the shove by 60 ms turns a recovery into a fall. The two sides are not symmetric either. Try one force several times in the instrument and you will get different outcomes. In the two 175 N runs (one from each side) the torso tipped by at most 5.5 and 5.8 degrees before coming back.
+There is no clean threshold in the middle. At the same 225 N in the same direction, moving the shove by 60 ms turns a recovery into a fall. The two sides are not symmetric either. Try one force several times in the figure and you will get different outcomes. In the two 175 N runs (one from each side) the torso tipped by at most 5.5 and 5.8 degrees before coming back.
 
 ## The real world is not this clean
 
@@ -156,18 +156,26 @@ In the simulator the sensors have no noise, signals have no delay, and the floor
 
 **Latency.** The network always sees the world as it was a few beats ago. Every extra 24 ms slows it a little: asked for 0.5, its actual speed falls from 0.47 all the way to 0.26 at 72 ms. Up to 72 ms it never fell; it only walks slower and slower.
 
-**Noise.** Random error added to the readings the network sees (to the scaled numbers, so it has no physical unit): at ±0.2 the speed drops from 0.47 to 0.42, which is hard to see by eye; at ±0.3 it stays up but slows to between 0.17 and 0.36 m/s; ±0.4 is the edge, where over 10 random seeds of 10 seconds each it fell 4 times and crawled at 0.1 to 0.25 m/s the other 6; at ±0.5 it fell all 10 times; at ±0.8 it is down within 0.6 seconds.
+**Noise.** Random error added to the readings the network sees (to the scaled numbers, so it has no physical unit). ±0.4 is the edge:
 
-**Friction.** This one surprised me the most. Change the floor from rubber (μ = 1) to something slipperier than ice (μ = 0.05) and the speed only drops from 0.47 to 0.44. The feet really do slip: the average sliding speed of the feet on the ground rises from 0.12 to 0.26 m/s. It walks anyway. Only at μ = 0.01 does it visibly struggle.
+| Noise | Result (asked for 0.5) |
+| --- | --- |
+| ±0.2 | 0.42, hard to see by eye |
+| ±0.3 | stays up, but only 0.17 to 0.36 |
+| ±0.4 | out of 10 random seeds, 4 falls; the other 6 crawl at 0.10 to 0.25 |
+| ±0.5 | falls all 10 times |
+| ±0.8 | down within 0.6 seconds |
+
+**Friction.** This one surprised me the most. Change the floor from rubber (μ = 1) to something slipperier than ice (μ = 0.05) and the speed only drops from 0.47 to 0.44. The feet really do slip: the average sliding speed of the feet on the ground rises from 0.12 to 0.27 m/s. It walks anyway. Only at μ = 0.01 does it visibly struggle.
 
 Taken together, these three results say the same thing. When a policy like this is trained, the simulator deliberately scrambles the friction, shoves the robot and adds noise to the sensors. It is called domain randomization, and the point is to stop the policy from trusting the simulator too much.<Sidenote>I have not looked up the training configuration of this particular policy, so "friction was randomized during training" is a guess inferred from its behaviour, not a fact.</Sidenote> The ways you fail to knock it over here are mostly ways somebody already tried on your behalf during training; the ways you succeed (blindfolding the joint angles, softening the spring) are ones nobody thought to defend against.
 
 ## What is not here
 
-This article only runs the policy; it never learns anything. Where that 758 KB file came from has not been touched at all. The first two points below are how policies of this kind are generally trained; I have not checked this policy's actual training setup:
+This article only runs the policy; it never learns anything. Where those 757 KB of weights came from has not been touched at all. The first two points below are how policies of this kind are generally trained:
 
 - **The reward function.** Training usually has only a score: points for matching the commanded speed, penalties for falling, shaking, wasting energy and dragging feet. The gait is what that score squeezed out.
-- **Thousands of dogs.** The policy file sits under `policy/ppo/` in the official repo, so the algorithm is PPO. Training of this kind usually simulates thousands of dogs at once on a GPU, each one falling over on different terrain and different friction.
+- **Thousands of dogs.** The policy file sits under `policy/ppo/` in the official repo, so the algorithm is most likely PPO. Training of this kind usually simulates thousands of dogs at once on a GPU, each one falling over on different terrain and different friction.
 - **Flat ground only.** The official deployment code includes stair terrain. It is not included here.
 
 Reproducing the training in a browser would take several orders of magnitude more compute. This page cannot do it.

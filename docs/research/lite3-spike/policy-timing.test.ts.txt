@@ -1,0 +1,18 @@
+import { readFileSync, writeFileSync } from "node:fs";
+import { it } from "vitest";
+import { Policy } from "@/content/posts/lite3-walking/components/policy";
+import golden from "./fixtures/lite3-policy.json";
+
+it("times one policy call", () => {
+  const file = readFileSync("public/lite3/policy.f32");
+  const policy = new Policy(file.buffer.slice(file.byteOffset, file.byteOffset + file.byteLength));
+  const obs = golden.pairs.map((p: { obs: number[] }) => Float32Array.from(p.obs));
+  for (let i = 0; i < 2000; i++) policy.act(obs[i % obs.length]); // warm up
+  const lines: string[] = [];
+  for (let run = 1; run <= 3; run++) {
+    const n = 5000, t0 = performance.now();
+    for (let i = 0; i < n; i++) policy.act(obs[i % obs.length]);
+    lines.push(`run ${run}: ${(((performance.now() - t0) / n) * 1000).toFixed(1)} µs per call (mean of ${n})`);
+  }
+  writeFileSync("docs/research/lite3-spike/policy-timing-output.txt", lines.join("\n") + `\n\nMeasured 2026-09-22 on an Apple M4 Pro, Node ${process.version} via vitest; the script is policy-timing.test.ts.txt beside this file.\n`);
+});
