@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
 /**
- * № 015, head-camera. While the article is a draft a production build leaves it out, the page is a 404, and every test
+ * № 013, head-camera. While the article is a draft a production build leaves it out, the page is a 404, and every test
  * here skips itself; removing `draft: true` from both language files turns the file on. (The shared lists in
  * a11y.spec.ts and smoke.spec.ts cannot hold a page that does not exist yet.)
  */
