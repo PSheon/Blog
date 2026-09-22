@@ -19,7 +19,7 @@ The room below has had one sample so far, and it is almost all snow. Press Start
 
 Not one pixel of that picture is drawn. There is no code for shadows and no code that says the red wall should tint the floor. Nobody wrote why the corners the lamp cannot reach are still a little bright. The whole picture does one thing, many times: **shoot a ray out through a pixel, let it bounce around the room at random, and see whether it ends up at the lamp.**
 
-This is path tracing. This article writes it from scratch: the scene, the acceleration structure, a reference version on the CPU and the WGSL kernel on the GPU, about 1,100 lines in all (TypeScript, plus the WGSL written for the GPU; what part two needs outdoors is counted in), with no graphics library. Then it answers a few questions. How does one ray become a colour? How long does the noise take to clear, and can it clear faster? What more do metal and glass need? And why does it still run when a thousand triangles become a million?
+This is path tracing. This article writes it from scratch: the scene, the acceleration structure, a reference version on the CPU and the WGSL kernel on the GPU, about 1,600 lines in all, with no graphics library.<Sidenote>TypeScript, plus the WGSL written for the GPU; everything part two's playground needs is counted in.</Sidenote> Then it answers a few questions. How does one ray become a colour? How long does the noise take to clear, and can it clear faster? What more do metal and glass need? And why does it still run when a thousand triangles become a million?
 
 This is part one. [Part two](/en/posts/light-playground) takes the same engine outdoors: a playground to walk, drive and fly a helicopter and an aeroplane through, every frame computed this way.
 
@@ -126,7 +126,13 @@ The tree is built by binned SAH: whenever a set of triangles has to be split in 
 
 **Nothing moves.** When the camera or the scene moves, every accumulated sample is void. That is the subject of [part two](/en/posts/light-playground).
 
-Where the numbers come from: the readouts in the figures are measured by your browser as it runs, so they will differ from mine. Where the text says "I measured", that was Chrome on an M4 Pro, in this page, recorded in this project's `docs/research/light/RESULTS.md`. That asking the lamp does not change the answer is held by a test: on three pixels of the CPU version, 6,000 paths each, the means with and without asking differ by no more than the noise allows (`tests/rt/strategies.test.ts`). The CPU and GPU versions are the same algorithm written twice: on eight pixels of figure 02 (both coloured walls, floor, ceiling, back wall, a torus, the lamp) the mean of 2,001 CPU paths and the GPU's 1,024 samples differ by at most 12 levels out of 255 in any channel, some above and some below. That the BVH finds the same hit as testing every triangle is held by the tests in `tests/rt/`. A browser without WebGPU gets a picture rendered earlier, and figure 02 still works on it, because its rays are the CPU's.
+Where the numbers come from:
+
+- **The readouts in the figures** are measured by your browser as it runs, so they will differ from mine.
+- **Where the text says "I measured"**, that was Chrome on an M4 Pro, in this page, recorded in this project's `docs/research/light/RESULTS.md`.
+- **Asking the lamp does not change the answer**: on three pixels of the CPU version, 6,000 paths each, the means with and without asking differ by no more than the noise allows (`tests/rt/strategies.test.ts`).
+- **The CPU and GPU versions** are the same algorithm written twice: on eight pixels of figure 02 (both coloured walls, floor, ceiling, back wall, a torus, the lamp) the mean of 2,001 CPU paths and the GPU's 1,024 samples differ by at most 12 levels out of 255 in any channel, some above and some below. That the BVH finds the same hit as testing every triangle is held by the tests in `tests/rt/`.
+- **A browser without WebGPU** gets a picture rendered earlier, and figure 02 still works on it, because its rays are the CPU's.
 
 ## Sources
 
