@@ -1,8 +1,8 @@
 ---
 title: "From rookie to boss bird: 50 birds teach themselves Flappy Bird"
-description: Give each of fifty birds a brain of only six weights, add survival of the fittest, and usually within twenty-odd generations they clear a hundred pipes in a row. Then open that brain and see what it actually learned.
+description: Give each of fifty birds a brain of only six weights, add survival of the fittest, and usually within a dozen or so generations they clear a hundred pipes in a row. Then open that brain and see what it actually learned.
 seoTitle: "50 birds teach themselves Flappy Bird"
-seoDescription: "Give each of fifty birds a brain of six weights, add survival of the fittest, and within twenty-odd generations they clear a hundred pipes. Then open the brain."
+seoDescription: "Give each of fifty birds a brain of six weights, add survival of the fittest, and in a dozen or so generations they clear a hundred pipes. Then open the brain."
 date: 2025-03-15
 updated: 2026-09-20
 tags: [ai-agent, neuroevolution, from-scratch]
@@ -22,13 +22,13 @@ The fifty birds below are evolving in your browser right now. Watch them hit the
 
 ## A brain of six numbers
 
-The drawing on the right of the instrument is everything a bird has:
+The brain on the right of the figure above is everything a bird has:
 
 - **Two inputs**: the bird's height and the height of the next opening.
 - **Two hidden neurons.**
 - **One output**: above 0.5, the bird flaps.
 
-The network has no biases, so its connections carry six weights in all: 2 × 2 + 2 × 1. Putting a neural network and evolution together is called neuroevolution. Instead of computing how each weight should change, you keep a crowd of individuals with different weights and let the ones that do well leave offspring.
+The network has no biases, so its connections carry six weights in all: 2 × 2 + 2 × 1. Putting a neural network and evolution together is called neuroevolution.
 
 ## How one generation becomes the next
 
@@ -66,15 +66,15 @@ Those three pieces of code are the whole algorithm.<Sidenote>The same `Populatio
 
 ## Open the brain: what it learned is a subtraction
 
-Once the birds fly well, look at the drawing on the right of the instrument. Brains that evolved successfully tend to look alike: at least one hidden neuron receives "bird height" and "gap height" through lines of **opposite colours**, one positive and one negative.
+Once the birds fly well, look at the brain on the right of the figure. Brains that evolved successfully tend to look alike: at least one hidden neuron receives "bird height" and "gap height" through lines of **opposite colours**, one positive and one negative.
 
-One positive plus one negative computes "my height minus the height of the opening": am I above the opening or below it? Below, so flap. This is no coincidence. Both inputs are positive numbers between 0 and 1, so a neuron whose two weights share a sign can only measure how large the two are together; it cannot tell which is higher. Comparing them takes one positive and one negative.<Sidenote>I ran 40 random seeds for 60 generations each, and 35 learned. Of those 35 graduating birds, 33 have at least one hidden neuron like this. Take it with a pinch of salt: six purely random weights meet the condition 75% of the time by chance. The script and its output are in `docs/research/evolution-seeds/`.</Sidenote>
+One positive plus one negative computes "my height minus the height of the opening": am I above the opening or below it? Below, so flap. This is no coincidence. Both inputs are positive numbers between 0 and 1. If the two weights share a sign, then when the bird and the opening both rise, the neuron's output only grows with them: what it measures is how high the two are together, not which is higher. Comparing them takes one positive and one negative.<Sidenote>I ran 40 random seeds for 60 generations each, and 35 learned. Of those 35 graduating birds, 33 have at least one hidden neuron like this. Take it with a pinch of salt: the starting weights are uniform between −1 and 1, so each hidden neuron has an even chance of one positive and one negative; both missing it has a chance of ¼, and a random brain meets the condition 1 − ¼ = 75% of the time. The script and its output are in `docs/research/evolution-seeds/`.</Sidenote>
 
-Six numbers, and what they learned is a subtraction. That subtraction is not in any line of code. It is simply the one combination of six numbers, out of all of them, that lived longest.
+That subtraction is not in any line of code: it is simply the one combination of six numbers, out of all of them, that lived longest.
 
 ## Evolution doesn't guarantee success
 
-I ran 12 different random seeds for 60 generations each: 10 graduated within 22 generations, one took until generation 43, and in one the whole population got stuck in the same bad habit and never cleared more than 3 pipes in all 60 generations. With 40 seeds, 5 never learned.
+I ran 12 different random seeds for 60 generations each: 11 learned, 10 of them graduating (a hundred pipes in a row) within 22 generations; in the last one the whole population got stuck in the same bad habit and never cleared more than 3 pipes in all 60. Over 40 seeds, 35 learned, and the median graduation came in generation 15.
 
 This is the usual weakness of evolutionary methods. With no gradient to say which way is better, evolution can only stumble on better individuals by luck. If the whole flock looks alike and all of it is bad, the 20% of fresh blood takes a long time to turn things round. If the score refuses to climb, press Restart and begin with a new set of ancestors.
 

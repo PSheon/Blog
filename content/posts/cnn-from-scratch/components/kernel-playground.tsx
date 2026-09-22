@@ -66,7 +66,7 @@ export function KernelPlayground() {
               aria-pressed={active === name}
               onClick={() => setKernel([...PRESETS[name]])}
               className={cn(
-                "rounded-sm border px-1.5 py-1 text-xs transition-colors",
+                "tap rounded-sm border px-1.5 py-1 text-xs transition-colors",
                 active === name ? "border-signal text-signal" : "border-border text-muted-foreground hover:text-foreground",
               )}
             >

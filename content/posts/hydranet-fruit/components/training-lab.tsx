@@ -147,7 +147,7 @@ export function TrainingLab() {
       s.trainMs += performance.now() - t0;
     };
 
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => (visible = entry.isIntersecting));
     if (rootRef.current) io.observe(rootRef.current);
     frame = requestAnimationFrame(loop);
     return () => {
@@ -203,7 +203,7 @@ export function TrainingLab() {
                 setHeads(h);
               }}
               className={cn(
-                "h-7 rounded-sm border px-2.5 text-xs transition-colors",
+                "tap h-7 rounded-sm border px-2.5 text-xs transition-colors",
                 heads === h ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
               )}
             >
@@ -236,7 +236,7 @@ export function TrainingLab() {
                 aria-pressed={selected === i}
                 aria-label={`${t.testSet} ${i + 1}`}
                 onClick={() => setSelected(i)}
-                className={cn("rounded-sm border p-px transition-colors", selected === i ? "border-signal" : "border-border hover:border-foreground/40")}
+                className={cn("tap rounded-sm border p-px transition-colors", selected === i ? "border-signal" : "border-border hover:border-foreground/40")}
               >
                 <SceneCanvas image={s.image} label="" className="rounded-[1px] border-0" />
               </button>

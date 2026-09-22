@@ -224,3 +224,11 @@ the same night with the lamps switched off (L): 8.4 ms; by day (16:00): 8.0 ms. 
 the one the article's 6.8 ms came from; compare the three with each other, not with that.) Strength 220 in the sun's
 units: the sun gives 18000 × 2.14e-3 ≈ 38.5 on a facing surface, the night exposure is 6×, so 220/d² × 6 is a third of
 that at 10 m.
+
+## 2026-09-22 — the opening numbers of part two, measured again
+
+The same view and method as the 2026-09-21 table above (player's spawn over the car park, 960×540, 8 bounces, four
+16-sample bursts through `window.__lights`), now with the lamps' lenses in the models and the spot-lamp loop in the
+kernel (no lamp lit by day): 6.72 and 6.59 ms a sample on two fresh loads, 35.4 node visits per ray; 11,317 moving
+triangles (the figure's readout; +42 from the lenses). Frame rate while strafing, one sample a frame, three 3 s
+windows: 117, 116, 117 fps (121 with nothing moving). The adaptive quality stayed at 960×540.

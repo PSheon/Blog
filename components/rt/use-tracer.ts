@@ -57,7 +57,7 @@ export function useTracer(root: RefObject<HTMLElement | null>, canvas: RefObject
 
   useEffect(() => {
     let alive = true, visible = false;
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting), { rootMargin: "200px" });
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => (visible = entry.isIntersecting), { rootMargin: "200px" });
     if (root.current) io.observe(root.current);
     const worker = new Worker(new URL("./scene.worker.ts", import.meta.url), { type: "module" });
     const frame = () => new Promise<number>((resolve) => requestAnimationFrame(resolve));

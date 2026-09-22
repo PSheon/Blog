@@ -1,0 +1,5 @@
+seed 1: 8.96 ms per generation (population 50, 252 days, mean of 30)
+seed 2: 9.04 ms per generation (population 50, 252 days, mean of 30)
+seed 3: 8.75 ms per generation (population 50, 252 days, mean of 30)
+
+Measured 2026-09-22 on an Apple M4 Pro, Node v22.19.0 (V8, as in Chrome), two runs of the script above (copy it into tests/ to rerun).

@@ -26,7 +26,7 @@ export function useCloud(canvas: RefObject<HTMLCanvasElement | null>, count: num
       latest.current.frame(view, dt);
       view.render();
     };
-    const seen = new IntersectionObserver(([entry]) => {
+    const seen = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => {
       visible = entry.isIntersecting;
       latest.current.onVisible?.(visible);
     });

@@ -41,7 +41,8 @@ describe("the numbers in the article", () => {
     const jobs = Array.from({ length: 100 }, (_, k) => makeJob(k + 1, GOOD)), minutes = (w: number) => jobs.reduce((s, j) => s + schedule(j.tasks, w, j.tasks.map((x) => x.attempts)).total, 0) / 100;
     expect([1, 2, 4].map((w) => Math.round(minutes(w)))).toEqual([122, 63, 38]);
     expect([8, 16, 32].map((w) => minutes(w).toFixed(1))).toEqual(["31.4", "31.0", "31.0"]);
-    says("1 個 worker 122 分鐘，2 個 63，4 個 38，8 個 31.4", "122 minutes with one worker, 63 with two, 38 with four, 31.4 with eight");
+    // The prose gives them as a table row, in both languages.
+    says("| 整份工作（分鐘） | 122 | 63 | 38 | 31.4 | 31.0 |", "| The whole job (minutes) | 122 | 63 | 38 | 31.4 | 31.0 |");
   }, 60_000);
 
   it("how honest the bars are, with good estimates and with biased ones", () => {

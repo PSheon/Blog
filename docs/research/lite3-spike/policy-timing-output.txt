@@ -1,0 +1,5 @@
+run 1: 151.9 µs per call (mean of 5000)
+run 2: 151.8 µs per call (mean of 5000)
+run 3: 154.6 µs per call (mean of 5000)
+
+Measured 2026-09-22 on an Apple M4 Pro, Node v22.19.0 via vitest; the script is policy-timing.test.ts.txt beside this file.

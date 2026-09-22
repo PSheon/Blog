@@ -16,7 +16,7 @@ export function SamplePicker({ t, digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }: { t
           key={d}
           type="button"
           onClick={() => setStrokes(SAMPLES[d])}
-          className="grid size-7 place-items-center rounded-sm border border-border bg-background font-mono text-xs transition-colors hover:border-signal hover:text-signal"
+          className="tap grid size-7 place-items-center rounded-sm border border-border bg-background font-mono text-xs transition-colors hover:border-signal hover:text-signal"
         >
           {d}
         </button>

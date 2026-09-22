@@ -7,7 +7,7 @@ export function useVisible(target: RefObject<Element | null>): RefObject<boolean
   const visible = useRef(true);
   useEffect(() => {
     if (!target.current) return;
-    const io = new IntersectionObserver(([entry]) => { visible.current = entry.isIntersecting; }, { rootMargin: "100px" });
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => { visible.current = entry.isIntersecting; }, { rootMargin: "100px" });
     io.observe(target.current);
     return () => io.disconnect();
   }, [target]);

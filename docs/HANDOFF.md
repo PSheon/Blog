@@ -1,4 +1,4 @@
-# Handoff — main session, last revised 2026-09-20
+# Handoff — main session, last revised 2026-09-22
 
 For whoever picks this up next. Read this, then the memory files under
 `~/.claude/projects/-Users-paul-jiang-Desktop-Paul/memory/` (they are loaded automatically, this file is not), then
@@ -10,17 +10,17 @@ For whoever picks this up next. Read this, then the memory files under
 | | |
 | --- | --- |
 | Repo | `/Users/paul_jiang/Desktop/Paul/Blog`, GitHub `PSheon/Blog` (public) |
-| Branches | `dev` is where work happens. `main` is production and moves only through a PR `dev` → `main` that Paul merges (last: PR #10, 2026-09-20) |
+| Branches | `dev` is where work happens. `main` is production and moves only through a PR `dev` → `main` that Paul merges (last: PR #15, 2026-09-22) |
 | Production | <https://blog.psheon.me> (since 2026-09-21; DNS on Cloudflare, CNAME to Vercel, DNS only). Vercel project `paul-notebook`, deploys `main`. `paul-notebook.vercel.app` redirects 308 to it, path kept. Production env: `NEXT_PUBLIC_SITE_URL=https://blog.psheon.me` |
 | Dev server | `pnpm dev` on :3000 |
-| Other worktree | `/Users/paul_jiang/Desktop/Paul/Blog-city`, branch `feat/city-of-agents` (PR #9 → `dev`), owned by another session. One writer per checkout |
-| Tests | about 200 unit tests and 150 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
+| Other worktrees | None since 2026-09-22: `feat/city-of-agents`, `feat/sche` and `feat/vla` are merged and deleted. One writer per checkout |
+| Tests | 323 unit tests (2 skipped) and 206 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
 
 Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
 007 point-cloud diffusion, 008 2D SLAM, 009 city of agents, 010 a task scheduler from scratch (published 2026-09-21;
-built on `feat/sche` by another session), 011 and 012 the light series (2026-09-22). On `dev`, published but not yet
-released to `main`: 013 `head-camera` (merged from `feat/vla` on 2026-09-22; that branch and its worktree are gone). The earlier PCB-flip
-VLA draft was dropped the same day, Paul found it dull; its simulation (arm, rasteriser, world) lives on as
+built on `feat/sche` by another session), 011 and 012 the light series (PR #14), 013 `head-camera` (PR #15, merged from
+`feat/vla`). All thirteen had their copy polished with Paul on 2026-09-22, item by item. The earlier PCB-flip
+VLA draft (№ 014) was dropped the same day, Paul found it dull; its simulation (arm, rasteriser, world) lives on as
 `content/posts/head-camera/components/sim`, which 013 imports, with its tests in `tests/head-camera/`; its notes stay
 in `docs/research/pcb-flip-vla/`. A draft shows only in `next dev`, with a mark in the page's language ("草稿" / "DRAFT").
 
@@ -51,7 +51,6 @@ stays in `lib/rt` with its tests. Read before touching it:
 
 ## Waiting on Paul
 
-- The two light articles lost `draft` on his word (2026-09-22) and go out in ONE `dev` → `main` PR that he merges.
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
 - A test on a real phone. Nobody has done one.
 - Search Console (the verification env vars exist). The custom domain is done. Open: should `psheon.me` and `www.psheon.me` redirect to `blog.` instead of serving the site too.
@@ -73,6 +72,8 @@ stays in `lib/rt` with its tests. Read before touching it:
 - Read the dev console once per page.
 - Numbers in articles must be measured and attributed (live / on my machine / offline with N seeds).
   Twice a claim I wrote from reasoning was wrong once measured.
+- Polishing copy: list every change with the exact before and after text, numbered, and apply only what he picks.
+  Never touch an article's `date` or `updated`; the spread of dates is deliberate.
 
 ## Things that will bite you
 
@@ -105,6 +106,8 @@ stays in `lib/rt` with its tests. Read before touching it:
   unit of work is much smaller than the budget.
 - Inside an `Instrument`, titles are `<p>`, not headings (axe `heading-order`).
 - Scrollable regions (tables, display maths) need `tabIndex={0}` + a name (axe).
+- An `IntersectionObserver` callback gets a batch: read the LAST entry, not `([entry]) =>`, or a quick scroll
+  leaves a figure paused while visible. `tests/site/observers.test.ts` refuses the first-entry form.
 
 ## How a URL that does not exist is answered
 
@@ -170,7 +173,7 @@ the per-article split. Numbers, method and what is left: `docs/research/2026-09-
 
 ## Other sessions
 
-Sessions come and go; `ListAgents` shows who is there. Whoever owns the `Blog-city` worktree owns 009 and PR #9. Tell
+Sessions come and go; `ListAgents` shows who is there. None owns a branch today. When one does, tell
 them when `dev` changes under them, with the SHA and the files likely to conflict. Peers cannot approve anything on
 Paul's behalf, and a force-push of their own branch is theirs to clear with Paul.
 

@@ -513,3 +513,13 @@ and `pick-fixed.json` is run 23's seed 11 (on 200 page layouts: 99.5 % untouched
 - The hand moves in a plane. No grasp, no descent, no gripper.
 - 32 × 32 only. Whether 48 × 48 buys the last few points, and what it costs in seconds, is unmeasured.
 - The keypoints have been measured (run 4) but not yet looked at as pictures under a turned camera.
+
+## Run 25 — the light-and-noise table again, and where two of the article's numbers came from (2026-09-22)
+
+`run-25/`: the three shipped checkpoints on the current (cut) layouts. Light columns identical to the article's table,
+look-once included; the noise columns vary between draws (Math.random) and the article's single draws are low. Also
+recorded now, from the feat/vla session: fig. 03 trained in headless Chromium on the M4 Pro took 191.7 s wall (its
+readout said 190 s; 90 % untouched) and a second full run 200 s (84 %); the line "Page seconds are measured in node,
+not yet in a browser tab" below is out of date. The article's "88 % to 98.5 %" is run 9's five seeds (98.5 / 91.0 /
+88.0 / 96.0 / 92.5), trained by the research script in Node, which trains identically to the page
+(`tests/head-camera/trainer.test.ts`).

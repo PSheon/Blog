@@ -20,7 +20,7 @@ export function NumberTicker({ value, pad = 0, duration = 900 }: { value: number
       setShown(Math.round(value * eased));
       if (t < 1) raf = requestAnimationFrame(tick);
     };
-    const seen = new IntersectionObserver(([entry]) => {
+    const seen = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => {
       if (!entry.isIntersecting) return;
       seen.disconnect();
       setShown(0);

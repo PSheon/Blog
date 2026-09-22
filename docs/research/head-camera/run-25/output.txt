@@ -1,0 +1,14 @@
+Run 25 (2026-09-22): the light-and-noise table for the three shipped checkpoints, camera untouched, on the page's
+current layouts (block inside the cut BLOCK_AREA), 200 episodes a condition, layout() from mulberry32(99). The script
+is run25.test.ts.txt beside this file (copy it into tests/ to run). Noise comes from Math.random, so the two noise
+columns were run three times; the light columns are deterministic and came out the same every time.
+
+| | normal | light 80% | light 70% | light 50% | noise 0.05 (3 runs) | noise 0.15 (3 runs) |
+| --- | --- | --- | --- | --- | --- | --- |
+| pick-open (look once) | 71.0 | 72.0 | 58.0 | 11.0 | 19.0 / 17.0 / 22.0 | 0.5 / 2.0 / 0.5 |
+| pick-fixed (keep looking) | 99.5 | 79.0 | 34.0 | 0.0 | 0.0 / 0.0 / 0.0 | 0.0 / 0.0 / 0.0 |
+| pick-shaken (+ shake, noise, light) | 100.0 | 100.0 | 100.0 | 97.0 | 98.5 / 100.0 / 98.5 | 50.5 / 47.5 / 49.0 |
+
+Against the article's table (written before this run): the light columns match exactly, look-once's included, so the
+cut corner did not change that row. The noise columns in the article (look-once 15 and 0, shaken 96.5 and 44.5) are
+each one draw and sit below all three draws here.

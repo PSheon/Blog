@@ -24,7 +24,7 @@ export function useFresh(target: RefObject<Element | null>, modelSteps: number, 
       last.current = performance.now();
       s.refresh();
     };
-    const seen = new IntersectionObserver(([entry]) => { visible.current = entry.isIntersecting; check(); }, { threshold: 0.2 });
+    const seen = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => { visible.current = entry.isIntersecting; check(); }, { threshold: 0.2 });
     if (target.current) seen.observe(target.current);
     const timer = window.setInterval(check, 1000);
     return () => { seen.disconnect(); window.clearInterval(timer); };

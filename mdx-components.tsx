@@ -14,7 +14,7 @@ function heading(Tag: "h2" | "h3" | "h4") {
     return (
       <Tag id={id} {...rest}>
         {id ? (
-          <a href={`#${id}`} className="heading-anchor">
+          <a href={`#${id}`} className="heading-anchor tap">
             {children}
           </a>
         ) : (

@@ -44,7 +44,7 @@ function Slider({
             data-slot="slider-thumb"
             key={index}
             getAriaValueText={valueText === undefined ? undefined : () => valueText}
-            className="relative block size-3 shrink-0 cursor-grab rounded-full active:cursor-grabbing border border-ring bg-white ring-ring/50 focus-visible:ring-ring transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
+            className="relative block size-3 shrink-0 cursor-grab rounded-full active:cursor-grabbing border border-ring bg-white ring-ring/50 focus-visible:ring-ring transition-[color,box-shadow] select-none after:absolute after:-inset-2 pointer-coarse:after:-inset-[17px] hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:opacity-50"
           />
         ))}
       </SliderPrimitive.Control>

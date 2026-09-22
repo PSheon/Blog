@@ -1,0 +1,25 @@
+import { writeFileSync } from "node:fs";
+import { it } from "vitest";
+import { icp } from "@/content/posts/slam-2d/components/icp";
+import { compose, inverse, type Pose } from "@/content/posts/slam-2d/components/se2";
+import { RING, scan } from "@/content/posts/slam-2d/components/world";
+import { mulberry32 } from "@/lib/ml";
+
+// The figure's two places and starting guesses (align-lab.tsx), run exactly as its "hand it to ICP" button does.
+const PLACES = {
+  corner: { a: { x: 18, y: 2, theta: 0 }, b: { x: 18.3, y: 2.35, theta: 0.25 }, start: { x: 1.6, y: -1.2, theta: 0.5 } },
+  corridor: { a: { x: 10.5, y: 12, theta: Math.PI }, b: { x: 10.1, y: 12.15, theta: Math.PI + 0.1 }, start: { x: -2, y: 0, theta: 0 } },
+};
+it("measures the align figure", () => {
+  const lines: string[] = [];
+  for (const [name, p] of Object.entries(PLACES)) {
+    const rng = mulberry32(3), target = scan(RING, p.a, rng).points, source = scan(RING, p.b, rng).points, truth: Pose = compose(inverse(p.a), p.b);
+    const off = (q: Pose) => ({ d: Math.hypot(q.x - truth.x, q.y - truth.y), a: Math.abs(Math.atan2(Math.sin(q.theta - truth.theta), Math.cos(q.theta - truth.theta))) * 180 / Math.PI });
+    const s = off(p.start);
+    let k = 0, m;
+    do { k++; m = icp(target, source, p.start, { maxIterations: k, gate: 3 }); } while (!(m.iterations < k || k >= 30));
+    const e = off(m.pose);
+    lines.push(`${name}: start ${s.d.toFixed(2)} m and ${s.a.toFixed(1)}° off; stopped after ${m.iterations} steps, ${e.d.toFixed(3)} m and ${e.a.toFixed(2)}° off; inliers ${(m.inliers * 100).toFixed(0)}%, rms ${(m.rms * 100).toFixed(1)} cm`);
+  }
+  writeFileSync("docs/research/slam-2d-icp/output.txt", lines.join("\n") + "\n\nMeasured 2026-09-22 with the figure's own inputs (seed 3 scans, gate 3, up to 30 steps); script: align.test.ts.txt beside this file.\n");
+});

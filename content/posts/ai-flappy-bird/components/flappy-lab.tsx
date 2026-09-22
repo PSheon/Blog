@@ -92,7 +92,7 @@ export function FlappyLab() {
 
     // Don't burn a core on an instrument nobody is looking at. Watch the whole instrument,
     // not the canvas: on a phone the controls and readouts sit a screen below it.
-    const io = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const io = new IntersectionObserver((entries, _observer, entry = entries[entries.length - 1]) => (visible = entry.isIntersecting));
     io.observe(rootRef.current ?? canvas);
     paint();
     if (playing) frame = requestAnimationFrame(loop);
@@ -168,7 +168,7 @@ export function FlappyLab() {
                 setSpeed(s);
               }}
               className={cn(
-                "h-7 min-w-9 rounded-sm border px-1.5 font-mono text-xs transition-colors",
+                "tap h-7 min-w-9 rounded-sm border px-1.5 font-mono text-xs transition-colors",
                 speed === s ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
               )}
             >
