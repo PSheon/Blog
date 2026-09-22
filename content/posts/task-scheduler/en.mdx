@@ -33,7 +33,7 @@ A job is a graph: every task remembers which tasks it is waiting for. The schedu
 3. **Jump to the moment the next attempt ends**, and give that worker back.
 4. **If that attempt failed, the task is not done**: it goes back among the tasks that can start and waits for the next free worker; whatever depends on it keeps waiting. Then back to rule 1.
 
-No clock ticks. Time only moves when an attempt ends, which is why a job that takes over two hours is scheduled in about 8 microseconds (measured on my machine). The core is two functions and a loop (`Scheduler` in `sim/job.ts`; only the book-keeping lines are left out here):
+No clock ticks. Time only moves when an attempt ends, which is why a job that would take one worker over two hours is scheduled in about 8 microseconds (measured on my machine). The core is two functions and a loop (`Scheduler` in `sim/job.ts`; only the book-keeping lines are left out here):
 
 ```ts
 assign() {                                                     // rules 1 and 2
@@ -117,7 +117,13 @@ Work done is not time passed, because the number of busy workers keeps changing.
 
 Drag the slider from 1 to 32. Two things happen together.
 
-First, the job gets faster and then meets a horizontal line and stops (the upper chart). On average: 122 minutes with one worker, 63 with two, 38 with four, 31.4 with eight, and 31.0 from there on however many you add. Those 31 minutes are the longest chain of tasks waiting on each other; more hands can only wait with it.
+First, the job gets faster and then meets a horizontal line and stops (the upper chart). On average:
+
+| Workers | 1 | 2 | 4 | 8 | 16 and more |
+| --- | --- | --- | --- | --- | --- |
+| The whole job (minutes) | 122 | 63 | 38 | 31.4 | 31.0 |
+
+Those 31 minutes are the longest chain of tasks waiting on each other; more hands can only wait with it.
 
 Second, the counting bar gets less honest: 10 points off with 4 workers, 17 with 16, a third of the run spent above 90%. More hands make the head of the job go faster; the tail is as long as ever.
 
@@ -145,7 +151,9 @@ It has a price too: **it goes backwards.** When a task outruns its estimate, the
 
 **The task sizes are a distribution I chose** (log-normal). I have only checked its spread against this project's own two test suites (1.0 and 2.8, above), not against anyone else's workload; what it is for your build or your CI, the slider in figure 04 lets you set.
 
-**The scheduling rule is the plainest there is**: whichever task is ready goes first, and a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails, and no job needs four workers to start together. Those are exactly what real schedulers of the Kubernetes or Airflow kind have to deal with. Clusters that train large models add one more: every member of a job has to get a machine at the same moment, or the whole job waits (gang scheduling). What to do downstream when a task is cancelled, and who should go first, are other articles too.
+**The scheduling rule is the plainest there is**: whichever task is ready goes first, and a failed one is retried at once with no waiting; no priorities, no pre-emption, no worker itself ever fails. Those are exactly what real schedulers of the Kubernetes or Airflow kind have to deal with; what to do downstream when a task is cancelled, and who should go first, are other articles too.
+
+**Nothing has to start together.** Clusters that train large models often need every member of a job to get a machine at the same moment, or the whole job waits (gang scheduling). Here every task is one worker's.
 
 **The unit is a whole job of tasks that wait for each other, not a single request.** How one request queues, gets routed, and how long to wait before retrying it, Sam Rose has covered in three fine interactive essays (see the sources); this article does not repeat them.
 
