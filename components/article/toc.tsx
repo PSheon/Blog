@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowUp } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import type { TocItem } from "@/lib/content/toc";
 import { cn } from "@/lib/utils";
@@ -57,14 +56,13 @@ function TocList({ items, active, onNavigate, stagger }: { items: TocItem[]; act
   );
 }
 
-export function Toc({ items, label, top }: { items: TocItem[]; label: string; /** the words for the way back up */ top: string }) {
+export function Toc({ items, label }: { items: TocItem[]; label: string }) {
   const active = useActiveHeading(items.map((i) => i.id));
   if (items.length === 0) return null;
   return (
     <nav aria-label={label}>
       <p className="label mb-3">{label}</p>
       <TocList items={items} active={active} />
-      <a href="#top" className="tap mt-3 inline-flex min-h-6 items-center gap-1 font-sans text-xs text-muted-foreground hover:text-foreground"><ArrowUp className="size-3.5" aria-hidden />{top}</a>
     </nav>
   );
 }

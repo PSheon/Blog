@@ -5,6 +5,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* The floating way back up: above the install hint while that is showing, and gone under the expanded playground. */
+body:has([data-testid="install-hint"]) .back-to-top { bottom: 5rem; }
+body:has([data-expanded="true"]) .back-to-top { display: none; }
+
 /* A control smaller than a fingertip gets a 44 px area to press where the pointer is a finger, without moving a pixel of
    layout: an invisible ::before, centred on it. (Not for an element that already uses its ::before.) */
 @utility tap {
