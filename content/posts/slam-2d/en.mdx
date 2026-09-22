@@ -50,9 +50,9 @@ Try dragging the cyan scan onto the white one by hand, then press "Let ICP do it
   <AlignLab />
 </Instrument>
 
-At **a corner**, starting two metres and nearly thirty degrees off, it is back within ten steps, to better than a centimetre. Press Scramble a few times: most starts are recovered, and when one is not, ICP knows it, because only one or two points in ten found a partner.
+At **a corner**, starting two metres and some fifteen degrees off, it is back in ten steps, to within a millimetre.<Sidenote>The figure's default starts, rerun by a script: at the corner the start is 2.02 m and 14.3° off and ICP stops at step 10; in the corridor the start is 2.40 m off and it stops 0.92 m away, with 75% of points matched, 3.5 cm from the wall. Script and output in `docs/research/slam-2d-icp/`.</Sidenote> Press Scramble a few times: most starts are recovered, and when one is not, ICP knows it, because only one or two points in ten found a partner.
 
-Now switch to **mid-corridor** and press again. This time the cyan scan has only been slid two metres back along the corridor, yet ICP stops almost a metre from the right answer, looking quite sure of itself: three quarters of the points matched, 3.5 cm from the wall on average. Two parallel walls tell you how far you are from them and nothing about how far along them you are; slide a metre forward and the scan looks almost the same.
+Now switch to **mid-corridor** and press again. This time the cyan scan has only been slid a little over two metres back along the corridor, yet ICP stops almost a metre from the right answer, looking quite sure of itself: three quarters of the points matched, 3.5 cm from the wall on average. Two parallel walls tell you how far you are from them and nothing about how far along them you are; slide a metre forward and the scan looks almost the same.
 
 The good news is that this kind of doubt can be computed, so the car can simply refuse such a match.<Sidenote>The small equation ICP solves already carries "which directions am I sure about": it is the pink ellipse in the figure, a small circle at the corner and stretched along the corridor in the corridor. Any match whose ellipse is too flat is thrown away.</Sidenote>
 
@@ -67,7 +67,7 @@ The car now holds two kinds of information:
 
 Draw every position the car remembered as a dot, and every "I believe" as a **spring** between two dots. The spring's natural length is what the sentence says, and the surer the sentence, the stiffer the spring. This picture is called a pose graph.
 
-With only the wheel springs the chain is slack; any shape will do, so it lies bent the way the wheels said. Press "Close the loop" and one short, stiff spring appears, pulling the two ends of the chain together:
+With only the wheel springs the chain is slack; any shape will do, so it lies bent the way the wheels said. Press "Close the loop" (recognising an old place is called closing the loop, or loop closure) and one short, stiff spring appears, pulling the two ends of the chain together:
 
 <Instrument fig="04" title="slam / springs" caption="In each pass every dot moves a little, all at once, so that the total tension in all the springs goes down. It is slowed down here so you can watch it pass by pass.">
   <SpringsLab />
@@ -89,13 +89,15 @@ The same route and the same car, twice round under four different settings. This
 
 **Very wrong wheels.** It does look for places it has been, and never finds one. It looks through old records near *where it believes it is*, and that belief has drifted more than ten metres away. As far as it knows, it never came back.
 
-**The same wheels, plus a camera.** Every wall is painted with its own stripes, and the car gets a panoramic camera one pixel tall. Now "I have seen this view before" nominates old places, and ICP confirms them. In two laps it recognises a place twenty-one times and is never wrong. Search by position, and once you have drifted far enough you are lost for good; search by appearance, and it does not matter how far you drifted.
+**The same wheels, plus a camera.** Every wall is painted with its own stripes, and the car gets a panoramic camera one pixel tall. Now "I have seen this view before" finds the likely old places, and ICP confirms them. In two laps it recognises a place twenty-one times and is never wrong. Search by position, and once you have drifted far enough you are lost for good; search by appearance, and it does not matter how far you drifted.
 
-**One wrong recognition.** The map was fine; one wrong spring was forced in, claiming that two places far apart are the same spot. I measured this separately: a hundred and four correct springs cannot save the map from one wrong one. The mean error goes from 0.10 m to 3.9 m, because least squares has no resistance to an outlier. That is why a real system would rather miss ten places than misrecognise one. Press the button on this card and the map that gets wrecked is the one you drew yourself at the top.
+**One wrong recognition.** The map was fine; one wrong spring was forced in, claiming that two places far apart are the same spot. I measured this separately: a hundred and four correct springs cannot save the map from one wrong one. The mean error goes from 0.10 m to 3.9 m, because least squares has no resistance to an outlier. That is why a real system would rather miss ten places than misrecognise one.
+
+(Press the button on this card and the map that gets wrecked is the one you drew yourself at the top.)
 
 ## What is different on the robot dog
 
-Our robot dog uses **a 3-D lidar and cameras**. Compared with this little car, the first half is very different and the second half is almost the same.
+A real robot dog (the real Lite3 from the previous article, for one) uses **a 3-D lidar and cameras**. Compared with this little car, the first half is very different and the second half is almost the same.
 
 **The lidar's ring becomes a cloud.** Sixteen lasers stacked vertically, more than five thousand points per turn. And a position is no longer three numbers in a plane (x, y, heading) but six, adding height, pitch and roll, because a walking dog sways. Lining two sweeps up works exactly as before; the small equation just has six unknowns instead of three.
 
@@ -103,7 +105,7 @@ Our robot dog uses **a 3-D lidar and cameras**. Compared with this little car, t
   <CloudLab />
 </Instrument>
 
-A single match is good to better than a centimetre and a quarter of a degree, in ten to thirty milliseconds a sweep. After thirty metres round the room it has still drifted more than sixty centimetres and six degrees. **Small errors are not errors that do not add up.** The cure is [the chain from before](#every-i-believe-in-one-picture), with six numbers per dot instead of three.
+A single match is good to better than a centimetre and a quarter of a degree, in thirty to forty milliseconds a sweep. After thirty metres round the room it has still drifted more than sixty centimetres and six degrees. **Small errors are not errors that do not add up.** The cure is [the chain from before](#every-i-believe-in-one-picture), with six numbers per dot instead of three.
 
 **The cameras recognise places.** They are the real version of the camera in the previous section: features across a whole image rather than one row of pixels, for the same purpose.
 

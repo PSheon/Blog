@@ -1,0 +1,4 @@
+corner: start 2.02 m and 14.3° off; stopped after 10 steps, 0.001 m and 0.02° off; inliers 98%, rms 2.1 cm
+corridor: start 2.40 m and 5.7° off; stopped after 18 steps, 0.918 m and 0.01° off; inliers 75%, rms 3.5 cm
+
+Measured 2026-09-22 with the figure's own inputs (seed 3 scans, gate 3, up to 30 steps); script: align.test.ts.txt beside this file.
