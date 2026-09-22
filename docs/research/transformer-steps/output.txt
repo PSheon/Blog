@@ -3,3 +3,8 @@ copy: first 100% at step 35, 35, 30, 40, 40 (seeds 1-5); loss at step 100: 0.010
 sort: first 100% at step 800, 725, 650, 675, 725 (seeds 1-5); loss at step 100: 0.344, 0.214, 0.238, 0.216, 0.216; 4.3 ms per step on this machine
 
 (this machine: Apple-silicon Mac, Node via vitest, 2026-09-20)
+
+In the page (2026-09-22, Chrome via Playwright, Apple M4 Pro, reverse, speed "fast", three fresh loads): the
+accuracy readout, a rolling window of recent answers, first showed 100 after 881, 813 and 803 ms (step 156, 149,
+148); about 200 steps a second. The readout lags the script's accuracy(40) above, which is why its step count is
+higher than 30–40.

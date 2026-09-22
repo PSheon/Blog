@@ -20,11 +20,11 @@ A person doesn't need to learn that, but at the start the model doesn't even kno
 
 Press Train and watch the line “what it writes now” turn from pink (wrong) to cyan (right), digit by digit.
 
-<Instrument fig="01" title="transformer / train" size="wide" caption="The attention maps at the bottom show where in the input the model is looking while it writes each digit. Choose “slow” to watch the change happen, or “fast” to finish training in a second or two. Press “Another one” for a different set of digits: training problems are generated at random every step, so the model has almost certainly never seen this one.">
+<Instrument fig="01" title="transformer / train" size="wide" caption="The attention maps at the bottom show where in the input the model is looking while it writes each digit. Choose “slow” to watch the change happen, or “fast” to reach 100% correct in under a second (about 0.8 s on my M4 Pro). Press “Another one” for a different set of digits: training problems are generated at random every step, so the model has almost certainly never seen this one.">
   <TrainingLab />
 </Instrument>
 
-If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the answer it writes turns cyan from end to end, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured offline with five fixed random seeds (`docs/research/transformer-steps/`): reverse and copy first reach 100% between step 30 and step 40, and a step takes 4 to 5 ms on my laptop. When you press the button the random numbers are new, so your step count will differ a little. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
+If all goes well, three things happen together within a hundred steps: the loss falls to nearly zero, the answer it writes turns cyan from end to end, and the lower half of one attention map grows a **diagonal running from upper right to lower left**.<Sidenote>Measured offline with five fixed random seeds (`docs/research/transformer-steps/`): reverse and copy first reach 100% between step 30 and step 40, and a step takes 4 to 5 ms on my laptop. When you press the button the random numbers are new, so your step count will differ a little; the accuracy on screen is a rolling average of recent answers, so it reaches 100% somewhat later than this. Which of the two heads grows the diagonal varies from run to run.</Sidenote>
 
 I didn't draw that line, and no line of code tells it to appear. It is a result of training. This article is about how it gets there.
 
@@ -79,7 +79,7 @@ $$
 
 $M$ is the **causal mask**: positions with $j > i$ get $-\infty$, so their weight after softmax is zero. While writing the second digit of the answer, the model can't peek at the third. That is why the upper-right triangle of every attention map stays dark.
 
-The two maps in the instrument are the output of $\mathrm{softmax}(\cdot)$ itself: how bright row $i$, column $j$ is tells you how much position $i$ read from position $j$.
+The two attention maps in the figure are the output of $\mathrm{softmax}(\cdot)$ itself: how bright row $i$, column $j$ is tells you how much position $i$ read from position $j$.
 
 ```ts title="lib/ml/transformer.ts"
 const scores = tape.scale(tape.matmul(qh, tape.transpose(kh)), 1 / Math.sqrt(dh));
@@ -106,7 +106,7 @@ Sort doesn't give such a clean picture. What sorting needs isn't "read position 
 Attention moves information between positions. Every other part works on each position separately:
 
 1. **Embedding.** Each token looks up a 32-dimensional vector, and a vector meaning "I am at position n" is added to it. Without position vectors the model couldn't tell the first digit from the sixth, and reversing would be impossible to learn.
-2. **LayerNorm.** Rescales each position's vector to mean 0 and variance 1, which keeps training stable.
+2. **LayerNorm.** Rescales each position's vector to mean 0 and variance 1, then multiplies by a learned scale and adds a learned shift, which keeps training stable.
 3. **MLP.** Two fully connected layers that widen to four times the width and come back. Attention fetches information; the MLP processes it.
 4. **Residual connections.** Each sub-layer's output is added to the stream instead of replacing it.
 5. **Unembedding.** Finally the 32-dimensional vector is projected to a score for each of the 11 tokens.
@@ -142,23 +142,23 @@ matmul(a: Mat, b: Mat): Mat {
 }
 ```
 
-This Transformer uses only twelve kinds of operation: matrix product, add, add bias, scale, transpose, ReLU, LayerNorm, causal softmax, splitting and re-joining attention heads, embedding lookup, and the cross-entropy loss at the end. After the forward pass, run the recorded functions **in reverse** and every parameter has its gradient. That is backpropagation.
+This Transformer uses only twelve kinds of operation.<Sidenote>Matrix product, add, add bias, scale, transpose, ReLU, LayerNorm, causal softmax, splitting and re-joining attention heads, embedding lookup, and the cross-entropy loss at the end.</Sidenote> After the forward pass, run the recorded functions **in reverse** and every parameter has its gradient. That is backpropagation.
 
 <Callout type="warn" title="A wrong gradient doesn't raise an error">
-The frightening thing about backpropagation is that a wrong formula still runs; the model simply, mysteriously, learns badly. So every operation in this engine has a unit test that compares its analytic gradient with a numerical one, $\frac{f(x + \varepsilon) - f(x - \varepsilon)}{2\varepsilon}$, to within $10^{-5}$, and the whole Transformer is spot-checked the same way in every parameter matrix.
+The frightening thing about backpropagation is that a wrong formula still runs; the model simply, mysteriously, learns badly. So every operation in this engine has a unit test that compares its analytic gradient with a numerical one, $\frac{f(x + \varepsilon) - f(x - \varepsilon)}{2\varepsilon}$ with $\varepsilon = 10^{-5}$, to within $10^{-6}$, and the whole Transformer is spot-checked the same way in every parameter matrix.
 </Callout>
 
 With gradients in hand, all that remains is updating the parameters. This uses Adam, which keeps a running average of each parameter's gradient and of its square, and uses them to give every parameter its own step size.
 
-Every step uses 16 brand-new random problems, and their gradients are averaged into one update. There are a million possible six-digit strings; in a hundred steps the model has seen at most 1,600 of them, yet it answers ones it has never seen. It hasn't memorised answers. It has learned the rule.
+Every step uses 16 brand-new random problems, and their gradients are averaged into one update. There are a million possible strings of six digits; in a hundred steps the model has seen at most 1,600 of them, yet it answers ones it has never seen. It hasn't memorised answers. It has learned the rule.
 
 ## How this differs from a real large language model
 
-Structurally, hardly at all. The difference is scale and everything that comes with it:
+The difference is scale and everything that comes with it:
 
 - **Parameters.** Fourteen thousand here; 175 billion in GPT-3.
-- **Layers.** One here. The sort task above already hints at what depth is for: one layer can do one lookup, and composing several steps takes more layers.
+- **Layers.** One here. One layer can learn to sort too, but it takes twenty times the steps of reversing and its solution is hard to read; more layers let a model split the work into steps, and that is usually what depth is for.
 - **Data.** Here the data is unlimited, noise-free, and every problem has exactly one right answer. Real text is none of those.
-- **Position encoding.** This model uses learned absolute position vectors and its position table has only 12 slots, so it handles exactly six digits. A seven-digit input doesn't even fit.
+- **Position encoding.** This model uses learned absolute position vectors (the length limit is above).
 
 The core is the same, though: predict the next token, compute the loss, send the gradient back, and nudge every parameter slightly in the right direction. Those few seconds you watched in your browser were the whole of it.
