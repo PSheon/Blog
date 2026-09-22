@@ -12,7 +12,7 @@ interactive: true
 
 import { TradingLab } from "./components";
 
-The conclusion first: the instrument below trains a trading bot in a few seconds. Given the full thirty generations, that bot makes about **+43%** on Apple's 2024 share price. Buying at the start of the same year and doing nothing makes **+34%**.
+The conclusion first: the figure below trains a trading bot in a few seconds. Given the full thirty generations, that bot makes about **+43%** on Apple's 2024 share price. Buying at the start of the same year and doing nothing makes **+34%**.
 
 The number is real, but it doesn't mean the bot can trade. Half of this article is about how it was trained; the other half is about why you shouldn't believe it. Train one yourself first.
 
@@ -20,7 +20,7 @@ The number is real, but it doesn't mean the bot can trade. Half of this article 
   <TradingLab />
 </Instrument>
 
-Training runs entirely in your browser, and the result is stored there, so it is still here the next time you visit.<Sidenote>It uses the same `lib/ml/neuroevolution.ts` as [the Flappy Bird entry](/en/posts/ai-flappy-bird). With a population of 50, one generation takes about 10 ms on my laptop, so no GPU is needed.</Sidenote>
+Training runs entirely in your browser, and the result is stored there, so it is still here the next time you visit.<Sidenote>It uses the same `lib/ml/neuroevolution.ts` as [the Flappy Bird entry](/en/posts/ai-flappy-bird). With a population of 50, one generation takes about 9 ms on my M4 Pro (method and output in `docs/research/trading-timing/`), so no GPU is needed.</Sidenote>
 
 ## How it is trained
 
@@ -44,23 +44,25 @@ export function observe(closes: number[], day: number): Float32Array {
 }
 ```
 
-The three parameters on the instrument map onto the steps above: **generations** is how many times to repeat, **population** is how many bots each generation has, and **mutation rate** is the chance that each weight is randomly changed. Press Train and the evolution curve climbs generation by generation, ending about nine percentage points above the dashed buy-and-hold line.
+The three parameters on the figure map onto the steps above: **generations** is how many times to repeat, **population** is how many bots each generation has, and **mutation rate** is the chance that each weight is randomly changed. Press Train and the evolution curve climbs generation by generation, ending about nine percentage points above the dashed buy-and-hold line.
 
 It looks as if they understand this market better and better.
 
 ## What it actually learned
 
-I trained six different random seeds for thirty generations each (population 50 and mutation rate 15%, all of them the instrument's defaults; stopping at 20 generations gives +41.5% to +43.8%).<Sidenote>Every number in this section comes from `docs/research/evolution-seeds/`. The seeds are fixed, so a re-run gives exactly the same results.</Sidenote> Every return landed between +42.9% and +43.9%, and the winners all did nearly the same thing: **most of the buying happens in the first half of the year, while the price is still low (the year's lowest close is $165 on 19 April), and by year end the bot is almost fully invested.** In between it makes a few dozen small sell-high, buy-low round trips, eight or nine in ten of them profitable.
+I trained six different random seeds for thirty generations each, with the figure's defaults.<Sidenote>Every number in this section comes from `docs/research/evolution-seeds/`. The seeds are fixed, so a re-run gives exactly the same results. The defaults are a population of 50 and a mutation rate of 15%; stopping at 20 generations gives +41.5% to +43.8%.</Sidenote> Every return landed between +42.9% and +43.9%, and the winners all did nearly the same thing:
 
-Apple rose 35% over 2024. In a year like that, any strategy that fills up while the price is low and holds to the end beats filling up at $185 on 2 January.
+- **Most of the buying happens in the first half of the year**, while the price is still low (the year's lowest close is $165 on 19 April).
+- **By year end the bot is almost fully invested.**
+- In between it makes a few dozen small buy-low, sell-high round trips, eight or nine in ten of them profitable.
 
-Now look again at where the evolution curve starts. In all six seeds the best bot of the **first generation**, the best of 50 random bots that have not evolved at all, already makes +39% to +41%, above the dashed line every time. I also generated 2,000 random bots: 13% beat buy-and-hold, and the best made +41%. Thirty generations of evolution squeeze out only about three more percentage points. A baseline that guessing can beat says something about this year's prices and these rules, not about the bot.
+Apple rose 35% over 2024 (buy-and-hold makes +34% because $10,000 buys only 53 shares, and the $161 left over never goes in). In a year like that, any strategy that fills up while the price is low and holds to the end beats filling up at $185 on 2 January.
+
+Now look again at where the evolution curve starts. In all six seeds the best bot of the **first generation**, the best of 50 random bots that have not evolved at all, already makes +39% to +41%, above the dashed line every time. I also generated 2,000 random bots: 13% beat buy-and-hold, and the best made +41%. Thirty generations of evolution squeeze out only about three more percentage points.
 
 <Callout type="warn" title="This is hindsight, not foresight">
-The bot is trained on one stretch of prices and scored on the same stretch. It didn't learn to spot a low. Evolution picked, out of a thousand or so candidate strategies, the ones that happened to buy at this year's low. On another year's data there is no reason for these strategies to keep working.
+The bot is trained on one stretch of prices and scored on the same stretch. It didn't learn to spot a low. Evolution picked, out of a thousand or so candidate strategies, the ones that happened to buy at this year's low. On another year's data there is no reason for these strategies to keep working. Six seeds converging on the same behaviour looks at first like "it found a pattern"; the more plausible explanation is the opposite: this year has one obvious low, and every road to a high score passes through it.
 </Callout>
-
-Six seeds converging on the same behaviour looks at first like "it found a pattern". The more plausible explanation is the opposite: this year has one obvious low, and every road to a high score passes through it.
 
 ## Three faces of the same mistake
 
@@ -68,7 +70,7 @@ Six seeds converging on the same behaviour looks at first like "it found a patte
 - **It has seen one kind of market.** There is one stock here and one bull year, so the habit the bots pick up is "fill up and hold". In a falling year the same habit loses badly.
 - **What it never saw, it cannot have learned.** Sudden news, policy changes, liquidity drying up: if it didn't happen in the training data, the bot has no response to it.
 
-Making this experiment honest would take at least three things: split the data into a training period and a test period and report results only on the test period; add trading costs; score across several stocks and several kinds of market. This page does none of them, so its numbers can illustrate the problem but not place an order.
+Making this experiment honest would take at least three things: split the data into a training period and a test period and report results only on the test period; add trading costs; score across several stocks and several kinds of market. This page does none of them.
 
 What the bots on this page do best is find the best script for a stretch of history whose ending is already known.
 

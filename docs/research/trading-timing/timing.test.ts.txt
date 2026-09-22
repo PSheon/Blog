@@ -1,0 +1,17 @@
+import { writeFileSync } from "node:fs";
+import { it } from "vitest";
+import data from "@/content/posts/trading-agent/aapl-2024.json";
+import { Trainer } from "@/content/posts/trading-agent/components/trading";
+import { mulberry32 } from "@/lib/ml";
+
+it("times one generation", () => {
+  const lines: string[] = [];
+  for (const seed of [1, 2, 3]) {
+    const t = new Trainer({ closes: data.closes, size: 50, mutationRate: 0.15, rng: mulberry32(seed) });
+    for (let i = 0; i < 3; i++) t.step(); // warm up the JIT
+    const n = 30, start = performance.now();
+    for (let i = 0; i < n; i++) t.step();
+    lines.push(`seed ${seed}: ${((performance.now() - start) / n).toFixed(2)} ms per generation (population 50, 252 days, mean of ${n})`);
+  }
+  writeFileSync("docs/research/trading-timing/output.txt", lines.join("\n") + "\n");
+});
