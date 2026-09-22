@@ -86,7 +86,7 @@ export function HeroStations({ stations, label, hint, t }: Props) {
                     // wide fallback serif (Linux, some Android) did not fit at 14 px. The dot goes first, under 24rem.
                     // The chosen station is told by its colour: text in full ink and a 2 px rule in the station's own colour under it
                     // (the tabs sit in a title bar, where a boxed pill looked like a stray button). Not colour alone: the rule is a shape too.
-                    "relative flex min-h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-0.5 font-heading text-[clamp(0.6875rem,3.5cqw,0.875rem)] font-semibold whitespace-nowrap transition-colors @[30rem]:px-2 @[30rem]:text-sm",
+                    "tap relative flex min-h-8 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-sm px-0.5 font-heading text-[clamp(0.6875rem,3.5cqw,0.875rem)] font-semibold whitespace-nowrap transition-colors @[30rem]:px-2 @[30rem]:text-sm",
                     "after:absolute after:inset-x-1 after:-bottom-px after:h-0.5 after:rounded-full after:bg-[var(--station)] after:opacity-0 after:transition-opacity after:content-['']",
                     s.key === active ? "text-foreground after:opacity-100" : "text-muted-foreground hover:text-foreground",
                   )}

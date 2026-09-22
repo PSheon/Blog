@@ -19,7 +19,7 @@ export function SiteHeader({ locale, t, tags }: Props) {
     { href: `/${locale}/tags`, label: t.nav.tags },
   ];
   const logo = (
-    <Link href={`/${locale}`} className="flex min-h-6 items-center gap-2.5" aria-label={`${site.name} — ${t.nav.home}`}>
+    <Link href={`/${locale}`} className="tap flex min-h-6 items-center gap-2.5" aria-label={`${site.name} — ${t.nav.home}`}>
       <KernelMark className="size-4" />
       <span className="font-mono text-sm font-medium tracking-tight">{site.name}</span>
     </Link>

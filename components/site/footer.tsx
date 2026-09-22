@@ -23,7 +23,7 @@ export function SiteFooter({ locale, t }: { locale: Locale; t: Dictionary }) {
       <div className="relative mx-auto w-full max-w-7xl px-5 pt-24 pb-6 sm:px-8">
         <div className="grid gap-x-12 gap-y-8 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
           <div className="grid gap-5">
-            <Link href={`/${locale}`} className="flex min-h-6 w-fit items-center gap-2.5">
+            <Link href={`/${locale}`} className="tap flex min-h-6 w-fit items-center gap-2.5">
               <KernelMark className="size-4" />
               <span className="font-mono text-sm">{site.name}</span>
             </Link>

@@ -183,7 +183,7 @@ export function PickLab() {
         <div className={`absolute top-3 left-3 flex max-w-[60%] flex-wrap gap-0.5 p-0.5 ${panel}`} role="group" aria-label={t.policy}>
           {DRIVERS.map((d) => (
             <button key={d} type="button" aria-pressed={driver === d} onClick={() => setDriver(d)} data-testid={`headcam-pick-${d}`}
-              className={`rounded-[5px] px-2.5 py-1 text-left font-sans text-[13px] transition-colors ${driver === d ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
+              className={`tap rounded-[5px] px-2.5 py-1 text-left font-sans text-[13px] transition-colors ${driver === d ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"}`}>
               {names[d]}
             </button>
           ))}

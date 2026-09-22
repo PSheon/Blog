@@ -6,10 +6,12 @@ import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { cn } from "@/lib/utils";
 
 /**
- * The way back up a long article: a round button in the bottom right corner that appears once the reader has
- * scrolled a screen down, and goes again near the top. It floats over the page, so it is one of the few things that
- * cast a shadow (DESIGN §Visual). It only fades; a button that slid while the page scrolled read as drifting. Dialogs and the expanded playground are z-50 and cover it; the install hint on a
- * phone pushes it up (globals.css). After the jump, focus goes to the title, so the keyboard carries on from the top.
+ * The way back up a long article: a round button in the bottom right corner. It appears when the reader, a screen or
+ * more down, scrolls back up (that is when a way to the top is wanted), and gets out of the way while they read down,
+ * where on a phone it sat over the last line of text. It only fades; a button that slid while the page scrolled read
+ * as drifting. It floats over the page, so it is one of the few things that cast a shadow (DESIGN §Visual). Dialogs
+ * and the expanded playground are z-50 and cover it; the install hint on a phone pushes it up (globals.css). After the
+ * jump, focus goes to the title, so the keyboard carries on from the top.
  */
 export function BackToTop({ label }: { label: string }) {
   const [shown, setShown] = useState(false), calm = useReducedMotion(), jumping = useRef(false); // on its way up: stay hidden until the top
@@ -21,8 +23,12 @@ export function BackToTop({ label }: { label: string }) {
       const y = window.scrollY;
       // the glide up ends at the top, or the moment the reader scrolls down again through it
       if (jumping.current && y > 0 && y <= lastY) { lastY = y; return; }
-      jumping.current = false; lastY = y;
-      setShown(y > window.innerHeight);
+      jumping.current = false;
+      // Reading down, it would sit over the last line of text on a phone: it shows only while the reader scrolls back up
+      // (a few pixels of hysteresis, so a finger's jitter does not flicker it), and never near the top.
+      const up = y < lastY - 4, down = y > lastY + 4;
+      if (up || down) lastY = y;
+      if (y <= window.innerHeight) setShown(false); else if (up) setShown(true); else if (down) setShown(false);
     };
     const onScroll = () => { if (!queued) queued = requestAnimationFrame(update); };
     update();

@@ -168,7 +168,7 @@ export function FlappyLab() {
                 setSpeed(s);
               }}
               className={cn(
-                "h-7 min-w-9 rounded-sm border px-1.5 font-mono text-xs transition-colors",
+                "tap h-7 min-w-9 rounded-sm border px-1.5 font-mono text-xs transition-colors",
                 speed === s ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
               )}
             >

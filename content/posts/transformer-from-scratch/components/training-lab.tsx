@@ -160,7 +160,7 @@ export function TrainingLab() {
                   setRunning(false);
                 }}
                 className={cn(
-                  "h-7 rounded-sm border px-2.5 text-xs transition-colors",
+                  "tap h-7 rounded-sm border px-2.5 text-xs transition-colors",
                   task === name ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
@@ -212,7 +212,7 @@ export function TrainingLab() {
                 aria-pressed={speed === s}
                 onClick={() => setSpeed(s)}
                 className={cn(
-                  "h-7 rounded-sm border px-2.5 text-xs transition-colors",
+                  "tap h-7 rounded-sm border px-2.5 text-xs transition-colors",
                   speed === s ? "border-signal bg-signal/10 text-signal" : "border-border text-muted-foreground hover:text-foreground",
                 )}
               >
