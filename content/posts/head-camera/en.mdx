@@ -68,7 +68,7 @@ Four ways of doing it, each the mean of five random seeds:
 
 Read across: the two rows that never saw a shaken camera go to almost nothing the moment it tilts; the two that did barely notice. Read down: when something is moved halfway through, “look once” cannot follow and “keep looking” does not care, because it was looking again at every step anyway.
 
-The last two rows both trained for 60,000 steps and are equally good with the camera untouched (96% and 95%); they differ only once it tilts. In the last row all five seeds are above 92%, and that number was hard won: at 20,000 steps the five seeds were 100, 97, 59, 37 and 2.5. The method was the same; some seeds simply learn slowly, and three times the steps brought every one of them in.<Sidenote>The two “look once” rows trained for only 10,000 steps: it sees one picture an episode, and more training does not give it a second look.</Sidenote>
+The last two rows both trained for 60,000 steps and are equally good with the camera untouched (96% and 95%); they differ only once it tilts. In the last row all five seeds are above 92%, and that number was hard won: at 20,000 steps the five seeds were 100, 97, 59.5, 36 and 2.5. The method was the same; some seeds simply learn slowly, and three times the steps brought every one of them in.<Sidenote>The two “look once” rows trained for only 10,000 steps: it sees one picture an episode, and more training does not give it a second look.</Sidenote>
 
 ## Why picking up is harder than touching
 
@@ -78,7 +78,9 @@ I failed at this task three times before it trained.
 
 **A rare action needs extra practice.** "Grip" only comes up when the hand is low and right over the block: under 1% of training pictures drawn at random. The network learned "almost never grip". With a fifth of the training pictures drawn from that region, it dared to.
 
-**The hand hides the block.** Once the hand is low over the block, seen from the head, it covers the block, and there is nothing left to line up on for the last two centimetres. That is why this gripper forgives 3 cm. The same thing has a bigger version, which is why fig. 01's dashed outline does not cover the whole bench: outside it, on the side away from the camera, the reaching hand and forearm come between the camera and the block, and with the hand still 8 cm away not one pixel of the block is left in the picture. The network has no memory; what it cannot see, it cannot head for. I measured the bench every 2 cm: in every cell inside the outline it places at least 19 blocks in 20; outside there is a large patch where it never places one, so the page does not let the block go there. The pad is large and flat and is fine anywhere.
+**The hand hides the block.** Once the hand is low over the block, seen from the head, it covers the block, and there is nothing left to line up on for the last two centimetres. That is why this gripper forgives 3 cm.
+
+The same thing has a bigger version, which is why fig. 01's dashed outline does not cover the whole bench: outside it, on the side away from the camera, the reaching hand and forearm come between the camera and the block, and with the hand still 8 cm away not one pixel of the block is left in the picture. The network has no memory; what it cannot see, it cannot head for. I measured the bench every 2 cm: in every cell inside the outline it places at least 19 blocks in 20; outside there is a large patch where it never places one, so the page does not let the block go there. The pad is large and flat and is fine anywhere.
 
 Figure 03 put cameras in the palms, and the stated reason is close-range pictures "when the main cameras are occluded". Here you can see why.
 
