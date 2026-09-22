@@ -20,6 +20,7 @@ everything is written in TypeScript and runs in the reader's tab: no TensorFlow.
 
 | № | English | 中文 |
 | --- | --- | --- |
+| 013 | [A mini Figure AI in three minutes: one camera, one arm](https://blog.psheon.me/en/posts/head-camera) | [三分鐘打造迷你 Figure AI：只給它一顆相機、一隻手臂](https://blog.psheon.me/zh/posts/head-camera) |
 | 012 | [Putting a path tracer in a 3D playground: crash a car, gun a plane, fly a helicopter](https://blog.psheon.me/en/posts/light-playground) | [把光追放進 3D 遊樂園：體驗開車碰撞、飛機加速、直升機飛行](https://blog.psheon.me/zh/posts/light-playground) |
 | 011 | [How a picture clears from snow: a WebGPU path tracer from scratch](https://blog.psheon.me/en/posts/light-from-noise) | [一張圖怎麼從雪花變清晰：從零寫一個 WebGPU 路徑追蹤器](https://blog.psheon.me/zh/posts/light-from-noise) |
 | 010 | [A task scheduler from scratch](https://blog.psheon.me/en/posts/task-scheduler) | [從零打造一個任務排程器](https://blog.psheon.me/zh/posts/task-scheduler) |
