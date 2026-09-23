@@ -42,6 +42,25 @@ tune it with your own picks (DPO, and it games the judge), and a blind test agai
 - CI cannot hear: `e2e/music-ai.spec.ts` checks training, tuning, the blind test's secrecy and that nothing heavy is
   fetched before the reader asks.
 
+### № 015, the Starship landing — DRAFT, PAUSED (2026-09-23)
+
+Everything is on `dev` and `draft: true`. Paul read it and said the prose is **不有趣，又有一點雜亂**; he is waiting
+for Fable to write it. **Do not rewrite the article without him.** The machinery under it is finished and measured.
+
+- The physics and the pilot are `content/posts/rocket-landing/components/{sim,pilot}.ts`. The one idea worth keeping
+  hold of: one Raptor spans 0.90–2.26 MN and the ship weighs 1.26 MN, so a single engine straddles its own weight
+  and two do not. The pilot therefore asks for a thrust and lights the fewest engines that can deliver it, and a
+  descent goes 0 → 1 → 2 → 1 by itself.
+- `docs/research/rocket/RESULTS.md` has every number, including the two I got wrong: an `engines` override meant the
+  learned engine counts never touched the score (I nearly published the noise), and a reward hack I predicted did
+  not happen. Measurement scripts are live code in `scripts/rocket/`, not copies, so lint and tsc keep them honest.
+- The figure has four pilots and two trainers. `e2e/rocket-landing.spec.ts` covers them and skips while the article
+  is a draft — flip `draft` to run it.
+- What the editorial pass found, if it helps whoever writes it: the three best moments (it cannot hover; the flip
+  throws it 64 m sideways so it must aim off-target; the network hovering 3 m above the deck for 90 seconds) are all
+  buried in engineering notes, the engine-count thread is told three separate times, and the last three sections
+  share one shape — setup, table, moral.
+
 ### The light series (two articles, published 2026-09-22)
 
 `light-from-noise` (№ 011, part one: what path tracing is) and `light-playground` (№ 012, part two: a playground you
