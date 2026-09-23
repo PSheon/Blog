@@ -36,6 +36,7 @@ export {
   Object3D,
   PCFShadowMap,
   PerspectiveCamera,
+  PointLight,
   Plane,
   PlaneGeometry,
   Points,
