@@ -1,0 +1,165 @@
+---
+title: "Train your own AI composer in three minutes: from noodling to calm"
+description: "Train a small Transformer to write four-part chorales from scratch, in your browser, and listen to it turn noodling into music. Then judge it: twenty clicks make it calmer — and show you how it games the judge."
+seoTitle: "Train an AI composer in three minutes"
+seoDescription: "Train a Transformer from scratch in your browser until it writes four-part chorales, hear it learn, tune it to your taste, and watch it game the judge."
+date: 2026-09-23
+tags: [generative, llm, from-scratch]
+no: 14
+interactive: true
+---
+
+import { BlindLab, ComposerLab, JudgeLab } from "./components";
+
+The composer below knows nothing at all. Press train and it reads 333 of Bach's four-part chorales in your browser,
+improvising a piece for you at six moments as it learns, starting with the noodling of step 0.
+
+<Instrument fig="01" title="composer / train" size="wide" caption="On the left, how the training is going. On the right, the six bars it wrote at each moment: one line is one note, and the four rows of colour are the four voices, soprano at the top. The numbers underneath measure whether it writes like four-part music, not whether it sounds good. Whether it sounds good is for your ears.">
+  <ComposerLab />
+</Instrument>
+
+First, what this is not. It is not Suno: it does not sing and it does not produce audio. It writes a score — which
+voice, which note, how long — and a synthesiser written from scratch plays it. The model has sixty-five thousand
+parameters and its weights are 260 KB, about a tenth of a three-minute MP3.
+
+## Turning music into words
+
+A chorale is cut into a grid of eighth notes. Each step has four voices, soprano down to bass, and each voice-step is
+one token: a new note is its pitch, a held note is `HOLD`, silence is `REST`. So what the model writes looks like
+this: soprano, alto, tenor, bass, soprano, alto, tenor, bass, and so on.
+
+```ts title="content/posts/music-ai/components/music.ts"
+export const HOLD = HI - LO + 1, REST = HOLD + 1, VOCAB = REST + 1; // 54 pitches + 2 = 56 words
+```
+
+From here it is exactly [№ 004's Transformer](/en/posts/transformer-from-scratch), the same code: look at the words
+so far, guess the next one. There it learned to write numbers backwards; here it learns Bach.
+
+There is a trap in this: the only way the model knows whose turn it is, is *which position* a word is in. So every
+window of the last 64 words has to start on the soprano, or the model reads every voice as its
+neighbour.<Sidenote>I walked into it the first time I let it compose: the bass climbed above the tenor and the voices
+crossed six steps out of ten. Training was never affected, only composing.</Sidenote>
+
+## What it learns first
+
+Train it a few times in figure 1 and the order barely changes. Here are two runs of figure 1's own recipe, five pieces measured at each
+moment, averaged. The validation error is how well it guesses the next note, lower being better; parallel fifths are
+four-part writing's cardinal sin, two voices a fifth apart moving the same way:<Sidenote>The table was measured in
+node, running the same code and the same 2,400 steps as the browser. On my M4 Pro a step takes about 69 ms in Chrome,
+so the whole run is under three minutes. Scripts and output are in `docs/research/music-ai/`.</Sidenote>
+
+| step | val. error | in key | voices crossing | held notes | parallel fifths (per 100 steps) |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 4.51 | 82% | 87% | 0.5% | 3.9 |
+| 100 | 2.01 | 99% | 36% | 78% | 1.1 |
+| 250 | 1.60 | 99.7% | 1.9% | 50% | 9.8 |
+| 500 | 1.39 | 99.6% | 1.1% | 55% | 10.0 |
+| 1000 | 1.21 | 98.7% | 1.8% | 54% | 12.0 |
+| 2000 | 1.07 | 99.2% | 1.3% | 53% | 8.9 |
+| 2400 | 1.05 | 99.5% | 0% | 65% | 7.2 |
+| Bach himself | | 97.7% | 2.6% | 45% | 0.16 |
+
+1. **Holding notes comes first.** At step 100, 78% of the notes are held: it has found that "carry on with the
+   previous note" is the best guess going, so it drones.
+2. **Then the voices learn their ranges.** Crossings fall from 87% to 2% by step 250, and stay cleaner than Bach's.
+3. **The key settles; the rhythm does not quite.** In-key notes hold at 99%, and held notes come back to about 50%, a little above Bach's 45% — then rise to 65% by the end of the run, which is slower than Bach.
+4. **Parallel fifths never arrive.** Bach breaks the rule 0.16 times per hundred steps; the model spends the whole
+   run between 7 and 12.
+
+In my browser the validation error passes 1.46 inside a minute, which is the best a 5-gram — look at the four words
+before, count how often each word follows — manages on the same data. The 5-gram composes far worse: it cannot see
+past four words, so a voice that has held a note for one step has forgotten which note it is on, and the voices cross
+72% of the time.
+
+## Is it composing, or remembering?
+
+The "longest copy" in figure 1 takes every step it wrote and looks for the longest run that appears, note for note, in
+one of the 333 training chorales. At 1,000 steps it is 3 to 6 steps (a step is an eighth note, eight of them a bar) —
+less than a bar. A chorale runs about 107 steps.
+
+So it is mostly composing. But the longer it trains, the longer the pieces it remembers: at 2,400 steps the longest
+copy is 5 to 10 steps — and one piece in ten copied 32 steps, four whole bars, so it can hold a passage verbatim.
+
+## You be the judge
+
+The "calm" in the title is not something it knows. Bach's chorales are neither slow nor quiet; slowing down and
+quietening are what you are about to tune into it.
+
+The trained model writes like Bach, which is not necessarily what you want to hear. Your turn: it writes two pieces,
+you pick one, and it moves a little towards the one you picked and away from the other. Models like ChatGPT are tuned
+on human preferences (RLHF); this is DPO, a simpler version that came later, with you as the judge.
+
+<Instrument fig="02" title="composer / judge" size="wide" caption="A model trained beforehand for 1,000 steps, the same recipe as figure 1. Every pick updates it. The numbers compare the eight pieces it writes now with the eight it wrote before your first pick.">
+  <JudgeLab />
+</Instrument>
+
+Keep picking the slower, quieter one and it slows down. I tried it with an automatic judge, set up exactly like this
+figure: always pick the piece with more held notes, and after 20 picks held notes go from 48% to 64%; after 40 they
+reach 78%, the chords lose half their variety, and it is on its way to a drone.
+
+### It finds the hole in the judge
+
+Then I had the automatic judge mark parallel fifths instead: always pick the piece that breaks the rule less. After 40
+picks the rate barely moves, 12.3 per hundred steps down to 10.9 — but held notes are up from 48% to 58% and the
+chords have lost a quarter of their variety. By 80 picks the rate is 8.0, held notes 63%, and distinct chords are down
+from 45 to 29.
+
+It really has brought the mistakes down, and the way it did it is to **move less**: a voice that stays put cannot walk
+into a parallel fifth.
+
+This is reward hacking, one of the hardest problems in training large language models: the judge measures one thing,
+the model optimises "keep the judge happy", and any gap between the two is a gap it will find. The textbook has two
+answers:
+
+- **A score that cannot be gamed that way.** Count the mistakes *per step on which voices move*, so standing still
+  buys nothing.
+- **A shorter leash.** DPO has a β that decides how far the model may drift from the model it started as.
+
+At the strength this figure uses, the two answers buy very little: over the same 80 picks the hack-proof judge gets
+parallel fifths to 7.0 against the gameable judge's 8.0, and both end up with 63% held notes. Both still learn to move
+less first.
+
+The difference shows when you push harder. Updating once per four picks, at three times the learning rate: the
+gameable judge gets to 5.9, at the price of 73% held notes and half the chords; the hack-proof judge gets to 7.0 with
+52% held notes and 41 chords, near where it started. **The harder you optimise, the more gaming pays** — which is
+exactly the position anyone tuning a large model is in. The figure above is deliberately gentle, so that twenty clicks
+do not wreck it.
+
+## Can it beat five lines of maths?
+
+Its last opponent uses no AI at all and fits in five lines: a 1/f random walk over a C pentatonic scale, above a fixed
+C–Am–F–G, a bar each.
+
+```ts title="simplified from content/posts/music-ai/components/music.ts"
+const scale = [60, 62, 64, 67, 69, 72, 74, 76, 79, 81];      // C pentatonic
+const chords = [[48, 55, 64], [45, 57, 64], [41, 53, 60], [43, 55, 62]];
+for (let d = 0; d < 4; d++) if (t % (2 << d) === 0) dice[d] = rng(); // four dice
+const soprano = scale[Math.floor(mean(dice) * scale.length)];       // a 1/f melody
+voices.push([soprano, ...chords[Math.floor(t / 8) % 4]]);           // a chord a bar
+```
+
+It never plays a wrong note and its voices never cross.
+
+But it breaks the parallel-fifths rule 19.8 times per hundred steps, over a hundred times Bach's rate, and it has half
+his harmonic variety. Four voices shifting together *are* a run of parallel fifths.
+
+So: can you hear it? Three pieces below, four bars each — one by Bach (from the 37 chorales the model never saw), one
+by the model after 1,000 steps, one by the five lines of maths, shuffled every time.
+
+<Instrument fig="03" title="composer / blind" size="wide" caption="Listen to all three before you guess. The answers arrive when you press the button, along with each piece's parallel fifths and chord variety. The piano rolls wait until then too: a chorale and a block-chord machine look nothing alike, which would give it away.">
+  <BlindLab />
+</Instrument>
+
+Once you have the answers, the two numbers under each card tell you that the three differ by more than how they sound.
+
+## The data and the sound
+
+- The data is Craig Sapp's edition of [Bach's 370 four-part chorales](https://github.com/craigsapp/bach-370-chorales),
+  licensed CC BY-NC-SA 4.0; the tokens and the trained model this page uses carry the same licence. Every chorale is
+  moved to C major or A minor and sampled onto a grid of eighth notes: 333 to train on, 37 kept back to check against.
+- The synthesiser is written from scratch, with none of the browser's own instruments or effects: the warm pad is a
+  fundamental and a soft octave, each doubled 4 cents apart, with a slow attack; the reverb follows Freeverb's layout,
+  so the tail darkens as it fades. The first version was an organ of five harmonics, and the first thing I heard was
+  how sharp it was: 6 to 16 dB more in the 1–4 kHz band than this one.
+- Everything here that measures "like Bach" is a proxy: in key, voices crossing, parallel fifths, held notes, chord
+  variety. They can say whether a piece follows the rules. They cannot say whether it is any good.
