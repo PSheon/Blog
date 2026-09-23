@@ -728,6 +728,26 @@ html:not(.dark) {
 }
 
 /*
+ * Changing the theme repaints every colour on the page at once. Left alone that is a hard cut; for the third of a
+ * second around the switch, every element is allowed to interpolate its colours instead. The class is added by the
+ * control that changes the theme and taken off again when the fade is over, so nothing carries a transition it did
+ * not ask for the rest of the time — and a reader who asked for less motion never gets the class at all.
+ */
+html.theme-fade,
+html.theme-fade *,
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition:
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease,
+    fill 260ms ease,
+    stroke 260ms ease,
+    box-shadow 260ms ease,
+    opacity 260ms ease !important;
+}
+
+/*
  * Page transitions (React <ViewTransition> → the browser's View Transitions API).
  * The routed content moves; header and footer are not part of it.
  */

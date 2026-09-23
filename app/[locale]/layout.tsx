@@ -67,7 +67,8 @@ export default async function LocaleLayout({ children, params }: LayoutProps<"/[
   return (
     <html lang={htmlLang[locale]} data-scroll-behavior="smooth" className={`${fontVariables} antialiased`} suppressHydrationWarning>
       <body id="top" className="flex min-h-dvh flex-col">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+        {/* No disableTransitionOnChange: the colours are meant to fade, and components/theme-provider scopes that to the moment of the change. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
             <a
               href="#content"
               className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"

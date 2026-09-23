@@ -31,6 +31,25 @@ function ThemeColor() {
   return null;
 }
 
+/**
+ * Change the theme with a fade rather than a cut.
+ *
+ * `html.theme-fade` (globals.css) lets every element interpolate its colours; it goes on just before the class that
+ * actually changes them and comes off when the fade is done. A reader who asked for less motion gets the old
+ * instant swap.
+ */
+export function useThemeFade() {
+  const { setTheme } = useTheme();
+  return (next: string) => {
+    const root = document.documentElement;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still) { setTheme(next); return; }
+    root.classList.add("theme-fade");
+    setTheme(next);
+    window.setTimeout(() => root.classList.remove("theme-fade"), 320);
+  };
+}
+
 export function ThemeProvider(props: ComponentProps<typeof NextThemesProvider>) {
   return (
     <NextThemesProvider {...props}>
