@@ -1,9 +1,10 @@
 "use client";
 
 import { TagFilter } from "./tag-filter";
+import { useTagFilter } from "./use-tag-filter";
 import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
-import { ViewTransition, useState } from "react";
+import { ViewTransition } from "react";
 import type { Locale } from "@/lib/i18n";
 import { PostCover } from "./post-cover";
 import { EntryNo, InteractiveBadge } from "./post-meta";
@@ -38,7 +39,7 @@ interface Props {
 /** The notebook's table of contents: one ruled line per entry, № and date in the margin. */
 export function PostIndex({ locale, rows, tags, labels, filterable = true, level = 2 }: Props) {
   const Heading = `h${level}` as const;
-  const [tag, setTag] = useState<string | null>(null);
+  const [tag, setTag] = useTagFilter();
   const counts: Record<string, number> = {}; for (const r of rows) for (const name of r.tags) counts[name] = (counts[name] ?? 0) + 1;
   const visible = tag ? rows.filter((r) => r.tags.includes(tag)) : rows;
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { TagFilter } from "./tag-filter";
+import { useTagFilter } from "./use-tag-filter";
 import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
-import { ViewTransition, useState } from "react";
+import { ViewTransition } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,7 @@ function span(i: number, count: number): string {
 
 /** The home page's index as a bento grid: the most recent articles as tiles with their drawings, the newest one the largest. */
 export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
-  const [tag, setTag] = useState<string | null>(null);
+  const [tag, setTag] = useTagFilter();
   const counts: Record<string, number> = {}; for (const r of rows) for (const name of r.tags) counts[name] = (counts[name] ?? 0) + 1;
   const visible = (tag ? rows.filter((r) => r.tags.includes(tag)) : rows).slice(0, limit);
 
