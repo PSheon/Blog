@@ -89,7 +89,7 @@ export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
                           type="button"
                           onClick={() => setTag(name === tag ? null : name)}
                           aria-pressed={name === tag}
-                          className="tap relative z-10 cursor-pointer rounded-sm decoration-signal/50 underline-offset-4 hover:text-foreground hover:underline aria-pressed:text-signal"
+                          className="tap relative z-10 inline-flex min-h-6 cursor-pointer items-center rounded-sm decoration-signal/50 underline-offset-4 hover:text-foreground hover:underline aria-pressed:text-signal"
                         >
                           #{name}
                         </button>

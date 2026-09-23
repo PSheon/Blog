@@ -732,9 +732,13 @@ html:not(.dark) {
  * second around the switch, every element is allowed to interpolate its colours instead. The class is added by the
  * control that changes the theme and taken off again when the fade is over, so nothing carries a transition it did
  * not ask for the rest of the time — and a reader who asked for less motion never gets the class at all.
+ *
+ * Canvases are left out. A canvas paints itself, so fading its CSS `color` gains nothing — and the 3-D figures read
+ * that very property to know what ink to draw in (followInk, content/posts/slam-2d/components/stage3d.ts). Mid-fade
+ * they would read a colour on its way somewhere and keep it for good.
  */
 html.theme-fade,
-html.theme-fade *,
+html.theme-fade *:not(canvas),
 html.theme-fade *::before,
 html.theme-fade *::after {
   transition:

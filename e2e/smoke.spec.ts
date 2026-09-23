@@ -171,7 +171,8 @@ test("a URL that matches nothing gets the site's own 404, in the language of the
     const heading = page.getByRole("heading", { level: 1 });
     await expect(heading).toHaveText(title);
     await expect(heading).not.toContainText(other); // it used to say both at once
-    await expect(page.getByTestId("not-found").getByRole("link")).toHaveAttribute("href", home);
+    // The page also offers the index and the five newest articles, so ask for the one this test is about.
+    await expect(page.getByTestId("not-found").getByRole("link").first()).toHaveAttribute("href", home);
     await expect(page.getByRole("banner")).toBeVisible();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
   }

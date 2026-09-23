@@ -88,6 +88,10 @@ Worth carrying forward:
   purpose — turning it back on will make the colours cut again.
 - **No animation library.** framer-motion was installed for one height transition and taken out again: DESIGN.md
   §2 and §7 both forbid it, and 66 KB gzipped against 203 KB of page scripts is the reason.
+- **One measured gap left open:** on the bilingual 404 (`/nope`, the only page rendered outside the locale layout,
+  with its own `<html>`), `--input` resolves to rgba(146,146,186,0.573) in a production build rather than the
+  rgba(155,155,196,0.58) everywhere else — 2.86:1 against the page instead of 3.0. It does not reproduce under
+  `next dev`. `e2e/design.spec.ts` still asserts the edge is there, and leaves the ratio to the pages it can check.
 - The tag filter lives in `?tag=`, figure resets all say 重來 / "Start over" with the same icon at 28 px, and the
   figures' buttons were swept in the browser article by article rather than read.
 
