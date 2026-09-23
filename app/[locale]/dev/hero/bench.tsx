@@ -99,7 +99,7 @@ function Measured({ station, width, shared, layout, t }: { station: Station; wid
 
 export function HeroBench({ t }: { t: Labels }) {
   const [width, setWidth] = useState(390);
-  const [equal, setEqual] = useState(true);
+  const [mode, setMode] = useState<"classifier" | "fixed" | "own">("classifier");
   const [layout, setLayout] = useState<ThinkLayout>("half");
   const seeRef = useRef<HTMLDivElement>(null);
   const [seeHeight, setSeeHeight] = useState<number>();
@@ -139,8 +139,9 @@ export function HeroBench({ t }: { t: Labels }) {
         ))}
         <span className="mx-2 h-4 w-px bg-border" aria-hidden />
         <span className="label mr-1">高度</span>
-        <button type="button" className={button(equal)} onClick={() => setEqual(true)}>四站等高</button>
-        <button type="button" className={button(!equal)} onClick={() => setEqual(false)}>各自的高度</button>
+        <button type="button" className={button(mode === "classifier")} onClick={() => setMode("classifier")}>等高（看見決定）</button>
+        <button type="button" className={button(mode === "fixed")} onClick={() => setMode("fixed")}>等高 430</button>
+        <button type="button" className={button(mode === "own")} onClick={() => setMode("own")}>各自的高度</button>
         <span className="mx-2 h-4 w-px bg-border" aria-hidden />
         <span className="label mr-1">思考排版</span>
         {LAYOUTS.map((l) => (
@@ -159,7 +160,14 @@ export function HeroBench({ t }: { t: Labels }) {
 
       <div className="mt-8 flex flex-wrap items-start gap-10">
         {(["see", "think", "generate", "act"] as Station[]).map((station) => (
-          <Measured key={`${station}-${width}-${equal}-${layout}`} station={station} width={width} shared={equal ? (seeHeight ?? null) : null} layout={layout} t={t} />
+          <Measured
+            key={`${station}-${width}-${mode}-${layout}`}
+            station={station}
+            width={width}
+            shared={mode === "fixed" ? 430 : mode === "classifier" ? (seeHeight ?? null) : null}
+            layout={layout}
+            t={t}
+          />
         ))}
       </div>
     </div>

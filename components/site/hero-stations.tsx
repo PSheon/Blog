@@ -48,38 +48,31 @@ interface Props {
  * but `think` sizes itself from its own content, and on a 390 phone that left 163 px of empty panel under a small
  * attention map. So the box follows the station that has a height of its own, and animates between the two.
  */
-/** Stations whose content sets its own height. The rest are stretched to the classifier's, as before. */
-const OWN_HEIGHT = new Set<StationKey>(["think"]);
+/*
+ * One height for all four, and it is the classifier's.
+ *
+ * Two of the stations size their canvas against the box (`container-type: size`), so given no height they collapse
+ * — 55 px for generate, 69 px for act, measured on /zh/dev/hero. That rules out letting each station be as tall as
+ * its own content, which is why the box follows the one station that has a height of its own to give.
+ */
 export function HeroStations({ stations, label, hint, t }: Props) {
   const active = useStation(), setActive = setStation;
-  const seeRef = useRef<HTMLDivElement>(null), ownRef = useRef<HTMLDivElement>(null);
+  const seeRef = useRef<HTMLDivElement>(null);
   const [seeHeight, setSeeHeight] = useState<number>();
-  const [ownHeight, setOwnHeight] = useState<number>();
   const id = useId(), current = stations.find((s) => s.key === active) ?? stations[0];
-  const ownsHeight = OWN_HEIGHT.has(active);
 
-  // Both panes are measured as they are laid out and as the window changes: the classifier is always in flow (it is
-  // only invisible), and a station with its own height is placed against the top rather than stretched.
+  // The classifier is always in flow (it is only invisible), so its height is known at every width.
   useEffect(() => {
-    const watch = (element: HTMLElement | null, set: (height: number) => void, real = () => true) => {
-      if (!element) return () => {};
-      const measure = () => { if (real()) set(element.offsetHeight); };
-      const observer = new ResizeObserver(measure);
-      observer.observe(element);
-      measure();
-      return () => observer.disconnect();
-    };
-    const stop = [
-      watch(seeRef.current, setSeeHeight),
-      // Only once the station itself is on screen: its chunk arrives a moment after the tab is pressed, and the
-      // loading placeholder is short, so measuring that would collapse the box and then grow it again.
-      watch(ownRef.current, setOwnHeight, () => !!ownRef.current?.querySelector("[data-station]")),
-    ];
-    return () => stop.forEach((fn) => fn());
-  }, [active]);
+    const element = seeRef.current;
+    if (!element) return;
+    const measure = () => setSeeHeight(element.offsetHeight);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, []);
 
-  // Until a station with its own height has measured one, the classifier's height holds the box open.
-  const height = ownsHeight ? (ownHeight ?? seeHeight) : seeHeight;
+  const height = seeHeight;
   const move = (from: number, by: number) => {
     const next = stations[(from + by + stations.length) % stations.length];
     setActive(next.key);
@@ -145,9 +138,7 @@ export function HeroStations({ stations, label, hint, t }: Props) {
                   <HeroInstrumentLazy hint={hint} />
                 </div>
                 {active !== "see" && (
-                  // Stretched to the box, unless the station brings a height of its own — then it sits against the
-                  // top and the box comes down to meet it.
-                  <div ref={ownsHeight ? ownRef : undefined} className={cn("absolute inset-x-0 top-0", !ownsHeight && "bottom-0")}>
+                  <div className="absolute inset-0">
                     {active === "think" && <Think t={t.think} />}
                     {active === "generate" && <Generate t={t.generate} />}
                     {active === "act" && <Act t={t.act} />}
