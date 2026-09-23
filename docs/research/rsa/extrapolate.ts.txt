@@ -1,0 +1,108 @@
+import { readFileSync } from 'node:fs'
+
+type Row = { algo: string; bits: number; failures: number; min: number; med: number; max: number }
+const rows: Row[] = readFileSync('runs/factor-curve.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+
+/** least squares y = a·x + b, with R². */
+function fit(xs: number[], ys: number[]) {
+  const n = xs.length
+  const mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n
+  const a = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0) / xs.reduce((s, x) => s + (x - mx) ** 2, 0)
+  const b = my - a * mx
+  const ssTot = ys.reduce((s, y) => s + (y - my) ** 2, 0)
+  const ssRes = ys.reduce((s, y, i) => s + (y - (a * xs[i] + b)) ** 2, 0)
+  return { a, b, r2: 1 - ssRes / ssTot }
+}
+
+const YEAR_MS = 365.25 * 24 * 3600 * 1000
+const human = (ms: number) => {
+  if (ms < 1000) return `${ms.toFixed(1)} ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`
+  if (ms < 3600_000) return `${(ms / 60_000).toFixed(1)} min`
+  if (ms < 86400_000) return `${(ms / 3600_000).toFixed(1)} h`
+  if (ms < YEAR_MS) return `${(ms / 86400_000).toFixed(1)} days`
+  const y = ms / YEAR_MS
+  return y < 1e6 ? `${y.toPrecision(3)} years` : `10^${Math.log10(y).toFixed(1)} years`
+}
+
+// ---------- exponential fits: log2(ms) = a·bits + b ----------
+console.log('=== exponential model: log2(median ms) = a·bits + b ===')
+console.log('algo | fitted on | a (bits of time per bit of key) | doubling every | R^2 | theory')
+const THEORY: Record<string, [number, string]> = {
+  trial: [0.5, 'O(sqrt n) = 2^(b/2), a = 0.5'],
+  fermat: [0.5, 'O((p-q)^2/sqrt n); for balanced random primes ~2^(b/2)'],
+  rho: [0.25, 'O(n^(1/4)) = 2^(b/4), a = 0.25'],
+}
+const fits: Record<string, { a: number; b: number }> = {}
+for (const algo of ['trial', 'fermat', 'rho']) {
+  const pts = rows.filter((r) => r.algo === algo && r.failures === 0 && r.med > 0.1)
+  const F = fit(pts.map((p) => p.bits), pts.map((p) => Math.log2(p.med)))
+  fits[algo] = F
+  console.log(`${algo} | ${pts[0].bits}-${pts[pts.length - 1].bits} bits (${pts.length} pts) | ${F.a.toFixed(3)} | ${(1 / F.a).toFixed(1)} bits | ${F.r2.toFixed(4)} | ${THEORY[algo][1]}`)
+}
+
+// ---------- subexponential fit for QS: ln(ms) = a·L + b, L = sqrt(ln n · ln ln n) ----------
+const L = (bits: number) => { const lnn = bits * Math.LN2; return Math.sqrt(lnn * Math.log(lnn)) }
+const qsPts = rows.filter((r) => r.algo === 'qs' && r.failures === 0 && r.bits >= 56)
+const qsFit = fit(qsPts.map((p) => L(p.bits)), qsPts.map((p) => Math.log(p.med)))
+console.log(`\n=== subexponential model for qs: ln(median ms) = a·sqrt(ln n · ln ln n) + b ===`)
+console.log(`fitted on ${qsPts[0].bits}-${qsPts[qsPts.length - 1].bits} bits (${qsPts.length} pts): a = ${qsFit.a.toFixed(3)} (theory 1.0), R^2 = ${qsFit.r2.toFixed(4)}`)
+// also fit qs to the exponential model, to show it is the wrong shape
+const qsExp = fit(qsPts.map((p) => p.bits), qsPts.map((p) => Math.log2(p.med)))
+console.log(`the same points forced into the exponential model: a = ${qsExp.a.toFixed(3)}, R^2 = ${qsExp.r2.toFixed(4)}`)
+
+// ---------- where a tab gives up ----------
+console.log('\n=== key size at which the median run reaches ... (from the fits) ===')
+console.log('algo | 1 s | 5 s | 1 min | 1 hour')
+for (const [algo, F] of Object.entries(fits)) {
+  const at = (ms: number) => ((Math.log2(ms) - F.b) / F.a).toFixed(0)
+  console.log(`${algo} | ${at(1000)} | ${at(5000)} | ${at(60_000)} | ${at(3600_000)} bits`)
+}
+{
+  const at = (ms: number) => {
+    const target = (Math.log(ms) - qsFit.b) / qsFit.a         // the L value
+    let lo = 16, hi = 100_000
+    for (let i = 0; i < 200; i++) { const mid = (lo + hi) / 2; if (L(mid) < target) lo = mid; else hi = mid }
+    return lo.toFixed(0)
+  }
+  console.log(`qs | ${at(1000)} | ${at(5000)} | ${at(60_000)} | ${at(3600_000)} bits`)
+}
+
+// ---------- the extrapolation the reader would make ----------
+console.log('\n=== extrapolating the measured curve to real key sizes ===')
+console.log('key bits | trial | fermat | rho | qs (subexp fit)')
+for (const bits of [128, 256, 512, 1024, 2048, 4096]) {
+  const cells = ['trial', 'fermat', 'rho'].map((a) => human(2 ** (fits[a].a * bits + fits[a].b)))
+  const qs = human(Math.exp(qsFit.a * L(bits) + qsFit.b))
+  console.log(`${bits} | ${cells.join(' | ')} | ${qs}`)
+}
+
+// ---------- and what the number field sieve really costs ----------
+// NFS heuristic: L_n[1/3, c] = exp(c·(ln n)^(1/3)·(ln ln n)^(2/3)), c = (64/9)^(1/3) = 1.9230
+const nfs = (bits: number) => { const lnn = bits * Math.LN2; return 1.9230 * lnn ** (1 / 3) * Math.log(lnn) ** (2 / 3) }
+console.log('\n=== NFS, anchored on a published factorisation (NOT measured here) ===')
+const ANCHOR = { bits: 829, name: 'RSA-250 (250 digits), Feb 2020', coreYears: 2700 }
+console.log(`anchor: ${ANCHOR.name}, reported ~${ANCHOR.coreYears} core-years`)
+console.log('key bits | NFS core-years (scaled from the anchor) | ratio to the QS fit')
+for (const bits of [512, 829, 1024, 2048, 3072, 4096]) {
+  const cy = ANCHOR.coreYears * Math.exp(nfs(bits) - nfs(ANCHOR.bits))
+  const qsYears = Math.exp(qsFit.a * L(bits) + qsFit.b) / YEAR_MS
+  const fmt = (y: number) => (y < 1e6 ? y.toPrecision(3) : `10^${Math.log10(y).toFixed(1)}`)
+  console.log(`${bits} | ${fmt(cy)} | QS/NFS = 10^${(Math.log10(qsYears) - Math.log10(cy)).toFixed(1)}`)
+}
+console.log(`\nfor scale: the universe is 1.38e10 years old; a big cloud is ~10^7 cores.`)
+
+// ---------- how much of the extrapolation is the fitted slope? ----------
+console.log('\n=== qs: fitted slope vs the theoretical one (intercept refit on the same points) ===')
+const Lm = qsPts.map((p) => L(p.bits)), ym = qsPts.map((p) => Math.log(p.med))
+const b1 = ym.reduce((s, y, i) => s + (y - 1.0 * Lm[i]), 0) / ym.length     // slope forced to 1.0
+for (const bits of [128, 512, 2048]) {
+  const fitted = Math.exp(qsFit.a * L(bits) + qsFit.b)
+  const theory = Math.exp(1.0 * L(bits) + b1)
+  console.log(`${bits} bits: fitted slope ${qsFit.a.toFixed(3)} -> ${human(fitted)};  slope 1.0 -> ${human(theory)}`)
+}
+console.log('\n=== what one extra key bit costs the attacker, at 2048 bits ===')
+const nfs2 = (bits: number) => { const lnn = bits * Math.LN2; return 1.9230 * lnn ** (1 / 3) * Math.log(lnn) ** (2 / 3) }
+console.log(`rho (measured slope 0.287): x${(2 ** 0.287).toFixed(3)} per bit`)
+console.log(`NFS: x${Math.exp(nfs2(2049) - nfs2(2048)).toFixed(4)} per bit -> doubles every ${(Math.log(2) / (nfs2(2049) - nfs2(2048))).toFixed(0)} bits`)
+console.log(`NFS at 1024 -> 2048 is a factor of 10^${((nfs2(2048) - nfs2(1024)) / Math.LN10).toFixed(1)}`)

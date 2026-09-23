@@ -1,0 +1,29 @@
+// Exactly the subset page.html measures, so node and Chromium can be compared
+// on identical seeds with nothing else running.
+import { generateKey, textToBlocks, encrypt, decrypt } from './rsa.ts'
+import { trialDivision, pollardRho, quadraticSieve } from './factor.ts'
+const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[(xs.length - 1) >> 1]
+const now = () => performance.now()
+const out: any[] = []
+for (const bits of [16, 128, 1024, 2048]) {
+  const ts: number[] = []
+  for (let s = 1; s <= 10; s++) { const t = now(); generateKey(bits, s); ts.push(now() - t) }
+  out.push({ kind: 'keygen', bits, med: +med(ts).toFixed(2), min: +Math.min(...ts).toFixed(2), max: +Math.max(...ts).toFixed(2) })
+}
+{
+  const k = generateKey(2048, 1); const b = textToBlocks('Meet me at the old pier at midnight.', 2048)
+  const c = encrypt(b, k); const ts: number[] = []
+  for (let i = 0; i < 5; i++) { const t = now(); decrypt(c, k); ts.push(now() - t) }
+  out.push({ kind: 'decrypt2048', med: +med(ts).toFixed(2) })
+}
+for (const [algo, fn, sizes] of [['trial', trialDivision, [32, 48, 56]], ['rho', pollardRho, [48, 64, 80, 96]], ['qs', quadraticSieve, [64, 96, 128]]] as [string, any, number[]][]) {
+  for (const bits of sizes) {
+    const ts: number[] = []
+    for (let s = 1; s <= 8; s++) {
+      const k = generateKey(bits, s); const a = fn(k.n, 30000, s)
+      if (a.ok && k.n % a.factor! === 0n) ts.push(a.ms)
+    }
+    out.push({ kind: 'factor', algo, bits, n: ts.length, med: +med(ts).toFixed(2), min: +Math.min(...ts).toFixed(2), max: +Math.max(...ts).toFixed(2) })
+  }
+}
+for (const r of out) console.log(JSON.stringify(r))

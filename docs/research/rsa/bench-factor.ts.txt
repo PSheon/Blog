@@ -1,0 +1,37 @@
+import { generateKey } from './rsa.ts'
+import { trialDivision, trialDivisionNumber, fermat, pollardRho, quadraticSieve, type Attempt } from './factor.ts'
+
+const SIZES = [16, 20, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 72, 80, 88, 96, 104, 112, 120, 128, 144, 160]
+const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8]
+const BUDGET = Number(process.env.BUDGET ?? 8000)
+
+type Runner = { name: string; run: (n: bigint, seed: number) => Attempt; maxBits?: number }
+const RUNNERS: Runner[] = [
+  { name: 'trial', run: (n) => trialDivision(n, BUDGET) },
+  { name: 'trial(number)', run: (n) => trialDivisionNumber(n, BUDGET), maxBits: 52 },
+  { name: 'fermat', run: (n) => fermat(n, BUDGET) },
+  { name: 'rho', run: (n, s) => pollardRho(n, BUDGET, s) },
+  { name: 'qs', run: (n) => quadraticSieve(n, BUDGET) },
+]
+
+const stat = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b)
+  return { min: s[0], med: s[(s.length - 1) >> 1], max: s[s.length - 1] }
+}
+
+for (const r of RUNNERS) {
+  for (const bits of SIZES) {
+    if (r.maxBits && bits > r.maxBits) break
+    const times: number[] = []
+    let failures = 0
+    for (const seed of SEEDS) {
+      const key = generateKey(bits, seed)
+      const a = r.run(key.n, seed)
+      if (!a.ok || key.n % a.factor! !== 0n || a.factor === 1n || a.factor === key.n) { failures++; times.push(BUDGET) }
+      else times.push(a.ms)
+    }
+    const s = stat(times)
+    console.log(JSON.stringify({ algo: r.name, bits, failures, ...s, all: times.map((t) => +t.toFixed(2)) }))
+    if (failures > 0 || s.med >= BUDGET * 0.9) break     // this algorithm has hit its ceiling
+  }
+}

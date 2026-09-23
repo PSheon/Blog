@@ -1,0 +1,71 @@
+import { generateKey, randomPrime, rng, millerRabin, randomBits, isqrt } from './rsa.ts'
+import { fermat, pollardRho, quadraticSieve } from './factor.ts'
+const now = () => Number(process.hrtime.bigint()) / 1e6
+const f = (x: number) => (x < 10 ? x.toFixed(2) : x < 1000 ? x.toFixed(1) : Math.round(x).toString())
+const med = (xs: number[]) => [...xs].sort((a,b)=>a-b)[(xs.length-1)>>1]
+
+// ---- A. why is the "fast" Number version slower? ----
+console.log('=== A. BigInt vs double modulo, 2e6 iterations of "n % d" ===')
+console.log('n | BigInt ms | Number ms | Number is')
+for (const [label, bn] of [['2^30', (1n<<30n)|1n], ['2^40', (1n<<40n)|1n], ['2^50', (1n<<50n)|1n]] as [string,bigint][]) {
+  const N = Number(bn)
+  let t = now(), acc = 0n
+  for (let d = 3n; d < 2_000_003n; d += 2n) acc += bn % d
+  const tb = now() - t
+  t = now(); let acc2 = 0
+  for (let d = 3; d < 2_000_003; d += 2) acc2 += N % d
+  const tn = now() - t
+  console.log(`${label} | ${f(tb)} | ${f(tn)} | ${tn < tb ? (tb/tn).toFixed(1)+'x faster' : (tn/tb).toFixed(1)+'x SLOWER'}  (${acc>0n&&acc2>0?'':'x'})`)
+}
+{ // same, but with n small enough to stay a Smi
+  let t = now(); let a = 0n; const bn = 1073741n
+  for (let d = 3n; d < 2_000_003n; d += 2n) a += bn % d
+  const tb = now() - t
+  const N = Number(bn); t = now(); let a2 = 0
+  for (let d = 3; d < 2_000_003; d += 2) a2 += N % d
+  console.log(`2^20 (fits a V8 Smi) | ${f(tb)} | ${f(now()-t)} | ${a>0n&&a2>0?'':'x'}`)
+}
+
+// ---- B. rho vs qs crossover, 16 seeds ----
+console.log('\n=== B. rho vs the toy sieve, 16 seeds each ===')
+console.log('bits | rho med ms (min-max) | qs med ms (min-max) | winner')
+for (const bits of [64, 72, 80, 88, 96, 104]) {
+  const R: number[] = [], Q: number[] = []
+  for (let s = 1; s <= 16; s++) {
+    const k = generateKey(bits, s)
+    const r = pollardRho(k.n, 60_000, s); if (r.ok && k.n % r.factor! === 0n) R.push(r.ms)
+    const q = quadraticSieve(k.n, 60_000); if (q.ok && k.n % q.factor! === 0n) Q.push(q.ms)
+  }
+  const rm = med(R), qm = med(Q)
+  console.log(`${bits} | ${f(rm)} (${f(Math.min(...R))}-${f(Math.max(...R))}) | ${f(qm)} (${f(Math.min(...Q))}-${f(Math.max(...Q))}) | ${rm < qm ? 'rho' : 'qs'} by ${(Math.max(rm,qm)/Math.min(rm,qm)).toFixed(1)}x`)
+}
+
+// ---- C. what keygen actually spends its time on ----
+console.log('\n=== C. primality testing: candidates tried per prime (20 rounds), 20 seeds ===')
+console.log('prime bits | candidates tried med (min-max) | theory ln(2^b)/2 | ms per prime')
+for (const bits of [8, 16, 32, 64, 128, 256, 512, 1024]) {
+  const tries: number[] = [], ms: number[] = []
+  for (let s = 1; s <= 20; s++) {
+    const next = rng(s * 7919)
+    const t = now(); const r = randomPrime(bits, next, 20); ms.push(now() - t); tries.push(r.tries)
+  }
+  console.log(`${bits} | ${med(tries)} (${Math.min(...tries)}-${Math.max(...tries)}) | ${(bits * Math.LN2 / 2).toFixed(1)} | ${f(med(ms))}`)
+}
+
+// ---- D. Fermat vs the gap between p and q ----
+console.log('\n=== D. Fermat on a 64-bit key as p and q move apart ===')
+console.log('q - p (approx) | fermat steps | fermat ms | theory (q-p)^2/(4·n^0.5)')
+{
+  const next = rng(4242)
+  const p = randomPrime(32, next, 20).p
+  for (const gapBits of [1, 4, 8, 12, 16, 20, 24, 28]) {
+    let q = p + (1n << BigInt(gapBits))
+    if ((q & 1n) === 0n) q += 1n
+    while (!millerRabin(q, 20, next)) q += 2n
+    const n = p * q
+    const a = fermat(n, 30_000)
+    const gap = q - p
+    const theory = Number(gap * gap) / (4 * Math.sqrt(Number(n)))
+    console.log(`2^${gapBits} (${gap}) | ${a.ok ? a.steps : 'gave up at ' + a.steps} | ${a.ok ? f(a.ms) : '>30000'} | ${theory.toFixed(1)}`)
+  }
+}

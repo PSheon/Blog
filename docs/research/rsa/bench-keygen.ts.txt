@@ -1,0 +1,39 @@
+import { generateKey, textToBlocks, encrypt, decrypt, blockBytes, modPow } from './rsa.ts'
+
+const now = () => Number(process.hrtime.bigint()) / 1e6
+const stat = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b)
+  return { min: s[0], med: s[(s.length - 1) >> 1], max: s[s.length - 1] }
+}
+const f = (x: number) => (x < 10 ? x.toFixed(2) : x < 1000 ? x.toFixed(1) : Math.round(x).toString())
+
+const SENTENCE = 'Meet me at the old pier at midnight.'   // 36 bytes
+const SIZES = [16, 24, 32, 40, 48, 64, 96, 128, 256, 512, 1024, 2048]
+const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
+console.log('bits | keygen ms (min/med/max, 10 seeds) | e | bytes/block | blocks | encrypt ms | decrypt ms | µs/modexp')
+for (const bits of SIZES) {
+  const seeds = bits >= 1024 ? SEEDS.slice(0, 5) : SEEDS
+  const times: number[] = []
+  const es = new Set<string>()
+  let key = generateKey(bits, 999)
+  for (const seed of seeds) {
+    const t0 = now()
+    key = generateKey(bits, seed)
+    times.push(now() - t0)
+    es.add(key.e.toString())
+  }
+  const blocks = textToBlocks(SENTENCE, bits)
+  // warm, then time 5 passes over the whole sentence
+  encrypt(blocks, key)
+  const et: number[] = [], dt: number[] = []
+  for (let i = 0; i < 5; i++) {
+    let t = now(); const c = encrypt(blocks, key); et.push(now() - t)
+    t = now(); decrypt(c, key); dt.push(now() - t)
+    if (decrypt(c, key).join() !== blocks.join()) throw new Error('roundtrip failed at ' + bits)
+  }
+  const k = stat(times), E = stat(et), D = stat(dt)
+  console.log(
+    `${bits} | ${f(k.min)}/${f(k.med)}/${f(k.max)} | ${[...es].join(',')} | ${blockBytes(bits)} | ${blocks.length} | ${f(E.med)} | ${f(D.med)} | ${f((E.med * 1000) / blocks.length)}/${f((D.med * 1000) / blocks.length)}`,
+  )
+}

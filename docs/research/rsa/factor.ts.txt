@@ -1,0 +1,246 @@
+// Four ways to pull p and q back out of n. Each returns the factor it found,
+// how long it took and how many steps it did, and each gives up at a deadline
+// so a benchmark (or a browser tab) can survive asking too much.
+
+import { gcd, isqrt, isSquare, modPow, rng, randomBits } from './rsa.ts'
+
+export type Attempt = {
+  algo: string
+  ok: boolean
+  factor: bigint | null
+  ms: number
+  steps: number
+  note?: string
+}
+
+// One clock for both hosts: node keeps hrtime (ns), the browser gets performance.now().
+const now = typeof process !== 'undefined' && process.hrtime
+  ? () => Number(process.hrtime.bigint()) / 1e6
+  : () => performance.now()
+
+// ---------- 1. trial division ----------
+
+export function trialDivision(n: bigint, budgetMs = 10_000): Attempt {
+  const t0 = now()
+  let steps = 0
+  if (n % 2n === 0n) return { algo: 'trial', ok: true, factor: 2n, ms: now() - t0, steps: 1 }
+  const limit = isqrt(n)
+  for (let d = 3n; d <= limit; d += 2n) {
+    steps++
+    if (n % d === 0n) return { algo: 'trial', ok: true, factor: d, ms: now() - t0, steps }
+    if ((steps & 0xffff) === 0 && now() - t0 > budgetMs) return { algo: 'trial', ok: false, factor: null, ms: now() - t0, steps, note: 'budget' }
+  }
+  return { algo: 'trial', ok: true, factor: n, ms: now() - t0, steps, note: 'prime' }
+}
+
+/** Same algorithm on doubles. Only valid while n < 2^53; used to price BigInt. */
+export function trialDivisionNumber(n: bigint, budgetMs = 10_000): Attempt {
+  const t0 = now()
+  const N = Number(n)
+  let steps = 0
+  const limit = Math.sqrt(N)
+  for (let d = 3; d <= limit; d += 2) {
+    steps++
+    if (N % d === 0) return { algo: 'trial(number)', ok: true, factor: BigInt(d), ms: now() - t0, steps }
+    if ((steps & 0xfffff) === 0 && now() - t0 > budgetMs) return { algo: 'trial(number)', ok: false, factor: null, ms: now() - t0, steps, note: 'budget' }
+  }
+  return { algo: 'trial(number)', ok: false, factor: null, ms: now() - t0, steps, note: 'prime?' }
+}
+
+// ---------- 2. Fermat ----------
+
+export function fermat(n: bigint, budgetMs = 10_000): Attempt {
+  const t0 = now()
+  let a = isqrt(n)
+  if (a * a < n) a += 1n
+  let steps = 0
+  for (;;) {
+    steps++
+    const b2 = a * a - n
+    const b = isSquare(b2)
+    if (b !== null) {
+      const f = a - b
+      if (f > 1n && f < n) return { algo: 'fermat', ok: true, factor: f, ms: now() - t0, steps }
+    }
+    a += 1n
+    if ((steps & 0x3ff) === 0 && now() - t0 > budgetMs) return { algo: 'fermat', ok: false, factor: null, ms: now() - t0, steps, note: 'budget' }
+  }
+}
+
+// ---------- 3. Pollard's rho (Brent) ----------
+
+export function pollardRho(n: bigint, budgetMs = 10_000, seed = 1): Attempt {
+  const t0 = now()
+  if (n % 2n === 0n) return { algo: 'rho', ok: true, factor: 2n, ms: now() - t0, steps: 1 }
+  const next = rng(seed)
+  let steps = 0
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const c = 1n + (randomBits(32, next) % (n - 1n))
+    const f = (x: bigint) => (x * x + c) % n
+    let y = 1n + (randomBits(32, next) % (n - 1n))
+    let g = 1n, r = 1n, q = 1n, x = 0n, ys = 0n
+    const m = 128n
+    while (g === 1n) {
+      x = y
+      for (let i = 0n; i < r; i++) y = f(y)
+      let k = 0n
+      while (k < r && g === 1n) {
+        ys = y
+        const lim = m < r - k ? m : r - k
+        for (let i = 0n; i < lim; i++) { y = f(y); q = (q * (x > y ? x - y : y - x)) % n; steps++ }
+        g = gcd(q, n)
+        k += m
+        if (now() - t0 > budgetMs) return { algo: 'rho', ok: false, factor: null, ms: now() - t0, steps, note: 'budget' }
+      }
+      r *= 2n
+    }
+    if (g === n) {           // the batch hid it; back up one step at a time
+      g = 1n
+      while (g === 1n) {
+        ys = f(ys)
+        g = gcd(x > ys ? x - ys : ys - x, n)
+        steps++
+        if (now() - t0 > budgetMs) return { algo: 'rho', ok: false, factor: null, ms: now() - t0, steps, note: 'budget' }
+      }
+    }
+    if (g !== n && g !== 1n) return { algo: 'rho', ok: true, factor: g, ms: now() - t0, steps }
+    // g === n: unlucky c, start over
+  }
+  return { algo: 'rho', ok: false, factor: null, ms: now() - t0, steps, note: 'restarts exhausted' }
+}
+
+// ---------- 4. a toy quadratic sieve ----------
+
+function legendre(a: bigint, p: bigint) { return modPow(a, (p - 1n) / 2n, p) }
+
+/** Tonelli–Shanks: x with x^2 ≡ a (mod p), p odd prime. */
+function sqrtMod(a: bigint, p: bigint): bigint | null {
+  a %= p
+  if (a === 0n) return 0n
+  if (legendre(a, p) !== 1n) return null
+  if (p % 4n === 3n) return modPow(a, (p + 1n) / 4n, p)
+  let q = p - 1n, s = 0n
+  while ((q & 1n) === 0n) { q >>= 1n; s++ }
+  let z = 2n
+  while (legendre(z, p) !== p - 1n) z++
+  let m = s, c = modPow(z, q, p), t = modPow(a, q, p), r = modPow(a, (q + 1n) / 2n, p)
+  while (t !== 1n) {
+    let i = 0n, t2 = t
+    while (t2 !== 1n) { t2 = (t2 * t2) % p; i++ }
+    let b = c
+    for (let j = 0n; j < m - i - 1n; j++) b = (b * b) % p
+    m = i; c = (b * b) % p; t = (t * c) % p; r = (r * b) % p
+  }
+  return r
+}
+
+function primesUpTo(limit: number) {
+  const sieve = new Uint8Array(limit + 1)
+  const out: number[] = []
+  for (let i = 2; i <= limit; i++) if (!sieve[i]) { out.push(i); for (let j = i * i; j <= limit; j += i) sieve[j] = 1 }
+  return out
+}
+
+/**
+ * Textbook quadratic sieve: sieve Q(x) = (root+x)^2 - n for B-smooth values,
+ * then find a subset whose product is a square by Gaussian elimination mod 2.
+ * No large primes, no multiple polynomials — the small version an article can
+ * show. `B` and `M` default to the usual L(n) heuristic.
+ */
+export function quadraticSieve(n: bigint, budgetMs = 10_000, opts: { B?: number; M?: number; slack?: number } = {}): Attempt {
+  const t0 = now()
+  let steps = 0
+  const lnn = Math.log(Number(n))
+  const B0 = opts.B ?? Math.max(50, Math.ceil(Math.exp(0.5 * Math.sqrt(lnn * Math.log(lnn)))))
+  const slack = opts.slack ?? 1.5
+  const root = isqrt(n) + 1n
+  let B = B0
+  let enlargements = 0
+
+  // The L(n) heuristic under-sizes the factor base for numbers this small:
+  // smooth Q(x) run out before there are enough relations. Sieve a bounded
+  // stretch, and if it is not enough, double B and start again.
+  restart: for (;;) {
+  const M = opts.M ?? Math.max(4000, B * 40)
+  const maxX = 400 * B * B
+  const base: { p: number; roots: number[] }[] = []
+  for (const p of primesUpTo(B)) {
+    const bp = BigInt(p)
+    if (n % bp === 0n) return { algo: 'qs', ok: true, factor: bp, ms: now() - t0, steps, note: 'factor base hit' }
+    if (p === 2) { base.push({ p, roots: [1] }); continue }
+    const r = sqrtMod(n, bp)
+    if (r === null) continue
+    base.push({ p, roots: r === 0n ? [0] : [Number(r), Number(bp - r)] })
+  }
+  const fbSize = base.length
+  const relations: { x: bigint; qx: bigint; vec: bigint }[] = []
+  const need = fbSize + 5
+  const logB = Math.log(B)
+
+  // Sieve x = 0, 1, 2, ... only, so Q(x) = (root+x)^2 - n is always positive
+  // and the factor base needs no sign column.
+  let offset = 0
+  const width = M
+  while (relations.length < need) {
+    if (now() - t0 > budgetMs) return { algo: 'qs', ok: false, factor: null, ms: now() - t0, steps, note: `budget (B=${B}, ${enlargements} enlargements, ${relations.length}/${need} relations, x<${offset})` }
+    if (offset > maxX) { B *= 2; enlargements++; continue restart }
+    const logs = new Float32Array(width)
+    for (const { p, roots } of base) {
+      const lp = Math.log(p)
+      for (const r of roots) {
+        // (root + x)^2 ≡ n (mod p)  ⇔  root + x ≡ ±r  ⇔  x ≡ r - root (mod p)
+        const want = Number(((BigInt(r) - root) % BigInt(p) + BigInt(p)) % BigInt(p))
+        let i = ((want - offset) % p + p) % p
+        for (; i < width; i += p) { logs[i] += lp; steps++ }
+      }
+    }
+    for (let i = 0; i < width; i++) {
+      const x = offset + i
+      // log Q(x) ≈ log(2·√n·x + x²); the threshold forgives `slack` missing primes
+      const approx = Math.log(2) + lnn / 2 + Math.log(Math.max(x, 1))
+      if (logs[i] < approx - slack * logB) continue
+      const bx = BigInt(x)
+      const val = (root + bx) * (root + bx) - n
+      if (val <= 0n) continue
+      let rem = val
+      let vec = 0n
+      for (let bi = 0; bi < fbSize; bi++) {
+        const bp = BigInt(base[bi].p)
+        let odd = false
+        while (rem % bp === 0n) { rem /= bp; odd = !odd; steps++ }
+        if (odd) vec |= 1n << BigInt(bi)
+      }
+      if (rem === 1n) relations.push({ x: root + bx, qx: val, vec })
+      if (relations.length >= need) break
+    }
+    offset += width
+  }
+
+  // Gaussian elimination over GF(2); each row carries which relations built it.
+  const rows = relations.map((r, i) => ({ vec: r.vec, mask: 1n << BigInt(i) }))
+  const pivots = new Map<number, { vec: bigint; mask: bigint }>()
+  const deps: bigint[] = []
+  for (const row of rows) {
+    let { vec, mask } = row
+    while (vec !== 0n) {
+      const hi = vec.toString(2).length - 1
+      const p = pivots.get(hi)
+      if (!p) { pivots.set(hi, { vec, mask }); break }
+      vec ^= p.vec; mask ^= p.mask
+    }
+    if (vec === 0n) deps.push(mask)
+  }
+
+  for (const dep of deps) {
+    let X = 1n, Y2 = 1n
+    for (let i = 0; i < relations.length; i++) {
+      if ((dep >> BigInt(i)) & 1n) { X = (X * relations[i].x) % n; Y2 *= relations[i].qx }
+    }
+    const Y = isqrt(Y2) % n
+    const g = gcd(X > Y ? X - Y : Y - X, n)
+    if (g !== 1n && g !== n) return { algo: 'qs', ok: true, factor: g, ms: now() - t0, steps, note: `B=${B}${enlargements ? ` (${enlargements}x enlarged)` : ''}, ${relations.length} relations, ${deps.length} dependencies` }
+  }
+  // Every dependency gave the trivial X ≡ ±Y: gather more relations.
+  B = Math.ceil(B * 1.4); enlargements++
+  }
+}

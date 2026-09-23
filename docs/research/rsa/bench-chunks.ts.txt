@@ -1,0 +1,57 @@
+// How long does each algorithm go without being able to stop?
+// A browser tab on the main thread has a 16 ms frame budget; a worker still has
+// to answer "stop" in a time the reader accepts.
+import { generateKey, gcd, isqrt, isSquare, rng, randomBits } from './rsa.ts'
+const now = () => Number(process.hrtime.bigint()) / 1e6
+const f = (x: number) => (x < 10 ? x.toFixed(2) : x < 1000 ? x.toFixed(1) : Math.round(x).toString())
+
+/** rho, instrumented: report the longest stretch between two yield points. */
+function rhoChunks(n: bigint, seed: number, budgetMs: number) {
+  const t0 = now(); const next = rng(seed)
+  let maxChunk = 0, maxWhat = '', total = 0
+  const mark = (t: number, what: string) => { const d = now() - t; if (d > maxChunk) { maxChunk = d; maxWhat = what } }
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const c = 1n + (randomBits(32, next) % (n - 1n))
+    const fn = (x: bigint) => (x * x + c) % n
+    let y = 1n + (randomBits(32, next) % (n - 1n))
+    let g = 1n, r = 1n, q = 1n, x = 0n
+    const m = 128n
+    while (g === 1n) {
+      x = y
+      const ta = now()
+      for (let i = 0n; i < r; i++) y = fn(y)          // <- no yield point inside
+      mark(ta, `advance r=${r}`)
+      let k = 0n
+      while (k < r && g === 1n) {
+        const tb = now()
+        const lim = m < r - k ? m : r - k
+        for (let i = 0n; i < lim; i++) { y = fn(y); q = (q * (x > y ? x - y : y - x)) % n; total++ }
+        g = gcd(q, n); mark(tb, `batch ${m}`)
+        k += m
+        if (now() - t0 > budgetMs) return { ms: now() - t0, maxChunk, maxWhat, ok: false }
+      }
+      r *= 2n
+    }
+    if (g !== n && g !== 1n) return { ms: now() - t0, maxChunk, maxWhat, ok: true }
+    g = 1n
+  }
+  return { ms: now() - t0, maxChunk, maxWhat, ok: false }
+}
+
+console.log('=== longest uninterruptible stretch (node; a frame is 16 ms) ===')
+console.log('algo | bits | total ms | longest stretch ms | where')
+for (const bits of [32, 48, 64, 80, 96]) {
+  const rows = [1, 2, 3, 4, 5].map((s) => rhoChunks(generateKey(bits, s).n, s, 120_000))
+  const worst = rows.reduce((a, b) => (b.maxChunk > a.maxChunk ? b : a))
+  console.log(`rho | ${bits} | ${f(Math.max(...rows.map((r) => r.ms)))} | ${f(worst.maxChunk)} | ${worst.maxWhat}`)
+}
+// trial division and Fermat check the clock every 65536 / 1024 steps
+for (const [name, every, work] of [['trial', 65536, (n: bigint, d: bigint) => n % d], ['fermat', 1024, (n: bigint, a: bigint) => isSquare(a * a - n)]] as [string, number, (a: bigint, b: bigint) => unknown][]) {
+  for (const bits of [48, 64]) {
+    const n = generateKey(bits, 1).n
+    let a = isqrt(n)
+    const t = now()
+    for (let i = 0; i < every; i++) { work(n, a); a += 2n }
+    console.log(`${name} | ${bits} | - | ${f(now() - t)} | one budget interval (${every} steps)`)
+  }
+}

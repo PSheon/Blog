@@ -1,0 +1,16 @@
+import { generateKey } from './rsa.ts'
+import { pollardRho, quadraticSieve } from './factor.ts'
+const SEEDS = [1,2,3,4,5,6,7,8]
+console.log('algo | bits | times ms | failures')
+for (const bits of [96, 104, 112]) {
+  const ts: number[] = []; let fail = 0
+  for (const s of SEEDS) { const k = generateKey(bits, s); const a = pollardRho(k.n, 120_000, s)
+    if (!a.ok || k.n % a.factor! !== 0n) { fail++; ts.push(-1) } else ts.push(+a.ms.toFixed(0)) }
+  console.log(`rho | ${bits} | ${ts.join(' ')} | ${fail}`)
+}
+for (const bits of [128, 136, 144, 152, 160, 176]) {
+  const ts: number[] = []; let fail = 0
+  for (const s of SEEDS) { const k = generateKey(bits, s); const a = quadraticSieve(k.n, 120_000)
+    if (!a.ok || k.n % a.factor! !== 0n) { fail++; ts.push(-1) } else ts.push(+a.ms.toFixed(0)) }
+  console.log(`qs | ${bits} | ${ts.join(' ')} | ${fail}`)
+}

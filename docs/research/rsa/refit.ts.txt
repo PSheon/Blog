@@ -1,0 +1,64 @@
+import { readFileSync } from 'node:fs'
+type Row = { algo: string; bits: number; failures: number; med: number; all: number[] }
+const rows: Row[] = readFileSync('runs/factor-curve.jsonl', 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+// merge in the 120 s ceiling run, which supersedes the 8 s one where they overlap
+const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[(xs.length - 1) >> 1]
+for (const line of readFileSync('runs/ceiling.txt', 'utf8').trim().split('\n').slice(1)) {
+  const [algo, bits, times, fails] = line.split('|').map((s) => s.trim())
+  const all = times.split(' ').map(Number).map((t) => (t < 0 ? 120_000 : t))
+  const r: Row = { algo, bits: +bits, failures: +fails, med: med(all), all }
+  const i = rows.findIndex((x) => x.algo === algo && x.bits === r.bits)
+  if (i >= 0) rows[i] = r; else rows.push(r)
+}
+function fit(xs: number[], ys: number[]) {
+  const n = xs.length, mx = xs.reduce((a, b) => a + b) / n, my = ys.reduce((a, b) => a + b) / n
+  const a = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0) / xs.reduce((s, x) => s + (x - mx) ** 2, 0)
+  const b = my - a * mx
+  const my2 = ys.reduce((s, y) => s + (y - my) ** 2, 0)
+  return { a, b, r2: 1 - ys.reduce((s, y, i) => s + (y - (a * xs[i] + b)) ** 2, 0) / my2 }
+}
+const YEAR = 365.25 * 24 * 3600 * 1000
+console.log('=== rho refitted with the 120 s ceiling data (96, 104, 112 bits now complete) ===')
+const pts = rows.filter((r) => r.algo === 'rho' && r.failures === 0 && r.med > 0.1).sort((a, b) => a.bits - b.bits)
+console.log('points:', pts.map((p) => `${p.bits}b:${p.med.toFixed(1)}ms`).join(' '))
+const F = fit(pts.map((p) => p.bits), pts.map((p) => Math.log2(p.med)))
+console.log(`slope ${F.a.toFixed(3)} (was 0.287, theory 0.25), R2 ${F.r2.toFixed(4)}, doubles every ${(1 / F.a).toFixed(1)} bits`)
+for (const bits of [128, 1024, 2048]) {
+  const y = (2 ** (F.a * bits + F.b)) / YEAR
+  console.log(`  ${bits} bits -> ${y < 1e6 ? y.toPrecision(3) + ' years' : '10^' + Math.log10(y).toFixed(1) + ' years'}`)
+}
+console.log(`  one extra key bit costs x${(2 ** F.a).toFixed(3)}`)
+console.log('\n=== qs refitted, subexponential, with the 120 s data ===')
+const L = (b: number) => { const l = b * Math.LN2; return Math.sqrt(l * Math.log(l)) }
+const q = rows.filter((r) => r.algo === 'qs' && r.failures === 0 && r.bits >= 56).sort((a, b) => a.bits - b.bits)
+console.log('points:', q.map((p) => `${p.bits}b:${p.med.toFixed(0)}ms`).join(' '))
+const QF = fit(q.map((p) => L(p.bits)), q.map((p) => Math.log(p.med)))
+console.log(`slope ${QF.a.toFixed(3)} (was 0.659, theory 1.0), R2 ${QF.r2.toFixed(4)}`)
+
+// ---- everything RESULTS.md quotes, recomputed on the merged data ----
+const human = (ms: number) => { const y = ms / YEAR
+  if (ms < 1000) return `${ms.toFixed(1)} ms`; if (ms < 60_000) return `${(ms/1000).toFixed(1)} s`
+  if (ms < 3600_000) return `${(ms/60_000).toFixed(1)} min`; if (ms < 86400_000) return `${(ms/3600_000).toFixed(1)} h`
+  if (ms < YEAR) return `${(ms/86400_000).toFixed(1)} days`
+  return y < 1e6 ? `${y.toPrecision(3)} years` : `10^${Math.log10(y).toFixed(1)} years` }
+console.log('\n=== qs extrapolated, fitted slope 0.770 vs theory 1.0 (intercept refit) ===')
+const Lm = q.map((p) => L(p.bits)), ym = q.map((p) => Math.log(p.med))
+const b1 = ym.reduce((s, y, i) => s + (y - Lm[i]), 0) / ym.length
+for (const bits of [128, 512, 2048]) console.log(`  ${bits}: fitted ${human(Math.exp(QF.a*L(bits)+QF.b))}  |  slope 1.0 ${human(Math.exp(L(bits)+b1))}`)
+
+console.log('\n=== key size where the median run reaches ... (merged data) ===')
+const atExp = (F: {a:number;b:number}, ms: number) => ((Math.log2(ms) - F.b) / F.a).toFixed(0)
+console.log(`rho | 1s ${atExp(F,1000)} | 5s ${atExp(F,5000)} | 1min ${atExp(F,60_000)} bits`)
+const atQ = (ms: number) => { const t = (Math.log(ms) - QF.b) / QF.a; let lo=16, hi=1e5
+  for (let i=0;i<200;i++){const m=(lo+hi)/2; if (L(m)<t) lo=m; else hi=m} return lo.toFixed(0) }
+console.log(`qs  | 1s ${atQ(1000)} | 5s ${atQ(5000)} | 1min ${atQ(60_000)} bits`)
+
+const nfs = (b: number) => { const l = b*Math.LN2; return 1.9230*l**(1/3)*Math.log(l)**(2/3) }
+const rhoYears = (b: number) => 2**(F.a*b+F.b)/YEAR
+console.log('\n=== rho curve vs NFS anchored on RSA-250 (829 bits, 2700 core-years) ===')
+for (const bits of [512, 1024, 2048]) {
+  const cy = 2700*Math.exp(nfs(bits)-nfs(829))
+  console.log(`  ${bits}: NFS ${cy<1e6?cy.toPrecision(3):'10^'+Math.log10(cy).toFixed(1)} core-years | rho curve 10^${Math.log10(rhoYears(bits)).toFixed(1)} years | reader wrong by 10^${(Math.log10(rhoYears(bits))-Math.log10(cy)).toFixed(0)}`)
+}
+console.log(`  NFS cost per extra key bit at 2048: x${Math.exp(nfs(2049)-nfs(2048)).toFixed(4)} (doubles every ${(Math.log(2)/(nfs(2049)-nfs(2048))).toFixed(0)} bits)`)
+console.log(`  NFS 1024 -> 2048: 10^${((nfs(2048)-nfs(1024))/Math.LN10).toFixed(1)}; rho curve says 10^${(Math.log10(rhoYears(2048))-Math.log10(rhoYears(1024))).toFixed(1)}`)

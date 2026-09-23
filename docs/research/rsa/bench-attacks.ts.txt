@@ -1,0 +1,73 @@
+import { generateKey, textToBlocks, encrypt, modPow, isqrt, blockBytes, modPowTrace } from './rsa.ts'
+import { fermat, pollardRho } from './factor.ts'
+
+const now = () => Number(process.hrtime.bigint()) / 1e6
+const f = (x: number) => (x < 10 ? x.toFixed(2) : x < 1000 ? x.toFixed(1) : Math.round(x).toString())
+
+// ---- 1. bad primes: p and q adjacent ----
+console.log('\n=== 1. p and q next to each other ===')
+console.log('bits | keygen ms | q - p | fermat ms | fermat steps | rho ms (for scale)')
+for (const bits of [32, 64, 128, 256, 512, 1024, 2048]) {
+  const t0 = now()
+  const k = generateKey(bits, 5, { closeness: 1 })
+  const kg = now() - t0
+  const a = fermat(k.n, 20000)
+  const ok = a.ok && k.n % a.factor! === 0n
+  const r = bits <= 96 ? pollardRho(k.n, 20000, 1) : null
+  console.log(`${bits} | ${f(kg)} | ${k.q - k.p} | ${ok ? f(a.ms) : 'FAIL'} | ${a.steps} | ${r ? f(r.ms) : '-'}`)
+}
+
+// ---- 2. textbook RSA is a substitution cipher ----
+console.log('\n=== 2. no padding: the same block always gives the same ciphertext ===')
+const TEXT = 'the quick brown fox jumps over the lazy dog. the dog sleeps. the fox runs. ' +
+  'she sells sea shells by the sea shore. peter piper picked a peck of pickled peppers.'
+for (const bits of [16, 24, 32, 64]) {
+  const k = generateKey(bits, 11)
+  const blocks = textToBlocks(TEXT, bits)
+  const ct = encrypt(blocks, k)
+  const distinct = new Set(ct.map(String)).size
+  // the most repeated ciphertext block, and what it really was
+  const counts = new Map<string, number>()
+  ct.forEach((c) => counts.set(c.toString(), (counts.get(c.toString()) ?? 0) + 1))
+  const [top, n1] = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]
+  const idx = ct.findIndex((c) => c.toString() === top)
+  const plain = blocks[idx]
+  const bytes = plain.toString(16).padStart(blockBytes(bits) * 2, '0').match(/../g)!.map((h) => parseInt(h, 16))
+  console.log(`${bits}-bit, ${blockBytes(bits)} byte block: ${blocks.length} blocks, ${distinct} distinct ciphertexts; commonest appears ${n1}x and is ${JSON.stringify(String.fromCharCode(...bytes))}`)
+}
+
+// ---- 3. small e, no padding: a cube root is enough ----
+console.log('\n=== 3. e = 3 with no padding: no factoring needed ===')
+console.log('key bits | max safe message bytes (n^(1/3)) | msg bytes | m^e < n? | cube-root ms | recovered')
+for (const bits of [128, 512, 1024, 2048]) {
+  let k = generateKey(bits, 3)
+  for (let s = 3; k.e !== 3n && s < 200; s++) k = generateKey(bits, s)   // want e = 3
+  const cube = Math.floor((bits - 1) / 3 / 8)
+  for (const msg of ['yes', 'attack at dawn']) {
+    const m = textToBlocks(msg, bits)[0]
+    const c = modPow(m, k.e, k.n)
+    const t0 = now()
+    const r = isqrt(isqrt(c))   // placeholder, replaced below
+    const root = icbrt(c)
+    const ms = now() - t0
+    console.log(`${bits} (e=${k.e}) | ${cube} | ${msg.length} | ${m ** 3n < k.n} | ${f(ms)} | ${root === m ? 'YES: ' + JSON.stringify(msg) : 'no'}`)
+  }
+}
+function icbrt(n: bigint): bigint {
+  if (n < 2n) return n
+  let x = 1n << (BigInt(n.toString(2).length) / 3n + 1n)
+  for (;;) {
+    const y = (2n * x + n / (x * x)) / 3n
+    if (y >= x) return x
+    x = y
+  }
+}
+
+// ---- 4. square-and-multiply, the figure ----
+console.log('\n=== 4. square-and-multiply ===')
+const k = generateKey(32, 2)
+const t = modPowTrace(7n, k.e, k.n)
+console.log(`n=${k.n} e=${k.e} (binary ${k.e.toString(2)}): ${t.steps.length} steps for 7^${k.e} mod n = ${t.result}`)
+console.log(t.steps.map((s, i) => `${i}:${s.op === 'square' ? 'S' : 'SM'}→${s.acc}`).join('  '))
+const kd = generateKey(2048, 2)
+console.log(`2048-bit d has ${kd.d.toString(2).length} bits, ${kd.d.toString(2).split('').filter((c) => c === '1').length} of them 1 → ${kd.d.toString(2).length + kd.d.toString(2).split('').filter((c) => c === '1').length} big multiplications per decryption`)

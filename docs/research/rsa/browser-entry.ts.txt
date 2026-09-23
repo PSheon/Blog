@@ -1,0 +1,3 @@
+import { generateKey, textToBlocks, encrypt, decrypt } from './rsa.ts'
+import { trialDivision, fermat, pollardRho, quadraticSieve } from './factor.ts'
+;(globalThis as any).RSA = { generateKey, textToBlocks, encrypt, decrypt, trialDivision, fermat, pollardRho, quadraticSieve }

@@ -1,0 +1,29 @@
+<!doctype html><html><head><meta charset="utf-8"><title>rsa bench</title></head>
+<body><pre id="out">ready</pre><script src="bundle.js"></script>
+<script>
+window.bench = () => {
+  const R = window.RSA, out = []
+  const med = (xs) => [...xs].sort((a,b)=>a-b)[(xs.length-1)>>1]
+  // keygen
+  for (const bits of [16, 128, 1024, 2048]) {
+    const ts = []
+    for (let s = 1; s <= 10; s++) { const t = performance.now(); R.generateKey(bits, s); ts.push(performance.now()-t) }
+    out.push({ kind: 'keygen', bits, med: +med(ts).toFixed(2), min: +Math.min(...ts).toFixed(2), max: +Math.max(...ts).toFixed(2) })
+  }
+  // decrypt cost at 2048
+  { const k = R.generateKey(2048, 1); const b = R.textToBlocks('Meet me at the old pier at midnight.', 2048)
+    const c = R.encrypt(b, k); const ts = []
+    for (let i = 0; i < 5; i++) { const t = performance.now(); R.decrypt(c, k); ts.push(performance.now()-t) }
+    out.push({ kind: 'decrypt2048', med: +med(ts).toFixed(2) }) }
+  // factoring
+  for (const [algo, fn, sizes] of [['trial', R.trialDivision, [32,48,56]], ['rho', R.pollardRho, [48,64,80,96]], ['qs', R.quadraticSieve, [64,96,128]]]) {
+    for (const bits of sizes) {
+      const ts = []
+      for (let s = 1; s <= 8; s++) { const k = R.generateKey(bits, s); const a = fn(k.n, 30000, s)
+        if (a.ok && k.n % a.factor === 0n) ts.push(a.ms) }
+      out.push({ kind: 'factor', algo, bits, n: ts.length, med: +med(ts).toFixed(2), min: +Math.min(...ts).toFixed(2), max: +Math.max(...ts).toFixed(2) })
+    }
+  }
+  return out
+}
+</script></body></html>

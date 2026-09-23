@@ -1,0 +1,186 @@
+// From-scratch RSA on native BigInt. Nothing here is safe for real use;
+// it is the same code shape the article's page would run.
+
+// ---------- seeded RNG (so every run in RESULTS.md can be reproduced) ----------
+
+export function rng(seed: number) {
+  let s = seed >>> 0
+  return () => {
+    // xorshift32
+    s ^= s << 13; s >>>= 0
+    s ^= s >>> 17
+    s ^= s << 5; s >>>= 0
+    return s
+  }
+}
+
+/** A random odd BigInt with exactly `bits` bits (top bit set). */
+export function randomBits(bits: number, next: () => number): bigint {
+  let v = 0n
+  for (let i = 0; i < bits; i += 32) v = (v << 32n) | BigInt(next())
+  v &= (1n << BigInt(bits)) - 1n
+  v |= 1n << BigInt(bits - 1)   // exact bit length
+  v |= 1n                        // odd
+  return v
+}
+
+// ---------- modular arithmetic ----------
+
+export function modPow(base: bigint, exp: bigint, mod: bigint): bigint {
+  let result = 1n
+  base %= mod
+  while (exp > 0n) {
+    if (exp & 1n) result = (result * base) % mod
+    base = (base * base) % mod
+    exp >>= 1n
+  }
+  return result
+}
+
+/** Square-and-multiply, recording each step — this is fig "modexp". */
+export function modPowTrace(base: bigint, exp: bigint, mod: bigint) {
+  const steps: { bit: number; op: 'square' | 'square+multiply'; acc: bigint }[] = []
+  const bits = exp.toString(2)
+  let acc = 1n
+  for (const ch of bits) {
+    acc = (acc * acc) % mod
+    if (ch === '1') { acc = (acc * base) % mod; steps.push({ bit: 1, op: 'square+multiply', acc }) }
+    else steps.push({ bit: 0, op: 'square', acc })
+  }
+  return { result: acc, steps }
+}
+
+export function gcd(a: bigint, b: bigint): bigint {
+  while (b) { const t = a % b; a = b; b = t }
+  return a < 0n ? -a : a
+}
+
+/** Extended Euclid; returns x with a*x ≡ 1 (mod m). */
+export function modInverse(a: bigint, m: bigint): bigint {
+  let [old_r, r] = [a % m, m]
+  let [old_s, s] = [1n, 0n]
+  while (r !== 0n) {
+    const q = old_r / r
+    ;[old_r, r] = [r, old_r - q * r]
+    ;[old_s, s] = [s, old_s - q * s]
+  }
+  if (old_r !== 1n) throw new Error('not invertible')
+  return ((old_s % m) + m) % m
+}
+
+/** Integer square root (Newton). */
+export function isqrt(n: bigint): bigint {
+  if (n < 2n) return n
+  let x = 1n << (BigInt(n.toString(2).length) >> 1n) + 1n
+  for (;;) {
+    const y = (x + n / x) >> 1n
+    if (y >= x) return x
+    x = y
+  }
+}
+
+export function isSquare(n: bigint): bigint | null {
+  const r = isqrt(n)
+  return r * r === n ? r : null
+}
+
+// ---------- primality ----------
+
+const SMALL_PRIMES = (() => {
+  const out: number[] = []
+  const sieve = new Uint8Array(1000)
+  for (let i = 2; i < 1000; i++) if (!sieve[i]) { out.push(i); for (let j = i * i; j < 1000; j += i) sieve[j] = 1 }
+  return out
+})()
+
+export let mrRounds = 0   // counter, so the notes can say how much work a test is
+
+export function millerRabin(n: bigint, k: number, next: () => number): boolean {
+  if (n < 2n) return false
+  for (const p of SMALL_PRIMES) {
+    const bp = BigInt(p)
+    if (n === bp) return true
+    if (n % bp === 0n) return false
+  }
+  let d = n - 1n, r = 0n
+  while ((d & 1n) === 0n) { d >>= 1n; r++ }
+  for (let i = 0; i < k; i++) {
+    mrRounds++
+    // a in [2, n-2]
+    const a = 2n + (randomBits(Math.max(8, n.toString(2).length), next) % (n - 3n))
+    let x = modPow(a, d, n)
+    if (x === 1n || x === n - 1n) continue
+    let composite = true
+    for (let j = 1n; j < r; j++) {
+      x = (x * x) % n
+      if (x === n - 1n) { composite = false; break }
+    }
+    if (composite) return false
+  }
+  return true
+}
+
+export function randomPrime(bits: number, next: () => number, k = 20) {
+  let tries = 0
+  for (;;) {
+    tries++
+    const c = randomBits(bits, next)
+    if (millerRabin(c, k, next)) return { p: c, tries }
+  }
+}
+
+// ---------- keys ----------
+
+export type Key = { n: bigint; e: bigint; d: bigint; p: bigint; q: bigint; bits: number }
+
+const E_CANDIDATES = [3n, 5n, 17n, 257n, 65537n]
+
+/**
+ * `bits` is the size of the modulus n. p and q get half each; when bits is odd
+ * q takes the extra bit. `closeness` > 0 makes q a near neighbour of p (the
+ * bad-prime demo).
+ */
+export function generateKey(bits: number, seed: number, opts: { closeness?: number; k?: number } = {}): Key {
+  const next = rng(seed)
+  const k = opts.k ?? 20
+  for (;;) {
+    const pb = bits >> 1, qb = bits - pb
+    const { p } = randomPrime(pb, next, k)
+    let q: bigint
+    if (opts.closeness) {
+      // walk up from p to the next prime — p and q end up within a few thousand
+      q = p + 2n
+      while (!millerRabin(q, k, next)) q += 2n
+    } else {
+      q = randomPrime(qb, next, k).p
+    }
+    if (p === q) continue
+    const n = p * q
+    if (n.toString(2).length !== bits) continue   // keep the advertised size exact
+    const phi = (p - 1n) * (q - 1n)
+    const e = E_CANDIDATES.find((c) => c < phi && gcd(c, phi) === 1n)
+    if (!e) continue
+    const d = modInverse(e, phi)
+    return { n, e, d, p: p < q ? p : q, q: p < q ? q : p, bits }
+  }
+}
+
+// ---------- messages ----------
+
+/** Bytes per block: the largest k with 256^k < n, i.e. floor((bits-1)/8). */
+export function blockBytes(bits: number) { return Math.max(1, (bits - 1) >> 3) }
+
+export function textToBlocks(text: string, bits: number): bigint[] {
+  const bytes = new TextEncoder().encode(text)
+  const k = blockBytes(bits)
+  const out: bigint[] = []
+  for (let i = 0; i < bytes.length; i += k) {
+    let v = 0n
+    for (let j = i; j < Math.min(i + k, bytes.length); j++) v = (v << 8n) | BigInt(bytes[j])
+    out.push(v)
+  }
+  return out
+}
+
+export function encrypt(blocks: bigint[], key: Key) { return blocks.map((m) => modPow(m, key.e, key.n)) }
+export function decrypt(cts: bigint[], key: Key) { return cts.map((c) => modPow(c, key.d, key.n)) }
