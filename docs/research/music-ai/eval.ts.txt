@@ -1,0 +1,57 @@
+// Re-evaluate saved checkpoints: validation loss, samples at two temperatures (5 seeds, 64 steps), metrics, WAVs.
+//   npx tsx eval.ts <run dir> <d> <ctxSteps> [layers]
+import fs from "node:fs";
+import { Tape } from "../Blog/lib/ml/autograd";
+import { Transformer } from "../Blog/lib/ml/transformer";
+import { mulberry32 } from "../Blog/lib/ml/neuroevolution";
+import { LO, VOCAB, VOICES, decode, longestCopy, renderWav, report, valTokens } from "./music";
+
+const [dir, d, ctxSteps, layers = "2"] = process.argv.slice(2);
+const CTX = +ctxSteps * VOICES;
+const model = new Transformer({ vocab: VOCAB, ctx: CTX, d: +d, heads: 4, layers: +layers });
+
+export function sample(steps: number, temperature: number, seed: number, prompt = [72 - LO, 67 - LO, 64 - LO, 48 - LO]): number[] {
+  const r = mulberry32(seed), ids = [...prompt];
+  while (ids.length < steps * VOICES) {
+    const ctx = ids.slice(Math.max(0, Math.ceil((ids.length - CTX) / VOICES) * VOICES));
+    const { logits } = model.forward(new Tape(), ctx);
+    const row = logits.data.subarray((ctx.length - 1) * VOCAB, ctx.length * VOCAB);
+    let max = -Infinity; for (const x of row) max = Math.max(max, x);
+    const p = Array.from(row, (x) => Math.exp((x - max) / temperature));
+    let u = r() * p.reduce((a, b) => a + b, 0), k = 0;
+    while (u > p[k] && k < p.length - 1) u -= p[k++];
+    ids.push(k);
+  }
+  return ids;
+}
+
+// The same 64 validation windows as train.ts.
+function window(pool: number[][], r: () => number): number[] {
+  const seq = pool[Math.floor(r() * pool.length)];
+  const steps = seq.length / VOICES, len = Math.min(CTX + VOICES, seq.length);
+  const start = Math.floor(r() * Math.max(1, steps - len / VOICES + 1)) * VOICES;
+  return seq.slice(start, start + len);
+}
+const valRng = mulberry32(99), valWindows = Array.from({ length: 64 }, () => window(valTokens, valRng));
+
+const files = fs.readdirSync(dir).filter((f) => /^model-\d+\.json$/.test(f)).sort((a, b) => parseInt(a.slice(6)) - parseInt(b.slice(6)));
+const rows: string[] = [];
+for (const f of files) {
+  const step = parseInt(f.slice(6));
+  const w = JSON.parse(fs.readFileSync(`${dir}/${f}`, "utf8"));
+  for (const [k, m] of Object.entries(model.params)) m.data.set(w[k]);
+  let val = 0;
+  for (const win of valWindows) val += new Tape().crossEntropy(model.forward(new Tape(), win.slice(0, -1).slice(0, CTX)).logits, win.slice(1, CTX + 1));
+  val /= valWindows.length;
+  const line: Record<string, unknown> = { step, val: +val.toFixed(3) };
+  for (const temp of [0.7, 1.0]) {
+    const rs = [1, 2, 3, 4, 5].map((seed) => decode(sample(64, temp, seed)));
+    const reps = rs.map((r) => report(r.pitches, r.onset));
+    const mean = (k: keyof (typeof reps)[0]) => +(reps.reduce((s, r) => s + r[k], 0) / reps.length).toFixed(3);
+    line[`T${temp}`] = { inKey: mean("inKey"), parallels: mean("parallels"), crossings: mean("crossings"), rough: mean("rough"), hold: mean("holdShare"), chords: mean("distinctChords"), copy: rs.map((r) => longestCopy(r.pitches)) };
+    renderWav(`${dir}/eval-step${step}-T${temp}.wav`, rs[0].pitches, rs[0].onset);
+  }
+  rows.push(JSON.stringify(line));
+  console.log(rows.at(-1));
+}
+fs.writeFileSync(`${dir}/eval.txt`, rows.join("\n") + "\n");

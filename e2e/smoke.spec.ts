@@ -133,8 +133,8 @@ test("feeds and sitemap are served", async ({ request }) => {
   const sitemap = await (await request.get("/sitemap.xml")).text();
   expect(sitemap).toContain("/zh/tags/from-scratch</loc>");
   // A tag with one article is left out, and its page asks not to be indexed.
-  expect(sitemap).not.toContain("/zh/tags/llm</loc>");
-  expect(await (await request.get("/zh/tags/llm")).text()).toContain('content="noindex, follow"');
+  expect(sitemap).not.toContain("/zh/tags/multi-task</loc>");
+  expect(await (await request.get("/zh/tags/multi-task")).text()).toContain('content="noindex, follow"');
 });
 
 // Next replaces `alternates` and `openGraph` wholesale when a page sets them, which once cost article

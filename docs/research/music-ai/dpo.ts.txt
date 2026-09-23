@@ -1,0 +1,121 @@
+// Preference tuning (DPO) on a trained checkpoint, with an automatic judge standing in for the reader.
+//   npx tsx dpo.ts <model.json> <d> <ctxSteps> <judge: parallels|calm> [pairs] [pairsPerUpdate] [beta] [lr]
+// The reader's click is simulated: of two samples, the judge prefers the one with fewer parallel fifths/octaves
+// ("parallels") or with more held notes ("calm"). Ties are skipped (a reader would skip them too).
+import fs from "node:fs";
+import { Mat, Tape } from "../Blog/lib/ml/autograd";
+import { Adam, Transformer } from "../Blog/lib/ml/transformer";
+import { mulberry32 } from "../Blog/lib/ml/neuroevolution";
+import { LO, VOCAB, VOICES, decode, longestCopy, renderWav, report, valTokens } from "./music";
+
+const [file, d, ctxSteps, judge = "parallels", pairsArg = "40", perArg = "4", betaArg = "0.2", lrArg = "3e-4"] = process.argv.slice(2);
+const CTX = +ctxSteps * VOICES, PAIRS = +pairsArg, PER = +perArg, BETA = +betaArg, LR = +lrArg;
+const config = { vocab: VOCAB, ctx: CTX, d: +d, heads: 4, layers: 2 };
+const policy = new Transformer(config), ref = new Transformer(config);
+const w = JSON.parse(fs.readFileSync(file, "utf8"));
+for (const m of [policy, ref]) for (const [k, p] of Object.entries(m.params)) p.data.set(w[k]);
+const adam = new Adam(policy.params);
+const PROMPT = [72 - LO, 67 - LO, 64 - LO, 48 - LO];
+const LEN = CTX; // a whole sample fits in one window, so its probability is one forward pass
+
+function sample(model: Transformer, tokens: number, temperature: number, r: () => number): number[] {
+  const ids = [...PROMPT];
+  while (ids.length < tokens) {
+    const ctx = ids.slice(Math.max(0, Math.ceil((ids.length - CTX) / VOICES) * VOICES));
+    const { logits } = model.forward(new Tape(), ctx);
+    const row = logits.data.subarray((ctx.length - 1) * VOCAB, ctx.length * VOCAB);
+    let max = -Infinity; for (const x of row) max = Math.max(max, x);
+    const p = Array.from(row, (x) => Math.exp((x - max) / temperature));
+    let u = r() * p.reduce((a, b) => a + b, 0), k = 0;
+    while (u > p[k] && k < p.length - 1) u -= p[k++];
+    ids.push(k);
+  }
+  return ids;
+}
+
+/** Sum of log-probabilities of the tokens after the prompt. */
+function logProb(model: Transformer, ids: number[], tape: Tape): { value: number; logits: Mat; targets: number[] } {
+  const { logits } = model.forward(tape, ids.slice(0, -1));
+  const targets = ids.slice(1).map((t, i) => (i + 1 < PROMPT.length ? -1 : t));
+  let lp = 0;
+  for (let r = 0; r < targets.length; r++) {
+    if (targets[r] < 0) continue;
+    const row = logits.data.subarray(r * VOCAB, (r + 1) * VOCAB);
+    let max = -Infinity; for (const x of row) max = Math.max(max, x);
+    let s = 0; for (const x of row) s += Math.exp(x - max);
+    lp += row[targets[r]] - max - Math.log(s);
+  }
+  return { value: lp, logits, targets };
+}
+
+/** How often two voices move in parallel fifths/octaves, per step on which at least two voices move: holding still cannot game it. */
+function perMove(pitches: number[][]): number {
+  let moves = 0, par = 0;
+  for (let t = 1; t < pitches.length; t++) {
+    const p = pitches[t], q = pitches[t - 1];
+    if (p.filter((x, v) => x !== q[v]).length >= 2) moves++;
+    for (let a = 0; a < 4; a++) for (let c = a + 1; c < 4; c++) {
+      if (p[a] < 0 || p[c] < 0 || q[a] < 0 || q[c] < 0) continue;
+      const now = (p[a] - p[c]) % 12, was = (q[a] - q[c]) % 12;
+      if (p[a] !== q[a] && p[c] !== q[c] && Math.sign(p[a] - q[a]) === Math.sign(p[c] - q[c]) && now === was && (now === 7 || now === 0)) par++;
+    }
+  }
+  return moves ? par / moves : 0;
+}
+const score = (ids: number[]) => {
+  const g = decode(ids), r = report(g.pitches, g.onset);
+  if (judge === "calm") return r.holdShare;
+  if (judge === "permove") return -perMove(g.pitches);
+  return -r.parallels;
+};
+
+function evaluate(label: string) {
+  const reps = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => { const g = decode(sample(policy, 64 * VOICES, 0.7, mulberry32(1000 + seed))); return { r: report(g.pitches, g.onset), copy: longestCopy(g.pitches), g }; });
+  const mean = (k: keyof (typeof reps)[0]["r"]) => +(reps.reduce((s, x) => s + x.r[k], 0) / reps.length).toFixed(3);
+  const valRng = mulberry32(99);
+  let val = 0;
+  for (let i = 0; i < 64; i++) {
+    const seq = valTokens[Math.floor(valRng() * valTokens.length)];
+    const steps = seq.length / VOICES, len = Math.min(CTX + VOICES, seq.length);
+    const start = Math.floor(valRng() * Math.max(1, steps - len / VOICES + 1)) * VOICES;
+    const win = seq.slice(start, start + len);
+    val += new Tape().crossEntropy(policy.forward(new Tape(), win.slice(0, -1).slice(0, CTX)).logits, win.slice(1, CTX + 1));
+  }
+  console.log(label, JSON.stringify({ val: +(val / 64).toFixed(3), inKey: mean("inKey"), parallels: mean("parallels"), crossings: mean("crossings"), hold: mean("holdShare"), chords: mean("distinctChords"), copy: reps.map((x) => x.copy) }));
+  return reps[0].g;
+}
+
+const tag = `${judge}-p${PAIRS}-b${BETA}-lr${LR}`;
+const before = evaluate("before");
+renderWav(`out/dpo-${tag}-before.wav`, before.pitches, before.onset);
+const r = mulberry32(5);
+let used = 0, skipped = 0, sampled = 0;
+const start = Date.now();
+while (used < PAIRS) {
+  policy.zeroGrad();
+  const tape = new Tape();
+  let n = 0;
+  while (n < PER && used < PAIRS) {
+    const a = sample(policy, LEN + 1, 1.0, r), b = sample(policy, LEN + 1, 1.0, r);
+    sampled += 2;
+    const sa = score(a), sb = score(b);
+    if (sa === sb) { skipped++; continue; }
+    const [win, lose] = sa > sb ? [a, b] : [b, a];
+    const pw = logProb(policy, win, tape), pl = logProb(policy, lose, tape);
+    const rw = logProb(ref, win, new Tape()).value, rl = logProb(ref, lose, new Tape()).value;
+    const z = BETA * (pw.value - rw - (pl.value - rl));
+    const g = BETA * (1 - 1 / (1 + Math.exp(-z))) / PER; // −dL/dz · β, averaged over the update's pairs
+    const count = (t: number[]) => t.filter((x) => x >= 0).length;
+    // crossEntropy's gradient is weight × d(mean NLL); log p = −count × mean NLL.
+    tape.crossEntropy(pw.logits, pw.targets, g * count(pw.targets));
+    tape.crossEntropy(pl.logits, pl.targets, -g * count(pl.targets));
+    n++; used++;
+  }
+  tape.backward();
+  adam.step(LR);
+  if (used % 20 === 0 || used === PAIRS) console.log(`pairs ${used} (skipped ties ${skipped}) ${((Date.now() - start) / 1000).toFixed(0)} s`);
+}
+const after = evaluate("after");
+renderWav(`out/dpo-${tag}-after.wav`, after.pitches, after.onset);
+fs.writeFileSync(`out/dpo-${tag}.json`, JSON.stringify(Object.fromEntries(Object.entries(policy.params).map(([k, m]) => [k, Array.from(m.data, (x) => +x.toFixed(5))]))));
+console.log("samples drawn", sampled);

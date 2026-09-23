@@ -1,0 +1,27 @@
+// Share of spectral energy above 2 kHz (and above 4 kHz), from 4096-point Hann-windowed FFT frames. WAV 16-bit in.
+import fs from "node:fs";
+function fft(re: Float64Array, im: Float64Array) {
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++) { let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; } }
+  for (let len = 2; len <= n; len <<= 1) {
+    const ang = (-2 * Math.PI) / len;
+    for (let i = 0; i < n; i += len) for (let k = 0; k < len / 2; k++) {
+      const wr = Math.cos(ang * k), wi = Math.sin(ang * k), a = i + k, b = a + len / 2;
+      const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+      re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+    }
+  }
+}
+const bands = (f: string) => {
+  const b = fs.readFileSync(f), ch = b.readUInt16LE(22), n = (b.length - 44) / 2 / ch, N = 4096;
+  let e2 = 0, e4 = 0, all = 0, mid = 0;
+  for (let s = 0; s + N <= n; s += N) {
+    const re = new Float64Array(N), im = new Float64Array(N);
+    for (let i = 0; i < N; i++) { let v = 0; for (let c = 0; c < ch; c++) v += b.readInt16LE(44 + ((s + i) * ch + c) * 2); re[i] = (v / ch) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N)); }
+    fft(re, im);
+    for (let k = 1; k < N / 2; k++) { const e = re[k] ** 2 + im[k] ** 2, hz = (k * 44100) / N; all += e; if (hz > 2000) e2 += e; if (hz > 4000) e4 += e; if (hz > 1000 && hz < 4000) mid += e; }
+  }
+  const db = (x: number) => (10 * Math.log10(x / all)).toFixed(1).padStart(6);
+  return `1–4 kHz ${db(mid)} dB   >2 kHz ${db(e2)} dB   >4 kHz ${db(e4)} dB`;
+};
+for (const f of process.argv.slice(2)) console.log(f.padEnd(44), bands(f));

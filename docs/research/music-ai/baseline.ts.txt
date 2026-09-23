@@ -1,0 +1,74 @@
+// Reference numbers: Bach's own validation chorales, n-gram models, and a rule-based "five lines of maths" composer.
+import { HOLD, REST, VOCAB, VOICES, decode, longestCopy, renderWav, report, trainTokens, valSet, valTokens } from "./music";
+import { mulberry32 } from "../Blog/lib/ml/neuroevolution";
+
+const mean = (rs: ReturnType<typeof report>[]) => Object.fromEntries(Object.keys(rs[0]).map((k) => [k, +(rs.reduce((s, r) => s + (r as any)[k], 0) / rs.length).toFixed(3)]));
+console.log("train tokens", trainTokens.reduce((s, t) => s + t.length, 0), "val tokens", valTokens.reduce((s, t) => s + t.length, 0), "vocab", VOCAB);
+console.log("bach (validation)", mean(valSet.map((c) => report(c.pitches, c.onset))));
+
+// n-gram with add-k smoothing, context = previous n-1 tokens. Validation cross-entropy in nats per token.
+function ngram(n: number, k = 0.05) {
+  const counts = new Map<string, Float64Array>();
+  for (const seq of trainTokens)
+    for (let t = 0; t < seq.length; t++) {
+      const ctx = seq.slice(Math.max(0, t - n + 1), t).join(",") + "|" + (t % VOICES);
+      if (!counts.has(ctx)) counts.set(ctx, new Float64Array(VOCAB));
+      counts.get(ctx)![seq[t]]++;
+    }
+  const prob = (ctx: string, id: number) => {
+    const c = counts.get(ctx);
+    if (!c) return 1 / VOCAB;
+    const total = c.reduce((a, b) => a + b, 0);
+    return (c[id] + k) / (total + k * VOCAB);
+  };
+  let nll = 0, count = 0;
+  for (const seq of valTokens)
+    for (let t = 0; t < seq.length; t++) { nll -= Math.log(prob(seq.slice(Math.max(0, t - n + 1), t).join(",") + "|" + (t % VOICES), seq[t])); count++; }
+  return { nll: nll / count, counts, prob };
+}
+for (const n of [1, 2, 3, 4, 5, 6, 8]) console.log(`${n}-gram val nats/token`, ngram(n).nll.toFixed(3));
+
+// Rule composer: pentatonic C (C D E G A) soprano as a 1/f (Voss) walk, a fixed I–vi–IV–V progression under it.
+function rules(steps: number, seed: number) {
+  const rng = mulberry32(seed);
+  const penta = [60, 62, 64, 67, 69, 72, 74, 76, 79, 81];
+  const dice = [0, 0, 0, 0].map(() => rng());
+  const chords = [[48, 55, 64], [45, 57, 64], [41, 53, 60], [43, 55, 62]]; // C, Am, F, G (bass, tenor, alto)
+  const pitches: number[][] = [], onset: number[][] = [];
+  let last = -1;
+  for (let t = 0; t < steps; t++) {
+    if (t % 2 === 0) for (let b = 0; b < 4; b++) if (((t / 2) & ((1 << b) - 1)) === 0) dice[b] = rng();
+    const idx = Math.floor((dice.reduce((a, b) => a + b, 0) / 4) * penta.length);
+    const s = penta[Math.min(penta.length - 1, idx)], ch = chords[Math.floor(t / 8) % 4];
+    const newS = t % 2 === 0 && s !== last;
+    pitches.push([newS || t % 2 === 1 ? (t % 2 === 0 ? s : last) : last, ch[2], ch[1], ch[0]]);
+    onset.push([newS ? 1 : 0, t % 8 === 0 ? 1 : 0, t % 8 === 0 ? 1 : 0, t % 8 === 0 ? 1 : 0]);
+    if (newS) last = s;
+  }
+  return { pitches, onset };
+}
+const rs = [1, 2, 3, 4, 5].map((s) => rules(96, s));
+console.log("rules", mean(rs.map((r) => report(r.pitches, r.onset))), "copy", Math.max(...rs.map((r) => longestCopy(r.pitches))));
+renderWav("out/rules.wav", rs[0].pitches, rs[0].onset);
+renderWav("out/bach-val.wav", valSet[0].pitches, valSet[0].onset);
+console.log("bach val chorale for listening:", valSet[0].id);
+
+// Let the 5-gram compose, from the same C major chord the Transformer starts from.
+{
+  const { prob } = ngram(5);
+  for (const temp of [0.7, 1.0]) {
+    const out = [1, 2, 3].map((seed) => {
+      const r = mulberry32(seed), ids = [72 - 31, 67 - 31, 64 - 31, 48 - 31];
+      while (ids.length < 64 * VOICES) {
+        const ctx = ids.slice(-4).join(",") + "|" + (ids.length % VOICES);
+        const p = Array.from({ length: VOCAB }, (_, k) => prob(ctx, k) ** (1 / temp));
+        let u = r() * p.reduce((a, b) => a + b, 0), k = 0;
+        while (u > p[k] && k < VOCAB - 1) u -= p[k++];
+        ids.push(k);
+      }
+      return decode(ids);
+    });
+    console.log(`5-gram T${temp}`, mean(out.map((d) => report(d.pitches, d.onset))), "copy", out.map((d) => longestCopy(d.pitches)));
+    renderWav(`out/5gram-T${temp}.wav`, out[0].pitches, out[0].onset);
+  }
+}

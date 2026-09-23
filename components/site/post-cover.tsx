@@ -318,6 +318,30 @@ function HeadCamera() {
   );
 }
 
+/** № 014: a piano roll that starts as scattered notes and settles into four voices, the way the composer learns. */
+function MusicAi() {
+  const rand = rng(23);
+  // Four voices on their own rows. On the left each note is thrown anywhere; by the right they have found their rows.
+  const notes: { x: number; y: number; w: number; v: number }[] = [];
+  const rows = [26, 42, 58, 74];
+  for (let v = 0; v < 4; v++) {
+    for (let x = 12; x < 150; ) {
+      const settled = Math.min(1, Math.max(0, (x - 30) / 70));
+      const stray = (rand() - 0.5) * 46 * (1 - settled);
+      const w = r1(6 + rand() * (4 + 12 * settled));
+      notes.push({ x: r1(x), y: r1(rows[v] + stray + (settled > 0.6 ? (rand() - 0.5) * 7 : 0)), w, v });
+      x += w + 3;
+    }
+  }
+  const ink = [S, S3, S2, "var(--chart-5)"];
+  return (
+    <>
+      {[12, 47, 82, 117, 150].map((x) => <path key={x} d={`M${x} 12 V88`} stroke={DIM} strokeWidth={0.8} strokeDasharray="2 4" />)}
+      {notes.map((n, i) => <rect key={i} x={n.x} y={n.y} width={n.w} height={3} rx={1.5} fill={ink[n.v]} opacity={0.9} />)}
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -332,6 +356,7 @@ const covers: Record<string, () => ReactNode> = {
   "light-from-noise": Light,
   "light-playground": Playground,
   "head-camera": HeadCamera,
+  "music-ai": MusicAi,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {

@@ -1,4 +1,4 @@
-# Handoff — main session, last revised 2026-09-22
+# Handoff — main session, last revised 2026-09-23
 
 For whoever picks this up next. Read this, then the memory files under
 `~/.claude/projects/-Users-paul-jiang-Desktop-Paul/memory/` (they are loaded automatically, this file is not), then
@@ -14,15 +14,33 @@ For whoever picks this up next. Read this, then the memory files under
 | Production | <https://blog.psheon.me> (since 2026-09-21; DNS on Cloudflare, CNAME to Vercel, DNS only). Vercel project `paul-notebook`, deploys `main`. `paul-notebook.vercel.app` redirects 308 to it, path kept. Production env: `NEXT_PUBLIC_SITE_URL=https://blog.psheon.me` |
 | Dev server | `pnpm dev` on :3000 |
 | Other worktrees | None since 2026-09-22: `feat/city-of-agents`, `feat/sche` and `feat/vla` are merged and deleted. One writer per checkout |
-| Tests | 323 unit tests (2 skipped) and 206 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
+| Tests | 323 unit tests (2 skipped) and 218 E2E runs (two projects: desktop, mobile), plus axe on every article. CI runs all of it on every push |
 
 Published, in both languages: 001 CNN, 002 Flappy Bird, 003 trading agent, 004 Transformer, 005 HydraNet, 006 Lite3,
 007 point-cloud diffusion, 008 2D SLAM, 009 city of agents, 010 a task scheduler from scratch (published 2026-09-21;
 built on `feat/sche` by another session), 011 and 012 the light series (PR #14), 013 `head-camera` (PR #15, merged from
-`feat/vla`). All thirteen had their copy polished with Paul on 2026-09-22, item by item. The earlier PCB-flip
+`feat/vla`), 014 `music-ai` (2026-09-23). Articles 001–013 had their copy polished with Paul on 2026-09-22, item by
+item, and 014 the same way as it was written. The earlier PCB-flip
 VLA draft (№ 014) was dropped the same day, Paul found it dull; its simulation (arm, rasteriser, world) lives on as
 `content/posts/head-camera/components/sim`, which 013 imports, with its tests in `tests/head-camera/`; its notes stay
 in `docs/research/pcb-flip-vla/`. A draft shows only in `next dev`, with a mark in the page's language ("草稿" / "DRAFT").
+
+### № 014, the AI composer (2026-09-23)
+
+A small Transformer (65k parameters, `lib/ml` again) learns Bach's four-part chorales in the reader's browser in about
+three minutes, and a synthesiser written sample by sample plays what it writes. Three figures: train and listen,
+tune it with your own picks (DPO, and it games the judge), and a blind test against Bach and five lines of maths.
+
+- `docs/research/music-ai/RESULTS.md` holds every number, both recipes (the research schedule and the page's), the
+  timbre work and the measurements that were thrown away. Copies of the research scripts sit beside it.
+- The data is **CC BY-NC-SA 4.0** (Craig Sapp's edition of the chorales), and so are `public/posts/music-ai/*.bin`
+  and anything else derived from them: attribution is in the README, the article and the licence note.
+- `scripts/music/convert.py` and `scripts/music/pack.ts` rebuild those two files byte for byte from the corpus clone
+  and a checkpoint, both of which live outside git in `Desktop/Paul/music-work/` (with every run and the MP3 packs).
+- Sound has its own rules now: DESIGN.md §4 "Instruments that make sound". The player is one `AudioContext` and one
+  worker for the page; figures 02 and 03 share a second worker, and every message carries which figure asked.
+- CI cannot hear: `e2e/music-ai.spec.ts` checks training, tuning, the blind test's secrecy and that nothing heavy is
+  fetched before the reader asks.
 
 ### The light series (two articles, published 2026-09-22)
 

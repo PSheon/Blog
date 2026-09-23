@@ -6,12 +6,13 @@
 **[blog.psheon.me](https://blog.psheon.me)** · [English](https://blog.psheon.me/en) · [中文](https://blog.psheon.me/zh) · [RSS](https://blog.psheon.me/en/feed.xml)
 
 An interactive blog. Every article builds one thing from scratch — a CNN, a Transformer, a diffusion model,
-neuroevolution, a quadruped's walking policy, a SLAM system, a city of autonomous agents, a task scheduler, a path tracer — and
+neuroevolution, a quadruped's walking policy, a SLAM system, a city of autonomous agents, a task scheduler, a path tracer,
+an AI composer — and
 ships with instruments you can train, open up and break right in the page. Apart from MuJoCo's physics in article 006,
 everything is written in TypeScript and runs in the reader's tab: no TensorFlow.js, no ONNX Runtime, no server. Bilingual (繁體中文 / English).
 
 從零實作的互動部落格：每一篇都能在瀏覽器裡訓練、拆開、弄壞。CNN、Transformer、擴散模型、神經演化、
-機器狗走路策略、SLAM、自己過日子的小鎮居民、任務排程器、路徑追蹤器，全部用 TypeScript 從零寫起，不靠任何機器學習函式庫，
+機器狗走路策略、SLAM、自己過日子的小鎮居民、任務排程器、路徑追蹤器、AI 作曲家，全部用 TypeScript 從零寫起，不靠任何機器學習函式庫，
 也不靠伺服器。
 
 ![paul.notebook](https://blog.psheon.me/en/opengraph-image)
@@ -20,6 +21,7 @@ everything is written in TypeScript and runs in the reader's tab: no TensorFlow.
 
 | № | English | 中文 |
 | --- | --- | --- |
+| 014 | [Train your own AI composer in three minutes: from noodling to calm](https://blog.psheon.me/en/posts/music-ai) | [三分鐘訓練你的 AI 作曲家：聽它從亂彈到療癒](https://blog.psheon.me/zh/posts/music-ai) |
 | 013 | [A mini Figure AI in three minutes: one camera, one arm](https://blog.psheon.me/en/posts/head-camera) | [三分鐘打造迷你 Figure AI：只給它一顆相機、一隻手臂](https://blog.psheon.me/zh/posts/head-camera) |
 | 012 | [Putting a path tracer in a 3D playground: crash a car, gun a plane, fly a helicopter](https://blog.psheon.me/en/posts/light-playground) | [把光追放進 3D 遊樂園：體驗開車碰撞、飛機加速、直升機飛行](https://blog.psheon.me/zh/posts/light-playground) |
 | 011 | [How a picture clears from snow: a WebGPU path tracer from scratch](https://blog.psheon.me/en/posts/light-from-noise) | [一張圖怎麼從雪花變清晰：從零寫一個 WebGPU 路徑追蹤器](https://blog.psheon.me/zh/posts/light-from-noise) |
@@ -118,6 +120,7 @@ Conventions that keep pages fast and honest:
 | `styles/launch-ui.css` | Glass, fade and hairline utilities from Launch UI |
 | `public/sw.js` | The service worker (network first for pages, cache first for immutable assets) |
 | `scripts/train-mnist` | One-off PyTorch training for article 001; exports weights and golden values for the tests |
+| `scripts/music` | Packs article 014's chorales and its trained composer into `public/posts/music-ai/*.bin` |
 | `scripts/light` | Packs the light series' assets (the playground, the vehicles, the character and its clips) into `public/posts/light-playground/*.bin`: geometry, skeleton and names only, never a texture |
 | `tests` | Vitest suites, grouped by library and by article |
 | `e2e` | Playwright smoke tests and axe accessibility checks |
@@ -142,4 +145,7 @@ Layout primitives and CSS utilities adapted from [Launch UI](https://www.launchu
 AAPL price data in the trading article is daily closing prices for 2024. The Lite3 robot model and
 walking policy in article 006 come from DEEP Robotics; their licences are in `public/lite3/`. The light
 series' playground is the geometry of [Sketchbook](https://github.com/swift502/Sketchbook)'s world by
-Jan Blaha (MIT); its textures are not used and `world.glb` is never committed.
+Jan Blaha (MIT); its textures are not used and `world.glb` is never committed. Article 014 trains on
+[Craig Sapp's digital edition of Bach's 370 four-part chorales](https://github.com/craigsapp/bach-370-chorales)
+(CC BY-NC-SA 4.0); the tokens and the trained model in `public/posts/music-ai/` are derived from it and carry the
+same licence.

@@ -1,0 +1,88 @@
+// Train a small Transformer on the chorales with lib/ml (the same code the browser runs), sample at checkpoints.
+//   npx tsx train.ts <run name> [steps] [d] [layers] [ctxSteps] [batch] [lr]
+import fs from "node:fs";
+import { Tape } from "../Blog/lib/ml/autograd";
+import { Adam, Transformer } from "../Blog/lib/ml/transformer";
+import { mulberry32 } from "../Blog/lib/ml/neuroevolution";
+import { LO, VOCAB, VOICES, decode, longestCopy, renderWav, report, trainTokens, valTokens } from "./music";
+
+const [name = "run", stepsArg = "2000", dArg = "64", layersArg = "2", ctxStepsArg = "32", batchArg = "8", lrArg = "3e-3"] = process.argv.slice(2);
+const STEPS = +stepsArg, D = +dArg, LAYERS = +layersArg, CTX = +ctxStepsArg * VOICES, BATCH = +batchArg, LR = +lrArg;
+const dir = `runs/${name}`;
+fs.mkdirSync(dir, { recursive: true });
+const log = (s: string) => { console.log(s); fs.appendFileSync(`${dir}/log.txt`, s + "\n"); };
+
+const rng = mulberry32(7);
+const model = new Transformer({ vocab: VOCAB, ctx: CTX, d: D, heads: 4, layers: LAYERS }, rng);
+const adam = new Adam(model.params);
+log(`params ${model.parameterCount()} ctx ${CTX} batch ${BATCH} lr ${LR}`);
+
+/** A random window that starts on a step boundary, so the voice order S A T B is always in phase. */
+function window(pool: number[][], r: () => number): number[] {
+  const seq = pool[Math.floor(r() * pool.length)];
+  const steps = seq.length / VOICES, len = Math.min(CTX + VOICES, seq.length);
+  const start = Math.floor(r() * Math.max(1, steps - len / VOICES + 1)) * VOICES;
+  return seq.slice(start, start + len);
+}
+
+function lossOn(ids: number[], tape: Tape, weight: number) {
+  const input = ids.slice(0, -1).slice(0, CTX), targets = ids.slice(1, CTX + 1);
+  return tape.crossEntropy(model.forward(tape, input).logits, targets, weight);
+}
+
+/** Validation loss on fixed windows: 64 of them, the same every time. */
+const valRng = mulberry32(99), valWindows = Array.from({ length: 64 }, () => window(valTokens, valRng));
+function validate(): number {
+  let s = 0;
+  for (const w of valWindows) s += lossOn(w, new Tape(), 1);
+  return s / valWindows.length;
+}
+
+function sample(steps: number, temperature: number, seed: number): number[] {
+  const r = mulberry32(seed);
+  const ids = [72 - LO, 67 - LO, 64 - LO, 48 - LO]; // a C major chord to start from
+  while (ids.length < steps * VOICES) {
+    // Slide by whole steps: position 0 must stay the soprano, or every voice reads as its neighbour.
+    const ctx = ids.slice(Math.max(0, Math.ceil((ids.length - CTX) / VOICES) * VOICES));
+    const { logits } = model.forward(new Tape(), ctx);
+    const row = logits.data.subarray((ctx.length - 1) * VOCAB, ctx.length * VOCAB);
+    let max = -Infinity; for (const x of row) max = Math.max(max, x);
+    const p = Array.from(row, (x) => Math.exp((x - max) / temperature));
+    let u = r() * p.reduce((a, b) => a + b, 0), k = 0;
+    while (u > p[k] && k < p.length - 1) u -= p[k++];
+    ids.push(k);
+  }
+  return ids;
+}
+
+function checkpoint(step: number) {
+  const val = validate();
+  const out: Record<string, unknown> = { step, val: +val.toFixed(4) };
+  for (const temp of [0.7, 1.0]) {
+    const rs = [1, 2, 3].map((seed) => decode(sample(64, temp, seed)));
+    const mean = (k: string) => +(rs.reduce((s, r) => s + (report(r.pitches, r.onset) as any)[k], 0) / rs.length).toFixed(3);
+    out[`T${temp}`] = { inKey: mean("inKey"), parallels: mean("parallels"), crossings: mean("crossings"), rough: mean("rough"), holdShare: mean("holdShare"), chords: mean("distinctChords"), copy: Math.max(...rs.map((r) => longestCopy(r.pitches))) };
+    renderWav(`${dir}/step${step}-T${temp}.wav`, rs[0].pitches, rs[0].onset);
+  }
+  log(JSON.stringify(out));
+  fs.writeFileSync(`${dir}/model-${step}.json`, JSON.stringify(Object.fromEntries(Object.entries(model.params).map(([k, m]) => [k, Array.from(m.data, (x) => +x.toFixed(5))]))));
+}
+
+const checkpoints = new Set([0, 100, 250, 500, 1000, 2000, 4000, 8000, 16000].filter((s) => s <= STEPS).concat([STEPS]));
+const start = Date.now();
+let running = 0;
+for (let step = 0; step <= STEPS; step++) {
+  if (checkpoints.has(step)) { log(`t=${((Date.now() - start) / 1000).toFixed(0)}s`); checkpoint(step); }
+  if (step === STEPS) break;
+  model.zeroGrad();
+  const tape = new Tape();
+  let loss = 0;
+  for (let b = 0; b < BATCH; b++) loss += lossOn(window(trainTokens, rng), tape, 1 / BATCH) / BATCH;
+  tape.backward();
+  // Short warm-up, then a cosine decay to a tenth.
+  const lr = LR * Math.min(1, (step + 1) / 100) * (0.1 + 0.9 * 0.5 * (1 + Math.cos((Math.PI * step) / STEPS)));
+  adam.step(lr);
+  running = step === 0 ? loss : 0.98 * running + 0.02 * loss;
+  if (step % 50 === 0) log(`step ${step} loss ${running.toFixed(3)} ${((Date.now() - start) / (step + 1)).toFixed(0)} ms/step`);
+}
+log(`done in ${((Date.now() - start) / 1000).toFixed(0)} s`);

@@ -97,5 +97,9 @@ self.addEventListener("fetch", (event) => {
   const { request } = event, url = new URL(request.url);
   // Only our own GETs. Vercel's analytics endpoints and anything cross-origin go straight to the network.
   if (request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/_vercel/")) return;
+  // A worker's own script goes straight to the network, never through a cache. The bundler hands a worker its chunk
+  // list in the URL's fragment (`…/turbopack-worker-…js#params=…`), and a fragment is not part of a Request: answering
+  // one from here loses it, and every worker on the site dies with "Missing worker bootstrap config".
+  if (request.destination === "worker" || request.destination === "sharedworker") return;
   event.respondWith(isAsset(url) ? cacheFirst(request) : networkFirst(request));
 });
