@@ -40,7 +40,8 @@ The area, lowercase, `[a-z0-9._/-]`. Optional only when the change really belong
 (`docs: production is blog.psheon.me`).
 
 - **An article**: its slug or the short name already in the log: `cnn`, `transformer`, `diffusion`, `flappy`, `lite3`,
-  `slam`, `city`, `scheduler`, `light`, `playground` (the figure), `light-playground` (the article's text).
+  `slam`, `city`, `scheduler`, `light`, `playground` (the figure), `light-playground` (the article's text),
+  `head-camera`, `music-ai`.
 - **Shared code**: `rt` (`lib/rt`), `ml`, `controls` (`components/lab`), `ui`, `site`, `home`, `header`, `search`, `post`.
 - **Everything else**: `e2e`, `deps`, `research` (`docs/research`), `repo`, `release` (release PR titles only).
 

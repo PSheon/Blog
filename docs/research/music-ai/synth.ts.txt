@@ -1,0 +1,122 @@
+// Softer voices for the listening tests: three timbres, a damped stereo reverb (Freeverb's layout), a gentle
+// low-pass on the mix, and the spectral centroid of the result as a number for "how bright".
+import fs from "node:fs";
+
+export type Timbre = "pad" | "epiano" | "flute";
+const SR = 44100;
+
+/** Deterministic noise for breath and detune. */
+function noise(seed: number) { let a = seed; return () => { a = (a * 1664525 + 1013904223) | 0; return a / 2147483648; }; }
+
+/** One note into L/R. Voice 0 is the soprano; lower voices sit a little louder and wider apart in the stereo field. */
+function note(L: Float32Array, R: Float32Array, timbre: Timbre, midi: number, start: number, dur: number, voice: number) {
+  const f = 440 * 2 ** ((midi - 69) / 12);
+  const level = [0.5, 0.55, 0.6, 0.75][voice];
+  const pan = [0.35, 0.6, 0.4, 0.5][voice]; // 0 left … 1 right
+  const gl = Math.cos((pan * Math.PI) / 2), gr = Math.sin((pan * Math.PI) / 2);
+  const rnd = noise(midi * 131 + Math.round(start * 1000));
+  const attack = timbre === "pad" ? 0.35 : timbre === "flute" ? 0.12 : 0.008;
+  const release = timbre === "pad" ? 1.4 : timbre === "flute" ? 0.35 : 1.2;
+  const total = Math.round((dur + release) * SR), a0 = Math.round(start * SR);
+  let breath = 0;
+  for (let i = 0; i < total && a0 + i < L.length; i++) {
+    const t = i / SR;
+    let env: number, x: number;
+    const on = t < dur ? 1 : Math.exp(-(t - dur) / (release / 4));
+    if (timbre === "pad") {
+      // Fundamental and a soft octave, each doubled 4 cents apart: the slow beating is the warmth.
+      env = Math.min(1, t / attack) ** 2 * on;
+      const d = 2 ** (4 / 1200);
+      x = 0.5 * (Math.sin(2 * Math.PI * f * t) + Math.sin(2 * Math.PI * f * d * t)) + 0.12 * (Math.sin(4 * Math.PI * f * t) + Math.sin(4 * Math.PI * f / d * t)) + 0.03 * Math.sin(6 * Math.PI * f * t);
+    } else if (timbre === "flute") {
+      // A sine, a little second harmonic, a breath of filtered noise at the start, and a slow vibrato.
+      env = Math.min(1, t / attack) * on;
+      const vib = 1 + 0.003 * Math.sin(2 * Math.PI * 4.8 * t) * Math.min(1, t / 0.6);
+      breath = 0.97 * breath + 0.03 * rnd();
+      x = Math.sin(2 * Math.PI * f * vib * t) + 0.08 * Math.sin(4 * Math.PI * f * vib * t) + 3 * breath * Math.exp(-t / 0.08);
+    } else {
+      // Electric piano by two-operator FM: the modulation index decays, so the tone softens as it sounds.
+      env = Math.min(1, t / attack) * Math.exp(-t / 2.2) * on;
+      const index = 1.1 * Math.exp(-t / 0.35);
+      x = Math.sin(2 * Math.PI * f * t + index * Math.sin(2 * Math.PI * f * t));
+    }
+    const s = 0.16 * level * env * x;
+    L[a0 + i] += s * gl; R[a0 + i] += s * gr;
+  }
+}
+
+/** Freeverb: eight damped feedback combs and four all-passes per side, the right side's delays a little longer. */
+function reverb(inL: Float32Array, inR: Float32Array, room = 0.84, damp = 0.45, wet = 0.32) {
+  const combs = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617], alls = [556, 441, 341, 225];
+  const side = (input: Float32Array, spread: number) => {
+    const out = new Float32Array(input.length);
+    for (const d0 of combs) {
+      const d = d0 + spread, buf = new Float32Array(d); let idx = 0, store = 0;
+      for (let i = 0; i < input.length; i++) {
+        const y = buf[idx];
+        store = y * (1 - damp) + store * damp; // the damping is a low-pass inside the loop: the tail darkens as it decays
+        buf[idx] = input[i] * 0.015 + store * room;
+        out[i] += y;
+        idx = (idx + 1) % d;
+      }
+    }
+    for (const d0 of alls) {
+      const d = d0 + spread, buf = new Float32Array(d); let idx = 0;
+      for (let i = 0; i < out.length; i++) {
+        const b = buf[idx], x = out[i];
+        out[i] = b - x; buf[idx] = x + b * 0.5;
+        idx = (idx + 1) % d;
+      }
+    }
+    return out;
+  };
+  const wl = side(inL, 0), wr = side(inR, 23);
+  for (let i = 0; i < inL.length; i++) { inL[i] = inL[i] * (1 - wet) + wl[i] * wet * 3; inR[i] = inR[i] * (1 - wet) + wr[i] * wet * 3; }
+}
+
+/** Two one-pole low-passes in a row at `hz`: a gentle 12 dB/octave roll-off over the whole mix. */
+function lowpass(x: Float32Array, hz: number) {
+  const a = Math.exp((-2 * Math.PI * hz) / SR);
+  for (let pass = 0; pass < 2; pass++) { let y = 0; for (let i = 0; i < x.length; i++) x[i] = y = (1 - a) * x[i] + a * y; }
+}
+
+/** Amplitude-weighted mean frequency of the whole signal (Hz), from 2048-point frames: higher sounds brighter. */
+export function centroid(x: Float32Array): number {
+  const N = 2048; let num = 0, den = 0;
+  for (let s = 0; s + N <= x.length; s += N * 8) {
+    for (let k = 1; k < N / 2; k += 2) {
+      let re = 0, im = 0;
+      for (let n = 0; n < N; n++) { const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * n) / N), v = x[s + n] * w; re += v * Math.cos((2 * Math.PI * k * n) / N); im -= v * Math.sin((2 * Math.PI * k * n) / N); }
+      const mag = Math.hypot(re, im); num += mag * ((k * SR) / N); den += mag;
+    }
+  }
+  return den ? num / den : 0;
+}
+
+export function renderStereo(file: string, pitches: number[][], onset: number[][], timbre: Timbre, { bpm = 60, octave = 0 } = {}) {
+  const stepSec = 60 / bpm / 2, n = Math.ceil((pitches.length * stepSec + 4) * SR);
+  const L = new Float32Array(n), R = new Float32Array(n);
+  for (let v = 0; v < 4; v++) {
+    let t = 0;
+    while (t < pitches.length) {
+      const p = pitches[t][v];
+      if (p < 0) { t++; continue; }
+      let len = 1;
+      while (t + len < pitches.length && pitches[t + len][v] === p && !onset[t + len][v]) len++;
+      note(L, R, timbre, p + 12 * octave, t * stepSec, len * stepSec, v);
+      t += len;
+    }
+  }
+  reverb(L, R);
+  lowpass(L, 3200); lowpass(R, 3200);
+  let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(R[i]));
+  const g = (0.8 / (peak || 1));
+  const buf = Buffer.alloc(44 + n * 4);
+  buf.write("RIFF", 0); buf.writeUInt32LE(36 + n * 4, 4); buf.write("WAVE", 8); buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(2, 22); buf.writeUInt32LE(SR, 24);
+  buf.writeUInt32LE(SR * 4, 28); buf.writeUInt16LE(4, 32); buf.writeUInt16LE(16, 34); buf.write("data", 36); buf.writeUInt32LE(n * 4, 40);
+  for (let i = 0; i < n; i++) { buf.writeInt16LE(Math.round(L[i] * g * 32767), 44 + i * 4); buf.writeInt16LE(Math.round(R[i] * g * 32767), 46 + i * 4); }
+  fs.writeFileSync(file, buf);
+  const mono = new Float32Array(n); for (let i = 0; i < n; i++) mono[i] = (L[i] + R[i]) / 2;
+  return centroid(mono);
+}

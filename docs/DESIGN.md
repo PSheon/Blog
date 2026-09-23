@@ -130,6 +130,23 @@ Rules inside an instrument:
 - A stage whose content depends on colour (coloured point clouds) stays dark in both themes: wrap it in
   `className="dark bg-[#070918]"`.
 
+### Instruments that make sound
+
+Article 014 is the first one that plays music, and its rules hold for the next one:
+
+- **One player for the page.** `content/posts/music-ai/components/player.ts` owns the single `AudioContext` and the
+  synthesiser worker; a figure asks it to play and whatever was playing stops. The context is created on the reader's
+  first press of Play, because a browser will not make sound before a gesture.
+- **Sound stops when the figures go.** The last figure to unmount stops playback, terminates the worker and closes
+  the context, or the music plays on over the next article.
+- **A piece ends when the music does.** The rendered buffer carries a reverb tail; treating the end of the buffer as
+  the end of playback left Play saying "Stop" over several seconds of silence.
+- **Changing the instrument keeps the position** and the old sound plays until the new one is ready.
+- **Nothing is heard by CI**, so the sound is made by pure functions with tests, and the E2E tests check everything
+  around it. A figure that only makes sound is not accessible: the piano roll, the numbers and the captions carry the
+  same information.
+- Audio and models are fetched when the reader asks for them, never with the article (`e2e/music-ai.spec.ts` checks).
+
 ### Controls for steering something by hand
 
 One thumb stick for the whole site: `components/lab/stick.tsx` (drag it, or focus it and use the arrows / W A S D; it

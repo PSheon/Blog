@@ -1,0 +1,52 @@
+# Bach chorales (Craig Sapp's edition, CC BY-NC-SA 4.0) -> an eighth-note grid, one JSON file.
+#   uv run --with music21 python convert.py
+# Each chorale is transposed to C major or A minor. A step holds, for S A T B, the MIDI pitch sounding (or -1),
+# whether that note starts on this step, and whether a fermata (phrase end) is on it.
+import glob, json, math, os, sys
+from music21 import converter, interval, pitch, note, expressions
+
+STEP = 0.5  # quarter lengths: an eighth note
+out, skipped = [], []
+for path in sorted(glob.glob("bach-370-chorales/kern/*.krn")):
+    name = os.path.basename(path)[:-4]
+    try:
+        score = converter.parse(path)
+        parts = list(score.parts)
+        if len(parts) != 4:
+            skipped.append((name, f"{len(parts)} parts")); continue
+        key = score.analyze("key")
+        tonic = "C" if key.mode == "major" else "A"
+        shift = interval.Interval(key.tonic, pitch.Pitch(tonic))
+        # Keep transpositions within a tritone so voices stay in their ranges.
+        if shift.semitones > 6: shift = interval.Interval(shift.semitones - 12)
+        if shift.semitones < -6: shift = interval.Interval(shift.semitones + 12)
+        score = score.transpose(shift)
+        parts = list(score.parts)
+        # kern lists bass first; order voices top-down by mean pitch to be sure.
+        def mean(p):
+            ps = [n.pitch.midi for n in p.recurse().notes if n.isNote]
+            return sum(ps) / max(1, len(ps))
+        parts.sort(key=mean, reverse=True)
+        length = max(p.highestTime for p in parts)
+        n = int(math.ceil(length / STEP))
+        pitches = [[-1] * 4 for _ in range(n)]
+        onset = [[0] * 4 for _ in range(n)]
+        fermata = [0] * n
+        for v, p in enumerate(parts):
+            for el in p.flatten().notesAndRests:
+                if not el.isNote: continue
+                a = int(round(el.offset / STEP)); b = int(round((el.offset + el.quarterLength) / STEP))
+                tied_in = el.tie is not None and el.tie.type in ("continue", "stop")
+                for t in range(a, min(b, n)):
+                    pitches[t][v] = el.pitch.midi
+                    onset[t][v] = 1 if (t == a and not tied_in) else 0
+                if any(isinstance(e, expressions.Fermata) for e in el.expressions) and b - 1 < n:
+                    fermata[max(a, b - 1)] = 1
+        ts = score.recurse().getElementsByClass("TimeSignature")
+        out.append({"id": name, "mode": key.mode, "shift": shift.semitones, "meter": ts[0].ratioString if ts else "4/4",
+                    "pitches": pitches, "onset": onset, "fermata": fermata})
+    except Exception as e:  # report and go on
+        skipped.append((name, repr(e)[:80]))
+json.dump(out, open("chorales.json", "w"))
+print(len(out), "chorales,", len(skipped), "skipped")
+for s in skipped[:20]: print("  skipped", *s)

@@ -1,0 +1,162 @@
+// Shared pieces of the music-AI spike: tokens, the split, sampling, the metrics, a WAV writer.
+import fs from "node:fs";
+import { mulberry32 } from "../Blog/lib/ml/neuroevolution";
+
+export interface Chorale { id: string; mode: string; meter: string; pitches: number[][]; onset: number[][]; fermata: number[] }
+export const LO = 31, HI = 84;
+export const HOLD = HI - LO + 1, REST = HOLD + 1, VOCAB = REST + 1;
+export const VOICES = 4;
+
+export const chorales: Chorale[] = JSON.parse(fs.readFileSync(new URL("./chorales.json", import.meta.url), "utf8"));
+
+/** One token per voice per eighth: S A T B. A new note is its pitch, a held one HOLD, silence REST. */
+export function tokens(c: Chorale): number[] {
+  const out: number[] = [];
+  c.pitches.forEach((step, t) => step.forEach((p, v) => out.push(p < 0 ? REST : c.onset[t][v] || t === 0 ? p - LO : HOLD)));
+  return out;
+}
+
+/** Split by chorale, seeded: 90 % train, 10 % validation. */
+const rng = mulberry32(2026);
+const order = chorales.map((_, i) => i).sort(() => rng() - 0.5);
+const nVal = Math.round(chorales.length * 0.1);
+export const valSet = order.slice(0, nVal).map((i) => chorales[i]);
+export const trainSet = order.slice(nVal).map((i) => chorales[i]);
+export const trainTokens = trainSet.map(tokens);
+export const valTokens = valSet.map(tokens);
+
+/** Tokens back to sounding pitches per step and voice (-1 silent), and onsets. */
+export function decode(ids: number[]): { pitches: number[][]; onset: number[][] } {
+  const pitches: number[][] = [], onset: number[][] = [];
+  const last = [-1, -1, -1, -1];
+  for (let t = 0; t * VOICES < ids.length; t++) {
+    const p: number[] = [], o: number[] = [];
+    for (let v = 0; v < VOICES; v++) {
+      const id = ids[t * VOICES + v];
+      if (id === undefined) { p.push(-1); o.push(0); continue; }
+      if (id === HOLD) { p.push(last[v]); o.push(0); }
+      else if (id === REST) { last[v] = -1; p.push(-1); o.push(0); }
+      else { last[v] = id + LO; p.push(id + LO); o.push(1); }
+    }
+    pitches.push(p); onset.push(o);
+  }
+  return { pitches, onset };
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Metrics. None of them says "beautiful"; they say whether the texture obeys what four-part writing obeys.
+
+/** C major's pitch classes, plus F# and G#: A minor's raised sixth and seventh. Every chorale is in C major or A minor. */
+const KEY = new Set([0, 2, 4, 5, 7, 9, 11, 6, 8]);
+
+/** Plomp–Levelt roughness of a chord of sine-rich tones (6 harmonics, 1/k amplitudes), after Sethares. */
+export function roughness(midi: number[]): number {
+  const partials: [number, number][] = [];
+  for (const m of midi) if (m >= 0) for (let k = 1; k <= 6; k++) partials.push([440 * 2 ** ((m - 69) / 12) * k, 1 / k]);
+  let r = 0;
+  for (let i = 0; i < partials.length; i++)
+    for (let j = i + 1; j < partials.length; j++) {
+      const [f1, a1] = partials[i], [f2, a2] = partials[j];
+      const s = 0.24 / (0.021 * Math.min(f1, f2) + 19), d = Math.abs(f2 - f1);
+      r += Math.min(a1, a2) * (Math.exp(-3.5 * s * d) - Math.exp(-5.75 * s * d));
+    }
+  return r;
+}
+
+export interface Report {
+  inKey: number; // share of note onsets whose pitch class belongs to C major or A minor (with raised 6, 7)
+  parallels: number; // parallel fifths/octaves per 100 steps (between any two voices, on moving steps)
+  crossings: number; // share of steps where a lower voice sounds above a higher one
+  rough: number; // mean chord roughness
+  holdShare: number; // share of voice-steps that are held (rhythm)
+  distinctChords: number; // distinct pitch-class sets per 100 steps (variety)
+}
+
+export function report(pitches: number[][], onset: number[][]): Report {
+  let notes = 0, inKey = 0, parallels = 0, crossings = 0, rough = 0, held = 0, cells = 0;
+  const chords = new Set<string>();
+  const key = KEY;
+  for (let t = 0; t < pitches.length; t++) {
+    const p = pitches[t];
+    for (let v = 0; v < 4; v++) {
+      if (p[v] < 0) continue;
+      cells++;
+      if (onset[t][v]) { notes++; if (key.has(p[v] % 12)) inKey++; } else held++;
+    }
+    for (let v = 0; v < 3; v++) if (p[v] >= 0 && p[v + 1] >= 0 && p[v + 1] > p[v]) { crossings++; break; }
+    rough += roughness(p);
+    chords.add(p.filter((x) => x >= 0).map((x) => x % 12).sort((a, b) => a - b).join(","));
+    if (t > 0) {
+      const q = pitches[t - 1];
+      for (let a = 0; a < 4; a++)
+        for (let b = a + 1; b < 4; b++) {
+          if (p[a] < 0 || p[b] < 0 || q[a] < 0 || q[b] < 0) continue;
+          const now = (p[a] - p[b]) % 12, before = (q[a] - q[b]) % 12;
+          const moved = p[a] !== q[a] && p[b] !== q[b] && Math.sign(p[a] - q[a]) === Math.sign(p[b] - q[b]);
+          if (moved && now === before && (now === 7 || now === 0)) parallels++;
+        }
+    }
+  }
+  const n = pitches.length;
+  return { inKey: inKey / notes, parallels: (100 * parallels) / n, crossings: crossings / n, rough: rough / n, holdShare: held / cells, distinctChords: (100 * chords.size) / n };
+}
+
+/** Longest run of steps (all four voices equal) that also occurs somewhere in the training set. */
+export function longestCopy(pitches: number[][]): number {
+  const key = (p: number[]) => p.join(",");
+  const index = new Map<string, [number, number][]>();
+  trainSet.forEach((c, ci) => c.pitches.forEach((p, t) => { const k = key(p); if (!index.has(k)) index.set(k, []); index.get(k)!.push([ci, t]); }));
+  let best = 0;
+  for (let t = 0; t < pitches.length; t++) {
+    for (const [ci, s] of index.get(key(pitches[t])) ?? []) {
+      const c = trainSet[ci].pitches;
+      let n = 0;
+      while (t + n < pitches.length && s + n < c.length && key(c[s + n]) === key(pitches[t + n])) n++;
+      if (n > best) best = n;
+    }
+  }
+  return best;
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Sound: a soft additive organ with a slow attack, and a simple feedback-delay reverb. Mono, 44.1 kHz, 16-bit.
+
+export function renderWav(file: string, pitches: number[][], onset: number[][], { bpm = 60, sampleRate = 44100 } = {}) {
+  const stepSec = 60 / bpm / 2; // an eighth
+  const n = Math.ceil((pitches.length * stepSec + 3) * sampleRate);
+  const out = new Float32Array(n);
+  for (let v = 0; v < 4; v++) {
+    let t = 0;
+    while (t < pitches.length) {
+      const p = pitches[t][v];
+      if (p < 0) { t++; continue; }
+      let len = 1;
+      while (t + len < pitches.length && pitches[t + len][v] === p && !onset[t + len][v]) len++;
+      const f = 440 * 2 ** ((p - 69) / 12), a0 = Math.round(t * stepSec * sampleRate), dur = len * stepSec;
+      const total = Math.round((dur + 0.6) * sampleRate);
+      for (let i = 0; i < total && a0 + i < n; i++) {
+        const s = i / sampleRate;
+        const env = Math.min(1, s / 0.06) * (s < dur ? 1 : Math.exp(-(s - dur) / 0.18));
+        let x = 0;
+        for (let k = 1; k <= 5; k++) x += Math.sin(2 * Math.PI * f * k * s) / (k * k);
+        out[a0 + i] += 0.12 * env * x;
+      }
+      t += len;
+    }
+  }
+  // Reverb: four feedback delays, a little of the dry signal fed in.
+  const wet = new Float32Array(n);
+  for (const [ms, g] of [[29.7, 0.72], [37.1, 0.7], [41.1, 0.68], [43.7, 0.66]] as const) {
+    const d = Math.round((ms / 1000) * sampleRate), buf = new Float32Array(n);
+    for (let i = 0; i < n; i++) buf[i] = out[i] + (i >= d ? g * buf[i - d] : 0);
+    for (let i = 0; i < n; i++) wet[i] += buf[i] * 0.18;
+  }
+  let peak = 0;
+  for (let i = 0; i < n; i++) { out[i] = out[i] * 0.75 + wet[i] * 0.35; peak = Math.max(peak, Math.abs(out[i])); }
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write("RIFF", 0); buf.writeUInt32LE(36 + n * 2, 4); buf.write("WAVE", 8); buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22); buf.writeUInt32LE(sampleRate, 24);
+  buf.writeUInt32LE(sampleRate * 2, 28); buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34); buf.write("data", 36); buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i++) buf.writeInt16LE(Math.round((out[i] / (peak || 1)) * 0.85 * 32767), 44 + i * 2);
+  fs.writeFileSync(file, buf);
+}
