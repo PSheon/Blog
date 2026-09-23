@@ -117,6 +117,10 @@ stays in `lib/rt` with its tests. Read before touching it:
 - An overlay that mounts lazily must mount closed and open a frame later, or its first opening has no animation.
 - `next/link` calls `preventDefault` before the bubble phase: listen for navigation clicks in the capture phase.
 - A service worker hides requests from `page.route`: `test.use({ serviceWorkers: "block" })` where a test routes.
+- A worker's script must never be answered from a cache: the bundler passes its chunk list in the URL fragment, which
+  a Request does not carry (`public/sw.js` lets `request.destination === "worker"` through). After a deploy, a reader
+  who already has the old service worker gets one page load under it, where every instrument that uses a worker sits
+  still; their next load has the new one. Verified on production on 2026-09-23.
 - Instruments hydrate a moment after the page. The E2E fixture in `smoke.spec.ts` waits for `[data-lab]`; a test
   with its own `page` must do the same before clicking.
 - 404s: see "How a URL that does not exist is answered" below before touching `dynamicParams`, `notFound()` or the proxy.
