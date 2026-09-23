@@ -67,6 +67,34 @@ stays in `lib/rt` with its tests. Read before touching it:
 - CI has no GPU. The light E2E tests take the "no adapter" branch; what needs a GPU was checked by hand
   in the Playwright MCP browser, whose own tab must be in front for pointer lock (a `newContext()` window is refused).
 
+### The UI/UX batch (2026-09-23)
+
+paul-8b measured the whole site and Paul picked thirteen fixes; they are on dev as one commit each. Two he turned
+down on purpose — the theme and language controls live only in the footer on desktop, and there is no print
+stylesheet — so do not "fix" either.
+
+Worth carrying forward:
+
+- **Two border-colour utilities in one class string are decided by CSS source order.** That is how the outline
+  button lost its edge on the light theme for a year. No shared base may set one; each variant names its own, and
+  `e2e/design.spec.ts` now measures the 3:1 DESIGN.md §2 promises.
+- **The article layout has its own breakpoint, `rail` (82rem)**, not `xl`. Three columns need 80.5rem and xl is
+  80rem, so wide figures were silently clipped between 1280 and 1304 — `main` is overflow-x-clip, so there was no
+  scrollbar to notice. The contents rail starts at `lg` now.
+- **The hero's four stations share one height, and it is the classifier's.** Generate and act size their canvas
+  against the box with `container-type: size`, so given no height they collapse to 55 px and 69 px. That was proved
+  on a bench at /zh/dev/hero which has since been removed; do not try "each station its own height" again.
+- **The theme change fades** (`html.theme-fade`, 260 ms). next-themes' `disableTransitionOnChange` is off on
+  purpose — turning it back on will make the colours cut again.
+- **No animation library.** framer-motion was installed for one height transition and taken out again: DESIGN.md
+  §2 and §7 both forbid it, and 66 KB gzipped against 203 KB of page scripts is the reason.
+- **One measured gap left open:** on the bilingual 404 (`/nope`, the only page rendered outside the locale layout,
+  with its own `<html>`), `--input` resolves to rgba(146,146,186,0.573) in a production build rather than the
+  rgba(155,155,196,0.58) everywhere else — 2.86:1 against the page instead of 3.0. It does not reproduce under
+  `next dev`. `e2e/design.spec.ts` still asserts the edge is there, and leaves the ratio to the pages it can check.
+- The tag filter lives in `?tag=`, figure resets all say 重來 / "Start over" with the same icon at 28 px, and the
+  figures' buttons were swept in the browser article by article rather than read.
+
 ## Waiting on Paul
 
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
@@ -117,6 +145,10 @@ stays in `lib/rt` with its tests. Read before touching it:
 - An overlay that mounts lazily must mount closed and open a frame later, or its first opening has no animation.
 - `next/link` calls `preventDefault` before the bubble phase: listen for navigation clicks in the capture phase.
 - A service worker hides requests from `page.route`: `test.use({ serviceWorkers: "block" })` where a test routes.
+- A worker's script must never be answered from a cache: the bundler passes its chunk list in the URL fragment, which
+  a Request does not carry (`public/sw.js` lets `request.destination === "worker"` through). After a deploy, a reader
+  who already has the old service worker gets one page load under it, where every instrument that uses a worker sits
+  still; their next load has the new one. Verified on production on 2026-09-23.
 - Instruments hydrate a moment after the page. The E2E fixture in `smoke.spec.ts` waits for `[data-lab]`; a test
   with its own `page` must do the same before clicking.
 - 404s: see "How a URL that does not exist is answered" below before touching `dynamicParams`, `notFound()` or the proxy.

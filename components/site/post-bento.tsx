@@ -1,9 +1,10 @@
 "use client";
 
 import { TagFilter } from "./tag-filter";
+import { useTagFilter } from "./use-tag-filter";
 import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
-import { ViewTransition, useState } from "react";
+import { ViewTransition } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import type { Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -37,7 +38,7 @@ function span(i: number, count: number): string {
 
 /** The home page's index as a bento grid: the most recent articles as tiles with their drawings, the newest one the largest. */
 export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
-  const [tag, setTag] = useState<string | null>(null);
+  const [tag, setTag] = useTagFilter();
   const counts: Record<string, number> = {}; for (const r of rows) for (const name of r.tags) counts[name] = (counts[name] ?? 0) + 1;
   const visible = (tag ? rows.filter((r) => r.tags.includes(tag)) : rows).slice(0, limit);
 
@@ -54,8 +55,9 @@ export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
             return (
               <li key={row.slug} className={cn("relative min-w-0", span(i, visible.length))}>
                 {big && <CornerMarks />}
-                <Link
-                  href={`/${locale}/posts/${row.slug}`}
+                {/* The card is no longer one big link: the title stretches an invisible ::after over the whole tile,
+                    so all of it still opens the article, and the tags sit above that layer as real filters. */}
+                <div
                   className={cn(
                     "spotlight group flex h-full flex-col overflow-hidden rounded-md border border-border bg-panel transition-colors hover:border-foreground/30",
                     wide && "sm:flex-row",
@@ -72,18 +74,30 @@ export function PostBento({ locale, rows, tags, labels, limit = 6 }: Props) {
                     </p>
                     <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
                       <h3 lang={row.langNote ? htmlLang.zh : undefined} className={cn("font-heading leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline", big ? "text-2xl lg:text-3xl" : "text-lg")}>
-                        {row.title}
+                        <Link href={`/${locale}/posts/${row.slug}`} className="outline-none after:absolute after:inset-0 after:rounded-md after:content-[''] focus-visible:after:ring-3 focus-visible:after:ring-ring/50">
+                          {row.title}
+                        </Link>
                       </h3>
                     </ViewTransition>
                     {/* Every tile says what the article is about while tiles are stacked; on the desktop grid only the roomy ones do. */}
                     <p lang={row.langNote ? htmlLang.zh : undefined} className={cn("max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted-foreground", !big && "line-clamp-2", !(big || wide) && "lg:hidden")}>{row.description}</p>
                     <p className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 font-mono text-xs text-muted-foreground">
                       {row.interactive && <InteractiveBadge label={labels.interactive} />}
-                      {row.tags.map((name) => <span key={name}>#{name}</span>)}
+                      {row.tags.map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => setTag(name === tag ? null : name)}
+                          aria-pressed={name === tag}
+                          className="tap relative z-10 inline-flex min-h-6 cursor-pointer items-center rounded-sm decoration-signal/50 underline-offset-4 hover:text-foreground hover:underline aria-pressed:text-signal"
+                        >
+                          #{name}
+                        </button>
+                      ))}
                       {row.langNote && <span className="text-signal-2">{row.langNote}</span>}
                     </p>
                   </div>
-                </Link>
+                </div>
               </li>
             );
           })}

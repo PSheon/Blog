@@ -76,7 +76,7 @@ That subtraction is not in any line of code: it is simply the one combination of
 
 I ran 12 different random seeds for 60 generations each: 11 learned, 10 of them graduating (a hundred pipes in a row) within 22 generations; in the last one the whole population got stuck in the same bad habit and never cleared more than 3 pipes in all 60. Over 40 seeds, 35 learned, and the median graduation came in generation 15.
 
-This is the usual weakness of evolutionary methods. With no gradient to say which way is better, evolution can only stumble on better individuals by luck. If the whole flock looks alike and all of it is bad, the 20% of fresh blood takes a long time to turn things round. If the score refuses to climb, press Restart and begin with a new set of ancestors.
+This is the usual weakness of evolutionary methods. With no gradient to say which way is better, evolution can only stumble on better individuals by luck. If the whole flock looks alike and all of it is bad, the 20% of fresh blood takes a long time to turn things round. If the score refuses to climb, press Start over and begin with a new set of ancestors.
 
 It works here because the problem is small: two inputs, one action, six numbers. The space to search is small enough that shooting blind still hits. With more parameters, the chance of stumbling on a good solution falls quickly, and that is usually where gradient descent wins.
 

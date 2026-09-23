@@ -89,16 +89,16 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
-        className="mx-auto w-full max-w-7xl px-5 pt-10 sm:px-8 lg:pt-16 xl:grid xl:grid-cols-[13rem_minmax(0,42.5rem)_17rem] xl:gap-x-12"
+        className="mx-auto w-full max-w-7xl px-5 pt-10 sm:px-8 lg:grid lg:justify-center lg:grid-cols-[13rem_minmax(0,42.5rem)] lg:gap-x-12 lg:pt-16 rail:grid-cols-[13rem_minmax(0,42.5rem)_17rem]"
         style={{ "--margin-w": "17rem", "--margin-gap": "3rem" } as React.CSSProperties}
       >
-        <aside className="hidden xl:block">
+        <aside className="hidden lg:block">
           <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-8">
             <Toc items={toc} label={t.post.toc} />
           </div>
         </aside>
 
-        <div className="mx-auto min-w-0 max-w-[42.5rem] xl:col-span-2 xl:mx-0 xl:max-w-none">
+        <div className="mx-auto min-w-0 max-w-[42.5rem] lg:mx-0 rail:col-span-2 rail:max-w-none">
           {post.draft && (
             // Only ever rendered by `next dev`: a production build has no drafts. To the author, in the page's language.
             <p role="note" data-testid="draft-banner" className="mb-6 max-w-[48rem] rounded-md border border-signal-2 bg-signal-2/10 px-4 py-3 font-sans text-sm leading-relaxed">
@@ -118,7 +118,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
             </p>
             {/* Same name as the title in the post index: the browser morphs one into the other. */}
             <ViewTransition name={`post-title-${slug}`} share="title-morph" default="none">
-              <h1 lang={post.isFallback ? htmlLang[post.locale] : undefined} className="mt-5 font-heading text-[clamp(2.125rem,5vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance [&:lang(zh)]:tracking-normal">
+              <h1 lang={post.isFallback ? htmlLang[post.locale] : undefined} className="mt-5 font-heading text-[clamp(2.125rem,4.2vw,3.25rem)] leading-[1.12] font-semibold tracking-tight text-balance [&:lang(zh)]:tracking-normal">
                 {post.title}
               </h1>
             </ViewTransition>
@@ -162,7 +162,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
           )}
 
           {/* Sticks just under the site header (h-14) for the whole article. */}
-          <div className="sticky top-14 z-30 mt-6 xl:hidden">
+          <div className="sticky top-14 z-30 mt-6 lg:hidden">
             <TocDisclosure items={toc} label={t.post.toc} />
           </div>
 

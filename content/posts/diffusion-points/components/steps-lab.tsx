@@ -80,7 +80,7 @@ export function StepsLab() {
         </fieldset>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" disabled={busy} onClick={() => void sample(count)} data-testid="diffusion-sample">
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void sample(count)} data-testid="diffusion-sample">
           <Dices />
           {t.sample}
         </Button>

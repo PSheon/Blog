@@ -6,8 +6,8 @@ export type FigureSize = "inline" | "wide" | "full";
 /** Width classes shared by figures and instruments. `wide` reaches into the sidenote margin. */
 export const figureSize: Record<FigureSize, string> = {
   inline: "",
-  wide: "xl:w-[calc(100%+var(--margin-w)+var(--margin-gap))]",
-  full: "-mx-5 w-[calc(100%+2.5rem)] sm:mx-0 sm:w-full xl:w-[calc(100%+var(--margin-w)+var(--margin-gap))]",
+  wide: "rail:w-[calc(100%+var(--margin-w)+var(--margin-gap))]",
+  full: "-mx-5 w-[calc(100%+2.5rem)] sm:mx-0 sm:w-full rail:w-[calc(100%+var(--margin-w)+var(--margin-gap))]",
 };
 
 interface Props {

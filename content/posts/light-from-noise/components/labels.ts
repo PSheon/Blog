@@ -34,7 +34,7 @@ const zh = {
 const en: typeof zh = {
   picture: "A Cornell box being path traced: all noise at first, clearer with every sample",
   spp: "Samples per pixel", rays: "Rays per second", million: "million", noise: "Error of the picture", steps: "Nodes visited per ray", triangles: "Triangles", build: "BVH build", ms: "ms",
-  start: "Start", pause: "Pause", restart: "Restart", bounces: "Bounces", unlimited: "no limit",
+  start: "Start", pause: "Pause", restart: "Start over", bounces: "Bounces", unlimited: "no limit",
   building: "Building the BVH…", loading: "Starting the GPU…", gpu: "GPU",
   chart: "Horizontal: samples per pixel (log). Vertical: error of the picture (log). The dashed line has slope −½.", chartX: "samples", chartY: "error", slope: "slope −½",
   noWebgpu: "This browser has no WebGPU, and this figure needs it. Open it in a recent Chrome, Edge or Safari 26.",

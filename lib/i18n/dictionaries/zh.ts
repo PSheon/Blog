@@ -50,9 +50,9 @@ const zh = {
       generate: { title: "replay · diffusion", caption: "一團彩色雜訊一步一步收成一顆蘋果。這裡重播的是擴散過程本身；真正的模型在文章裡，由你在瀏覽器裡訓練。", more: "去訓練一個" },
       act: { title: "live · neuroevolution", caption: "五十隻小鳥，各有一顆六個權重的大腦。活最久的生下一代，沒有人教牠們怎麼飛。", more: "看牠們學到了什麼" },
     },
-    think: { steps: "訓練步數", input: "題目", output: "模型寫的", attention: "每個答案在看哪個數字", again: "再學一次" },
-    generate: { note: "擴散過程的重播，這裡沒有模型在跑" },
-    act: { generation: "第幾代", alive: "還在飛", best: "最多過幾根" },
+    think: { steps: "訓練步數", input: "題目", output: "模型寫的", attention: "每個答案在看哪個數字", again: "重新訓練" },
+    generate: { note: "擴散過程的重播，這裡沒有模型在跑", again: "重播" },
+    act: { generation: "第幾代", alive: "還在飛", best: "最多過幾根", again: "重新演化" },
   },
   home: {
     latest: "最新文章",
@@ -115,7 +115,7 @@ const zh = {
     play: "播放",
     pause: "暫停",
     step: "單步",
-    reset: "重置",
+    reset: "重來",
     clear: "清除",
     loading: "載入模型中…",
     error: "模型載入失敗。",
@@ -123,7 +123,7 @@ const zh = {
     crashed: "這個互動元件發生錯誤，文章其餘部分不受影響。",
     noscript: "此互動圖表需要啟用 JavaScript。",
   },
-  notFound: { title: "找不到這一頁", body: "這一頁可能被移走了，或從來不存在。", home: "回到首頁" },
+  notFound: { title: "找不到這一頁", body: "這一頁可能被移走了，或從來不存在。", home: "回到首頁", browse: "所有文章", latest: "最近寫的", search: "或按 ⌘K 搜尋全站" },
 };
 
 export default zh;

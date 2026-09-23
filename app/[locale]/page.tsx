@@ -73,11 +73,13 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               {t.hero.ctaSecondary}
             </Link>
           </div>
-          {/* Three numbers lettered like an instrument's readouts; counted from the posts, not typed in. */}
-          <dl className="order-5 flex gap-6 sm:gap-8 border-t border-rule pt-5 lg:mt-10 lg:max-w-md">
+          {/* Three numbers lettered like an instrument's readouts; counted from the posts, not typed in. The English
+              labels are long enough to wrap, so they get even columns and a balanced break rather than one word
+              stranded on a line of its own. */}
+          <dl className="order-5 grid grid-cols-3 gap-5 border-t border-rule pt-5 sm:gap-8 lg:mt-10 lg:max-w-md">
             {readouts.map((r, i) => (
-              <div key={r.label} className="flex flex-col-reverse justify-end gap-1">
-                <dt className="label">{r.label}</dt>
+              <div key={r.label} className="flex min-w-0 flex-col-reverse justify-end gap-1">
+                <dt className="label text-pretty">{r.label}</dt>
                 <dd className="font-mono text-2xl leading-none tabular" style={{ color: RAIL_COLORS[i === 2 ? 3 : i] }}>
                   <NumberTicker value={r.value} pad={r.pad} />
                 </dd>
@@ -129,8 +131,13 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
                   <ArrowRight className="size-4 transition-transform group-hover:translate-x-1" aria-hidden />
                 </p>
               </div>
-              {/* The stage is dark in both themes, like the article's own: yellow points vanish on white. */}
-              <div className="dark relative m-3 flex items-center overflow-hidden rounded-md border-border bg-[#070918] dark:m-0 dark:rounded-none dark:border-t md:dark:border-t-0 md:dark:border-l">
+              {/*
+                A LIVE preview keeps a dark stage in both themes, like the article it comes from — article 007's
+                yellow points vanish on white. A drawn cover is made of theme tokens and belongs on the page's own
+                panel: forcing the dark stage under it put a black rectangle in the middle of the light theme for
+                every article that has no live preview, which is most of them.
+              */}
+              <div className={`relative m-3 flex items-center overflow-hidden rounded-md border-border dark:m-0 dark:rounded-none dark:border-t md:dark:border-t-0 md:dark:border-l ${hasPreview(latest.slug) ? "dark bg-[#070918]" : "bg-panel"}`}>
                 <div className="dot-grid absolute inset-0 opacity-60" aria-hidden />
                 <div className="relative w-full p-4">
                   {hasPreview(latest.slug) ? <PostPreview slug={latest.slug} /> : <PostCover slug={latest.slug} no={latest.no} />}

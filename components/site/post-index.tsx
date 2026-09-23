@@ -1,9 +1,10 @@
 "use client";
 
 import { TagFilter } from "./tag-filter";
+import { useTagFilter } from "./use-tag-filter";
 import { htmlLang } from "@/lib/i18n/config";
 import Link from "next/link";
-import { ViewTransition, useState } from "react";
+import { ViewTransition } from "react";
 import type { Locale } from "@/lib/i18n";
 import { PostCover } from "./post-cover";
 import { EntryNo, InteractiveBadge } from "./post-meta";
@@ -38,7 +39,7 @@ interface Props {
 /** The notebook's table of contents: one ruled line per entry, № and date in the margin. */
 export function PostIndex({ locale, rows, tags, labels, filterable = true, level = 2 }: Props) {
   const Heading = `h${level}` as const;
-  const [tag, setTag] = useState<string | null>(null);
+  const [tag, setTag] = useTagFilter();
   const counts: Record<string, number> = {}; for (const r of rows) for (const name of r.tags) counts[name] = (counts[name] ?? 0) + 1;
   const visible = tag ? rows.filter((r) => r.tags.includes(tag)) : rows;
 
@@ -51,11 +52,13 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
       ) : (
         <ol className="border-t border-rule">
           {visible.map((row) => (
-            <li key={row.slug} className="border-b border-rule">
-              <Link
-                href={`/${locale}/posts/${row.slug}`}
-                className="spotlight spotlight-row group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline lg:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_9rem]"
-              >
+            <li key={row.slug} className="relative border-b border-rule">
+              {/*
+                The row is not one big link any more. The title's link stretches an invisible ::after over the whole
+                row, so all of it is still clickable, and the tags sit above that layer — a reader who presses one
+                gets the filter they were obviously reaching for instead of the article.
+              */}
+              <div className="spotlight spotlight-row group grid gap-x-6 gap-y-1.5 py-5 md:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_auto] md:items-baseline lg:grid-cols-[4.5rem_7.5rem_minmax(0,1fr)_9rem]">
                 <EntryNo no={row.no} draft={row.draft} locale={locale} className="text-xs text-signal" />
                 <time dateTime={row.date} className="label">
                   {row.dateLabel}
@@ -63,7 +66,9 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
                 <div className="min-w-0">
                   <ViewTransition name={`post-title-${row.slug}`} share="title-morph" default="none">
                     <Heading lang={row.langNote ? htmlLang.zh : undefined} className="font-heading text-xl leading-snug font-semibold text-balance decoration-signal decoration-1 underline-offset-4 group-hover:underline">
-                      {row.title}
+                      <Link href={`/${locale}/posts/${row.slug}`} className="outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-sm focus-visible:after:ring-3 focus-visible:after:ring-ring/50">
+                        {row.title}
+                      </Link>
                     </Heading>
                   </ViewTransition>
                   <p lang={row.langNote ? htmlLang.zh : undefined} className="mt-1.5 max-w-[60ch] text-[0.9375rem] leading-relaxed text-muted-foreground">
@@ -71,8 +76,16 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
                   </p>
                   <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs text-muted-foreground">
                     {row.interactive && <InteractiveBadge label={labels.interactive} />}
-                    {row.tags.map((t) => (
-                      <span key={t}>#{t}</span>
+                    {row.tags.map((name) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setTag(name === tag ? null : name)}
+                        aria-pressed={name === tag}
+                        className="tap relative z-10 inline-flex min-h-6 cursor-pointer items-center rounded-sm decoration-signal/50 underline-offset-4 hover:text-foreground hover:underline aria-pressed:text-signal"
+                      >
+                        #{name}
+                      </button>
                     ))}
                     {row.langNote && <span className="text-signal-2">{row.langNote}</span>}
                   </p>
@@ -82,7 +95,7 @@ export function PostIndex({ locale, rows, tags, labels, filterable = true, level
                   <PostCover slug={row.slug} no={row.no} className="mb-2 hidden rounded-sm border border-border bg-panel opacity-80 transition-opacity group-hover:opacity-100 lg:block" />
                   <span className="label">{row.minutesLabel}</span>
                 </div>
-              </Link>
+              </div>
             </li>
           ))}
         </ol>

@@ -1,6 +1,6 @@
 "use client";
 
-import { CornerDownLeft, FileText, Hash, TextSearch } from "lucide-react";
+import { CornerDownLeft, FileText, Hash, TextSearch, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -81,7 +81,21 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
       >
         {/* We rank results ourselves (lib/search.ts); cmdk only handles keyboard navigation. */}
         <Command shouldFilter={false} loop label={t.open} className="bg-transparent">
-          <CommandInput value={query} onValueChange={setQuery} placeholder={t.placeholder} className="h-12 text-base" />
+          {/* A phone has no Esc key, and the hints below are hidden there, so the way out has to be visible. */}
+          <div className="flex items-center gap-1 pr-1.5">
+            <div className="min-w-0 flex-1">
+              <CommandInput value={query} onValueChange={setQuery} placeholder={t.placeholder} className="h-12 text-base" />
+            </div>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              aria-label={t.close}
+              data-testid="search-close"
+              className="tap grid size-9 shrink-0 cursor-pointer place-items-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground sm:pointer-fine:hidden"
+            >
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
           <CommandList className="max-h-[min(60vh,28rem)] scroll-py-2 p-1.5">
             {searching && docs && hits.length === 0 && tagHits.length === 0 && (
               // (not cmdk's Empty: that hides itself while the list has items, and the latest articles below are items)
@@ -163,7 +177,9 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
 
           {/* How many there are now, said once per change to a screen reader; the group heading shows it to the eye. */}
           <p className="sr-only" role="status" aria-live="polite">{searching && docs ? (hits.length === 1 ? t.resultsOne : t.results.replace("{n}", String(hits.length))) : ""}</p>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3.5 py-2 font-mono text-xs text-muted-foreground">
+          {/* Keyboard hints for keyboards only: on a 390-wide phone these three cost 40 px of list, and one of them
+              names a key the device does not have. */}
+          <div className="hidden flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3.5 py-2 font-mono text-xs text-muted-foreground sm:pointer-fine:flex">
             <span className="flex items-center gap-1.5">
               <kbd className="rounded-sm border border-border px-1">↑</kbd>
               <kbd className="rounded-sm border border-border px-1">↓</kbd>
@@ -175,7 +191,7 @@ export default function SearchPalette({ locale, tags, t, open, onOpenChange }: P
               </kbd>
               {t.select}
             </span>
-            <span className="hidden items-center gap-1.5 sm:flex">
+            <span className="flex items-center gap-1.5">
               <kbd className="rounded-sm border border-border px-1">/</kbd>
               {t.open}
             </span>

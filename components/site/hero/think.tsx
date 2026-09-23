@@ -5,6 +5,7 @@ import { HeatCanvas } from "@/components/lab/heat-canvas";
 import { runWhenSeen } from "@/components/lab/run-when-seen";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Trainer } from "@/content/posts/transformer-from-scratch/components/task";
+import { StationReset } from "./reset";
 import { mulberry32 } from "@/lib/ml";
 
 const PROBLEM = [3, 1, 4, 1, 5, 9], WANT = [...PROBLEM].reverse();
@@ -67,7 +68,7 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
   const box = "grid aspect-square w-full place-items-center rounded-sm border bg-background text-[clamp(0.75rem,4.2cqw,1.25rem)] leading-none";
   const row = "grid max-w-[12.5rem] grid-cols-6 gap-1";
   return (
-    <div ref={root} className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
+    <div ref={root} data-station="think" className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
       <div className="mx-auto w-full max-w-[15rem]">
         {/* Input digits along the top, the answer down the side: a trained model lights the anti-diagonal. */}
         <div className="grid grid-cols-[1rem_1fr] gap-1 font-mono text-[0.7rem] text-muted-foreground">
@@ -92,10 +93,10 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
             })}
           </p>
         </div>
-        <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
           <span className="label">{t.steps}</span>
           <span className="tabular text-signal-3">{view.steps.toLocaleString()}</span>
-          {view.done && <button type="button" onClick={() => setRun((r) => r + 1)} className="label tap cursor-pointer underline decoration-dotted underline-offset-4 hover:text-foreground">{t.again}</button>}
+          <StationReset label={t.again} onClick={() => setRun((r) => r + 1)} testId="hero-think-again" />
         </p>
       </div>
     </div>

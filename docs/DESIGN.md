@@ -42,6 +42,9 @@ The one exception is a stage that must stay dark in both themes (section 5).
 - Radius is small (`--radius: 0.375rem`): `rounded-sm` for chips, toggle cells and canvases, `rounded-md` for panels,
   buttons and dialogs, `rounded-full` only for pills and dots. Borders are 1 px: `--border` for a line that only
   divides, `--input` (3:1 against every surface) for the edge of something that can be pressed or typed into.
+  That 3:1 is checked, not trusted: `e2e/design.spec.ts` measures it on the home pages and the 404, in both themes.
+  Two border-colour utilities in one class string are decided by CSS source order, not by the order they are
+  written, so no shared base may set one — each button variant names its own.
 - No drop shadows on anything that sits in the page; depth comes from `panel`, borders and the two glows
   (`.hero-glow`, `.card-glow`). A layer that floats over the page (the phone's drawer, the open outline, the install
   hint) casts one, so that it reads as above the text it covers. The selected station's dot and the rail's dots

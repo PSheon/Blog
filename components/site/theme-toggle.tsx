@@ -2,6 +2,7 @@
 
 import { Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useThemeFade } from "@/components/theme-provider";
 import { useSyncExternalStore } from "react";
 import type { Dictionary } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,8 @@ const noop = () => () => {};
 
 /** Light / dark / follow-the-system, as one segmented control. */
 export function ThemeToggle({ t }: { t: Dictionary["theme"] }) {
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
+  const change = useThemeFade();
   // The stored choice is only known in the browser; render nothing as "pressed" until then.
   const mounted = useSyncExternalStore(noop, () => true, () => false);
 
@@ -31,7 +33,7 @@ export function ThemeToggle({ t }: { t: Dictionary["theme"] }) {
             aria-pressed={active}
             aria-label={t[value]}
             title={t[value]}
-            onClick={() => setTheme(value)}
+            onClick={() => change(value)}
             className={cn(
               "tap grid h-6 w-7 place-items-center rounded-sm transition-colors",
               active ? "bg-accent text-foreground ring-1 ring-foreground/45 ring-inset" : "text-muted-foreground hover:text-foreground", // the ring: the fill alone is 1.1:1 against its neighbours

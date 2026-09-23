@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
@@ -99,7 +100,7 @@ function Springs({ lap }: { lap: Lap }) {
       <div className="grid items-end gap-4 sm:grid-cols-[auto_1fr_1fr_1fr]">
         <div className="flex gap-2">
           <Button size="sm" disabled={closed} onClick={close}>{t.addLoop}</Button>
-          <Button size="sm" variant="ghost" onClick={reset}>{t.reset}</Button>
+          <Button size="sm" variant="ghost" onClick={reset}><RotateCcw />{t.reset}</Button>
         </div>
         <Readout label={t.pass} value={pass} tone="plain" />
         <Readout label={t.tension} value={tension < 10 ? tension.toFixed(2) : tension.toFixed(0)} tone="alt" />

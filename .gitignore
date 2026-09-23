@@ -30,3 +30,6 @@ scripts/**/data/
 
 # PyTorch checkpoints of the VLA article: regenerable (scripts/train-vla/pipeline.sh), 2 MB each
 /scripts/train-vla/runs/
+
+# Another session's checkout, made by `git worktree` and never ours to commit.
+.claude/worktrees/

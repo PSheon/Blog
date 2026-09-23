@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,7 @@ export function DriveLab() {
           <div className="absolute inset-0 grid place-items-center rounded-md bg-background/70 backdrop-blur-sm" role="status">
             <div className="grid justify-items-center gap-3 text-center">
               <p>{t.full}</p>
-              <Button size="sm" onClick={() => restart({ ...knobs, wrong: PRESETS[preset].wrong })}>{t.reset}</Button>
+              <Button size="sm" onClick={() => restart({ ...knobs, wrong: PRESETS[preset].wrong })}><RotateCcw />{t.reset}</Button>
             </div>
           </div>
         )}
@@ -136,7 +137,7 @@ export function DriveLab() {
           <p id={hintId} className="text-muted-foreground">{t.driveHint}</p>
           <div className="flex flex-wrap gap-2">
             <Button size="sm" data-testid="slam-autopilot" onClick={() => setAuto((a) => !a)}>{auto ? t.stopAutopilot : t.autopilot}</Button>
-            <Button size="sm" variant="ghost" onClick={() => restart(knobs)}>{t.reset}</Button>
+            <Button size="sm" variant="ghost" onClick={() => restart(knobs)}><RotateCcw />{t.reset}</Button>
             {fast && <span className="label self-center text-signal">{t.fastForward}</span>}
             {preset !== "healthy" && (
               <span className="flex items-center gap-2 rounded-full border border-border py-0.5 pr-1 pl-3" data-testid="slam-preset">

@@ -86,7 +86,7 @@ export function CloudLab() {
     <div ref={root} className="grid gap-4 text-sm">
       {status !== "ready" ? (
         <div className="grid aspect-[2/1] place-items-center rounded-md border border-border">
-          <Button onClick={() => void load()} disabled={status === "loading"}>{t.cloudLoad}</Button>
+          <Button size="sm" onClick={() => void load()} disabled={status === "loading"}>{t.cloudLoad}</Button>
         </div>
       ) : (
         <canvas role="img" aria-label={t.picCloud} ref={stage} className="aspect-[2/1] w-full rounded-md border border-border text-foreground" />

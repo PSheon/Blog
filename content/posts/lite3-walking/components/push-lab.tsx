@@ -65,8 +65,8 @@ export function PushLab() {
         <div className="grid content-start gap-4">
           <Param label={t.force} shown={`${newtons} N`} value={newtons} min={50} max={400} step={25} onChange={setNewtons} />
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" disabled={!live || busy} onClick={() => shove("away")} data-testid="lite3-push-away"><ArrowUp />{t.pushAway}</Button>
-            <Button variant="outline" disabled={!live || busy} onClick={() => shove("toward")} data-testid="lite3-push-toward"><ArrowDown />{t.pushToward}</Button>
+            <Button size="sm" variant="outline" disabled={!live || busy} onClick={() => shove("away")} data-testid="lite3-push-away"><ArrowUp />{t.pushAway}</Button>
+            <Button size="sm" variant="outline" disabled={!live || busy} onClick={() => shove("toward")} data-testid="lite3-push-toward"><ArrowDown />{t.pushToward}</Button>
           </div>
           <div>
             <p className="label">{t.tiltTrace}</p>

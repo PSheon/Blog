@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Another session's worktree lives here, with its own build output. Linting a neighbour's .next reports
+    // hundreds of problems in generated code that nobody can act on.
+    ".claude/**",
   ]),
 ]);
 

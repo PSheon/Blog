@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { ErrorBoundary } from "@/components/lab/error-boundary";
 import { cn } from "@/lib/utils";
@@ -32,20 +32,47 @@ interface Props {
   hint: string;
   t: {
     think: { steps: string; input: string; output: string; attention: string; again: string };
-    generate: { note: string };
-    act: { generation: string; alive: string; best: string };
+    generate: { note: string; again: string };
+    act: { generation: string; alive: string; best: string; again: string };
   };
 }
 
 /**
  * The hero as four stations of the same rail that runs under it: see, think, generate, act, each the live model of
  * one article. The classifier is what the page opens on and the only one loaded with it; the others arrive when
- * their tab is first chosen. Its panel stays mounted (invisible) underneath the others, so the box keeps one height
- * whatever is showing and nothing on the page moves.
+ * their tab is first chosen, and it stays mounted (invisible) underneath them so its model and whatever the reader
+ * drew survive a trip through the other three.
+ *
+ * The box used to take its height from the classifier whatever was showing. Three of the four fill that height —
+ * they are built to fill the box they are given, and two of them need a definite height to size a canvas against —
+ * but `think` sizes itself from its own content, and on a 390 phone that left 163 px of empty panel under a small
+ * attention map. So the box follows the station that has a height of its own, and animates between the two.
+ */
+/*
+ * One height for all four, and it is the classifier's.
+ *
+ * Two of the stations size their canvas against the box (`container-type: size`), so given no height they collapse
+ * — 55 px for generate, 69 px for act, measured on /zh/dev/hero. That rules out letting each station be as tall as
+ * its own content, which is why the box follows the one station that has a height of its own to give.
  */
 export function HeroStations({ stations, label, hint, t }: Props) {
   const active = useStation(), setActive = setStation;
+  const seeRef = useRef<HTMLDivElement>(null);
+  const [seeHeight, setSeeHeight] = useState<number>();
   const id = useId(), current = stations.find((s) => s.key === active) ?? stations[0];
+
+  // The classifier is always in flow (it is only invisible), so its height is known at every width.
+  useEffect(() => {
+    const element = seeRef.current;
+    if (!element) return;
+    const measure = () => setSeeHeight(element.offsetHeight);
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+
+  const height = seeHeight;
   const move = (from: number, by: number) => {
     const next = stations[(from + by + stations.length) % stations.length];
     setActive(next.key);
@@ -99,18 +126,25 @@ export function HeroStations({ stations, label, hint, t }: Props) {
             </div>
           </div>
           </div>
-          <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${active}`} className="dot-grid relative p-4 font-sans sm:p-5">
+          <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${active}`} className="dot-grid p-4 font-sans sm:p-5">
             <ErrorBoundary fallback={<p className="py-10 text-center text-sm text-muted-foreground">This instrument hit an error. The rest of the page is unaffected.</p>}>
-              <div className={cn(active !== "see" && "invisible")} inert={active !== "see"} data-lab>
-                <HeroInstrumentLazy hint={hint} />
-              </div>
-              {active !== "see" && (
-                <div className="absolute inset-4 sm:inset-5">
-                  {active === "think" && <Think t={t.think} />}
-                  {active === "generate" && <Generate t={t.generate} />}
-                  {active === "act" && <Act t={t.act} />}
+              {/* A plain CSS transition on an explicit height: the site installs no animation library (DESIGN §7),
+                  and one number moving between two known values does not need one. */}
+              <div
+                className="relative overflow-hidden transition-[height] duration-300 ease-out motion-reduce:transition-none"
+                style={{ height: height ?? "auto" }}
+              >
+                <div ref={seeRef} className={cn(active !== "see" && "invisible")} inert={active !== "see"} data-lab>
+                  <HeroInstrumentLazy hint={hint} />
                 </div>
-              )}
+                {active !== "see" && (
+                  <div className="absolute inset-0">
+                    {active === "think" && <Think t={t.think} />}
+                    {active === "generate" && <Generate t={t.generate} />}
+                    {active === "act" && <Act t={t.act} />}
+                  </div>
+                )}
+              </div>
             </ErrorBoundary>
           </div>
         </div>

@@ -29,6 +29,13 @@ body:has([data-expanded="true"]) .back-to-top { display: none; }
 }
 
 @theme inline {
+  /*
+   * The article's three-column layout needs 13rem of rail + 3rem + 42.5rem of body + 3rem + 17rem of margin, plus
+   * 2rem of page padding on each side: 80.5rem before a scrollbar. Tailwind's `xl` is 80rem, which is 8px short —
+   * at exactly 1280 the wide figures ran past the viewport and `main`'s overflow-x-clip silently cut their right
+   * border off, with no scrollbar to show it. This breakpoint is that sum, rounded up past a scrollbar.
+   */
+  --breakpoint-rail: 82rem;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   /* Latin from web fonts; Chinese from whatever the system ships (Apple → Android/Linux → Windows). */
@@ -718,6 +725,30 @@ html:not(.dark) {
     vertical-align: super;
     line-height: 0;
   }
+}
+
+/*
+ * Changing the theme repaints every colour on the page at once. Left alone that is a hard cut; for the third of a
+ * second around the switch, every element is allowed to interpolate its colours instead. The class is added by the
+ * control that changes the theme and taken off again when the fade is over, so nothing carries a transition it did
+ * not ask for the rest of the time — and a reader who asked for less motion never gets the class at all.
+ *
+ * Canvases are left out. A canvas paints itself, so fading its CSS `color` gains nothing — and the 3-D figures read
+ * that very property to know what ink to draw in (followInk, content/posts/slam-2d/components/stage3d.ts). Mid-fade
+ * they would read a colour on its way somewhere and keep it for good.
+ */
+html.theme-fade,
+html.theme-fade *:not(canvas),
+html.theme-fade *::before,
+html.theme-fade *::after {
+  transition:
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease,
+    fill 260ms ease,
+    stroke 260ms ease,
+    box-shadow 260ms ease,
+    opacity 260ms ease !important;
 }
 
 /*

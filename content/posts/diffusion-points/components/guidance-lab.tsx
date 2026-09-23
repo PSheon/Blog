@@ -53,7 +53,7 @@ export function GuidanceLab() {
         <Slider value={[guidance]} min={0} max={6} step={0.5} aria-label={t.guidance} onValueChange={(v) => setGuidance(Array.isArray(v) ? v[0] : v)} />
       </label>
       <div className="flex flex-wrap items-center gap-3">
-        <Button variant="outline" disabled={busy} onClick={() => void sample(guidance, true)}>
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => void sample(guidance, true)}>
           <Dices />
           {t.sample}
         </Button>
