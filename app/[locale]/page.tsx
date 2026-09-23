@@ -73,11 +73,13 @@ export default async function HomePage({ params }: PageProps<"/[locale]">) {
               {t.hero.ctaSecondary}
             </Link>
           </div>
-          {/* Three numbers lettered like an instrument's readouts; counted from the posts, not typed in. */}
-          <dl className="order-5 flex gap-6 sm:gap-8 border-t border-rule pt-5 lg:mt-10 lg:max-w-md">
+          {/* Three numbers lettered like an instrument's readouts; counted from the posts, not typed in. The English
+              labels are long enough to wrap, so they get even columns and a balanced break rather than one word
+              stranded on a line of its own. */}
+          <dl className="order-5 grid grid-cols-3 gap-5 border-t border-rule pt-5 sm:gap-8 lg:mt-10 lg:max-w-md">
             {readouts.map((r, i) => (
-              <div key={r.label} className="flex flex-col-reverse justify-end gap-1">
-                <dt className="label">{r.label}</dt>
+              <div key={r.label} className="flex min-w-0 flex-col-reverse justify-end gap-1">
+                <dt className="label text-pretty">{r.label}</dt>
                 <dd className="font-mono text-2xl leading-none tabular" style={{ color: RAIL_COLORS[i === 2 ? 3 : i] }}>
                   <NumberTicker value={r.value} pad={r.pad} />
                 </dd>
