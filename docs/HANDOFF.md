@@ -67,6 +67,30 @@ stays in `lib/rt` with its tests. Read before touching it:
 - CI has no GPU. The light E2E tests take the "no adapter" branch; what needs a GPU was checked by hand
   in the Playwright MCP browser, whose own tab must be in front for pointer lock (a `newContext()` window is refused).
 
+### The UI/UX batch (2026-09-23)
+
+paul-8b measured the whole site and Paul picked thirteen fixes; they are on dev as one commit each. Two he turned
+down on purpose — the theme and language controls live only in the footer on desktop, and there is no print
+stylesheet — so do not "fix" either.
+
+Worth carrying forward:
+
+- **Two border-colour utilities in one class string are decided by CSS source order.** That is how the outline
+  button lost its edge on the light theme for a year. No shared base may set one; each variant names its own, and
+  `e2e/design.spec.ts` now measures the 3:1 DESIGN.md §2 promises.
+- **The article layout has its own breakpoint, `rail` (82rem)**, not `xl`. Three columns need 80.5rem and xl is
+  80rem, so wide figures were silently clipped between 1280 and 1304 — `main` is overflow-x-clip, so there was no
+  scrollbar to notice. The contents rail starts at `lg` now.
+- **The hero's four stations share one height, and it is the classifier's.** Generate and act size their canvas
+  against the box with `container-type: size`, so given no height they collapse to 55 px and 69 px. That was proved
+  on a bench at /zh/dev/hero which has since been removed; do not try "each station its own height" again.
+- **The theme change fades** (`html.theme-fade`, 260 ms). next-themes' `disableTransitionOnChange` is off on
+  purpose — turning it back on will make the colours cut again.
+- **No animation library.** framer-motion was installed for one height transition and taken out again: DESIGN.md
+  §2 and §7 both forbid it, and 66 KB gzipped against 203 KB of page scripts is the reason.
+- The tag filter lives in `?tag=`, figure resets all say 重來 / "Start over" with the same icon at 28 px, and the
+  figures' buttons were swept in the browser article by article rather than read.
+
 ## Waiting on Paul
 
 - Switch on Analytics and Speed Insights in the Vercel dashboard. Every performance number we have is simulated.
