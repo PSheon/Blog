@@ -89,16 +89,16 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
 
       <article
-        className="mx-auto w-full max-w-7xl px-5 pt-10 sm:px-8 lg:pt-16 xl:grid xl:grid-cols-[13rem_minmax(0,42.5rem)_17rem] xl:gap-x-12"
+        className="mx-auto w-full max-w-7xl px-5 pt-10 sm:px-8 lg:pt-16 rail:grid rail:grid-cols-[13rem_minmax(0,42.5rem)_17rem] rail:gap-x-12"
         style={{ "--margin-w": "17rem", "--margin-gap": "3rem" } as React.CSSProperties}
       >
-        <aside className="hidden xl:block">
+        <aside className="hidden rail:block">
           <div className="sticky top-24 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-8">
             <Toc items={toc} label={t.post.toc} />
           </div>
         </aside>
 
-        <div className="mx-auto min-w-0 max-w-[42.5rem] xl:col-span-2 xl:mx-0 xl:max-w-none">
+        <div className="mx-auto min-w-0 max-w-[42.5rem] rail:col-span-2 rail:mx-0 rail:max-w-none">
           {post.draft && (
             // Only ever rendered by `next dev`: a production build has no drafts. To the author, in the page's language.
             <p role="note" data-testid="draft-banner" className="mb-6 max-w-[48rem] rounded-md border border-signal-2 bg-signal-2/10 px-4 py-3 font-sans text-sm leading-relaxed">
@@ -162,7 +162,7 @@ export default async function PostPage({ params }: PageProps<"/[locale]/posts/[s
           )}
 
           {/* Sticks just under the site header (h-14) for the whole article. */}
-          <div className="sticky top-14 z-30 mt-6 xl:hidden">
+          <div className="sticky top-14 z-30 mt-6 rail:hidden">
             <TocDisclosure items={toc} label={t.post.toc} />
           </div>
 

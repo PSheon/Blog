@@ -55,3 +55,19 @@ for (const theme of ["light", "dark"] as const) {
     });
   }
 }
+
+/*
+ * `main` has overflow-x-clip, so a figure that reaches past the viewport is cut silently: no scrollbar, no
+ * horizontal scroll, just a missing right border. The three-column article layout needs 80.5rem and Tailwind's `xl`
+ * is 80rem, so every wide figure lost 8 px between 1280 and 1304 (measured by paul-8b).
+ */
+test("no figure reaches past the viewport at any desktop width", async ({ page }) => {
+  for (const width of [1024, 1152, 1279, 1280, 1300, 1311, 1312, 1360, 1440, 1920]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/zh/posts/cnn-from-scratch");
+    const worst = await page.evaluate(() =>
+      [...document.querySelectorAll("figure")].reduce((most, figure) => Math.max(most, Math.round(figure.getBoundingClientRect().right) - window.innerWidth), -Infinity),
+    );
+    expect(worst, `a figure runs ${worst} px past the viewport at ${width}`).toBeLessThanOrEqual(0);
+  }
+});
