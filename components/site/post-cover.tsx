@@ -342,6 +342,37 @@ function MusicAi() {
   );
 }
 
+/**
+ * The descent, left to right: belly-down and coasting, one engine for the flip, two to brake, one again for the
+ * last few metres. The flames ARE the drawing — how many are lit is what the article is about.
+ */
+function RocketLanding() {
+  // The ship, drawn once and turned: origin at the engines, nose up the -y axis.
+  const ship = (x: number, y: number, turn: number, flames: number) => (
+    <g key={`${x}-${y}`} transform={`translate(${x} ${y}) rotate(${turn})`}>
+      {Array.from({ length: flames }, (_, i) => {
+        const at = flames === 1 ? 0 : flames === 2 ? (i - 0.5) * 3.4 : (i - 1) * 3.4;
+        return <path key={i} d={`M${r1(at - 1.3)} 0 L${r1(at + 1.3)} 0 L${at} ${9 + flames * 2.5} Z`} fill={S2} opacity={0.85} />;
+      })}
+      <path d="M-3 0 V-19 Q0 -24 3 -19 V0 Z" fill="var(--background)" stroke={S} strokeWidth={1.5} strokeLinejoin="round" />
+      <path d="M-3 -2 l-4.5 1.5 M3 -2 l4.5 1.5 M-3 -16 l-3.5 -1.5 M3 -16 l3.5 -1.5" stroke={S} strokeWidth={1.2} strokeLinecap="round" />
+    </g>
+  );
+  return (
+    <>
+      {/* the track it comes down, and the sea it comes down to */}
+      <path d="M6 20 C54 22 92 38 112 62 S122 84 124 84" fill="none" stroke={DIM} strokeWidth={1} strokeDasharray="2 3.5" />
+      <path d="M8 90 H152" stroke={DIM} strokeWidth={1} />
+      <rect x={106} y={86} width={36} height={4} rx={1} fill={DIM} opacity={0.6} />
+      <path d="M116 88 h16" stroke={S3} strokeWidth={1.4} strokeLinecap="round" />
+      {ship(26, 30, 96, 0)}
+      {ship(74, 44, 52, 1)}
+      {ship(106, 68, 18, 2)}
+      {ship(124, 86, 0, 1)}
+    </>
+  );
+}
+
 const covers: Record<string, () => ReactNode> = {
   "cnn-from-scratch": Cnn,
   "ai-flappy-bird": Flappy,
@@ -357,6 +388,7 @@ const covers: Record<string, () => ReactNode> = {
   "light-playground": Playground,
   "head-camera": HeadCamera,
   "music-ai": MusicAi,
+  "rocket-landing": RocketLanding,
 };
 
 export function PostCover({ slug, no, className }: { slug: string; no: number; className?: string }) {
