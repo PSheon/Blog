@@ -121,7 +121,7 @@ const en: Dictionary = {
     play: "Play",
     pause: "Pause",
     step: "Step",
-    reset: "Reset",
+    reset: "Start over",
     clear: "Clear",
     loading: "Loading model…",
     error: "The model failed to load.",

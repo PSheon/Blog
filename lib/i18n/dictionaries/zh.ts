@@ -115,7 +115,7 @@ const zh = {
     play: "播放",
     pause: "暫停",
     step: "單步",
-    reset: "重置",
+    reset: "重來",
     clear: "清除",
     loading: "載入模型中…",
     error: "模型載入失敗。",
