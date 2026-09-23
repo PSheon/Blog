@@ -1,10 +1,12 @@
 "use client";
 
+import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { ErrorBoundary } from "@/components/lab/error-boundary";
+import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { type StationKey, setStation, useStation } from "./hero/station-store";
 import { ChunkLoading } from "./chunk-loading";
@@ -40,12 +42,40 @@ interface Props {
 /**
  * The hero as four stations of the same rail that runs under it: see, think, generate, act, each the live model of
  * one article. The classifier is what the page opens on and the only one loaded with it; the others arrive when
- * their tab is first chosen. Its panel stays mounted (invisible) underneath the others, so the box keeps one height
- * whatever is showing and nothing on the page moves.
+ * their tab is first chosen, and it stays mounted (invisible) underneath them so its model and whatever the reader
+ * drew survive a trip through the other three.
+ *
+ * The box used to take its height from the classifier whatever was showing. Three of the four fill that height —
+ * they are built to fill the box they are given, and two of them need a definite height to size a canvas against —
+ * but `think` sizes itself from its own content, and on a 390 phone that left 163 px of empty panel under a small
+ * attention map. So the box follows the station that has a height of its own, and animates between the two.
  */
+/** Stations whose content sets its own height. The rest are stretched to the classifier's, as before. */
+const OWN_HEIGHT = new Set<StationKey>(["think"]);
 export function HeroStations({ stations, label, hint, t }: Props) {
   const active = useStation(), setActive = setStation;
+  const still = useReducedMotion();
+  const seeRef = useRef<HTMLDivElement>(null), ownRef = useRef<HTMLDivElement>(null);
+  const [seeHeight, setSeeHeight] = useState<number>();
+  const [ownHeight, setOwnHeight] = useState<number>();
   const id = useId(), current = stations.find((s) => s.key === active) ?? stations[0];
+  const ownsHeight = OWN_HEIGHT.has(active);
+
+  // Both panes are measured as they are laid out and as the window changes: the classifier is always in flow (it is
+  // only invisible), and a station with its own height is placed against the top rather than stretched.
+  useEffect(() => {
+    const watch = (element: HTMLElement | null, set: (height: number) => void) => {
+      if (!element) return () => {};
+      const observer = new ResizeObserver(() => set(element.offsetHeight));
+      observer.observe(element);
+      set(element.offsetHeight);
+      return () => observer.disconnect();
+    };
+    const stop = [watch(seeRef.current, setSeeHeight), watch(ownRef.current, setOwnHeight)];
+    return () => stop.forEach((fn) => fn());
+  }, [active]);
+
+  const height = ownsHeight ? ownHeight : seeHeight;
   const move = (from: number, by: number) => {
     const next = stations[(from + by + stations.length) % stations.length];
     setActive(next.key);
@@ -99,18 +129,27 @@ export function HeroStations({ stations, label, hint, t }: Props) {
             </div>
           </div>
           </div>
-          <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${active}`} className="dot-grid relative p-4 font-sans sm:p-5">
+          <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${active}`} className="dot-grid p-4 font-sans sm:p-5">
             <ErrorBoundary fallback={<p className="py-10 text-center text-sm text-muted-foreground">This instrument hit an error. The rest of the page is unaffected.</p>}>
-              <div className={cn(active !== "see" && "invisible")} inert={active !== "see"} data-lab>
-                <HeroInstrumentLazy hint={hint} />
-              </div>
-              {active !== "see" && (
-                <div className="absolute inset-4 sm:inset-5">
-                  {active === "think" && <Think t={t.think} />}
-                  {active === "generate" && <Generate t={t.generate} />}
-                  {active === "act" && <Act t={t.act} />}
+              <motion.div
+                className="relative overflow-hidden"
+                initial={false}
+                animate={{ height: height ?? "auto" }}
+                transition={still ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 38, mass: 0.7 }}
+              >
+                <div ref={seeRef} className={cn(active !== "see" && "invisible")} inert={active !== "see"} data-lab>
+                  <HeroInstrumentLazy hint={hint} />
                 </div>
-              )}
+                {active !== "see" && (
+                  // Stretched to the box, unless the station brings a height of its own — then it sits against the
+                  // top and the box comes down to meet it.
+                  <div ref={ownsHeight ? ownRef : undefined} className={cn("absolute inset-x-0 top-0", !ownsHeight && "bottom-0")}>
+                    {active === "think" && <Think t={t.think} />}
+                    {active === "generate" && <Generate t={t.generate} />}
+                    {active === "act" && <Act t={t.act} />}
+                  </div>
+                )}
+              </motion.div>
             </ErrorBoundary>
           </div>
         </div>
