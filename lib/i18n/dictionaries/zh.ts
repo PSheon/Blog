@@ -123,7 +123,7 @@ const zh = {
     crashed: "這個互動元件發生錯誤，文章其餘部分不受影響。",
     noscript: "此互動圖表需要啟用 JavaScript。",
   },
-  notFound: { title: "找不到這一頁", body: "這一頁可能被移走了，或從來不存在。", home: "回到首頁" },
+  notFound: { title: "找不到這一頁", body: "這一頁可能被移走了，或從來不存在。", home: "回到首頁", browse: "所有文章", latest: "最近寫的", search: "或按 ⌘K 搜尋全站" },
 };
 
 export default zh;

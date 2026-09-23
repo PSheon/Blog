@@ -129,7 +129,7 @@ const en: Dictionary = {
     crashed: "This instrument hit an error. The rest of the article is unaffected.",
     noscript: "This interactive figure needs JavaScript.",
   },
-  notFound: { title: "Page not found", body: "It may have moved, or never existed.", home: "Back home" },
+  notFound: { title: "Page not found", body: "It may have moved, or never existed.", home: "Back home", browse: "All notes", latest: "Written lately", search: "or press ⌘K to search the site" },
 };
 
 export default en;
