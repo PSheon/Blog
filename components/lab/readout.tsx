@@ -11,14 +11,16 @@ interface Props {
   /** The headline number of an instrument. */
   large?: boolean;
   className?: string;
+  /** Put a test id on the value, so a spec can read the number without the label. */
+  testId?: string;
 }
 
 /** A labelled number, set in tabular mono so it doesn't jitter as it changes. */
-export function Readout({ label, value, unit, tone = "signal", large, className }: Props) {
+export function Readout({ label, value, unit, tone = "signal", large, className, testId }: Props) {
   return (
     <div className={cn("min-w-0", className)}>
       <div className="label">{label}</div>
-      <div className={cn("font-mono leading-tight tabular", large ? "text-4xl" : "text-lg", tones[tone])}>
+      <div className={cn("font-mono leading-tight tabular", large ? "text-4xl" : "text-lg", tones[tone])} data-testid={testId}>
         {value}
         {unit && <span className="ml-1 text-xs text-muted-foreground">{unit}</span>}
       </div>
