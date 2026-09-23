@@ -37,21 +37,7 @@ function lookup(heads: Float64Array[], T: number): Float64Array | null {
  * "Think": article 004's one-layer Transformer, trained from random weights while you watch. It learns to write six
  * digits backwards in a couple of seconds, and the attention map grows the anti-diagonal that does it.
  */
-/**
- * `layout` is only for /dev, where the three candidates sit side by side to be chosen between:
- *   half     — the two halves share the row, which is what the hero ships
- *   sixFour  — the map gets 60 % of the row, so it is bigger without the station getting taller
- *   stacked  — the map takes the whole width and the digits go under it, which makes the station tall
- */
-export type ThinkLayout = "half" | "sixFour" | "stacked";
-
-const COLUMNS: Record<ThinkLayout, string> = {
-  half: "grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
-  sixFour: "grid-cols-[minmax(0,6fr)_minmax(0,4fr)]",
-  stacked: "",
-};
-
-export default function HeroThink({ t, layout = "half" }: { t: { steps: string; input: string; output: string; attention: string; again: string }; layout?: ThinkLayout }) {
+export default function HeroThink({ t }: { t: { steps: string; input: string; output: string; attention: string; again: string } }) {
   const [view, setView] = useState<View>({ steps: 0, output: [], map: null, done: false });
   const [run, setRun] = useState(0);
 
@@ -82,8 +68,8 @@ export default function HeroThink({ t, layout = "half" }: { t: { steps: string; 
   const box = "grid aspect-square w-full place-items-center rounded-sm border bg-background text-[clamp(0.75rem,4.2cqw,1.25rem)] leading-none";
   const row = "grid max-w-[12.5rem] grid-cols-6 gap-1";
   return (
-    <div ref={root} data-station="think" className={`@container grid h-full items-center gap-4 sm:gap-5 ${COLUMNS[layout]}`}>
-      <div className={`mx-auto w-full ${layout === "stacked" ? "max-w-[11rem]" : "max-w-[15rem]"}`}>
+    <div ref={root} data-station="think" className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
+      <div className="mx-auto w-full max-w-[15rem]">
         {/* Input digits along the top, the answer down the side: a trained model lights the anti-diagonal. */}
         <div className="grid grid-cols-[1rem_1fr] gap-1 font-mono text-[0.7rem] text-muted-foreground">
           <span />

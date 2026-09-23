@@ -43,7 +43,7 @@ export function Stage({ id, knobs, onFrame, note }: Props) {
             <p className="max-w-sm">{t.elsewhere}</p>
           ) : (
             <div className="grid max-w-sm justify-items-center gap-3">
-              <Button onClick={() => void loadRig()} disabled={status === "loading"}>
+              <Button size="sm" onClick={() => void loadRig()} disabled={status === "loading"}>
                 {status === "loading" ? t.loading : status === "error" ? t.retry : t.load}
               </Button>
               <p role={status === "error" ? "alert" : undefined}>{status === "error" ? t.error : t.loadNote}</p>

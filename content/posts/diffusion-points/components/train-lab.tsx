@@ -69,15 +69,15 @@ export function TrainLab() {
       </label>
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="flex flex-wrap gap-1.5">
-          <Button onClick={() => setRunning(!running)} data-testid="diffusion-train">
+          <Button size="sm" onClick={() => setRunning(!running)} data-testid="diffusion-train">
             {running ? <Pause /> : <Play />}
             {running ? t.pause : steps ? t.resume : t.train}
           </Button>
-          <Button variant="outline" onClick={sampleAgain}>
+          <Button size="sm" variant="outline" onClick={sampleAgain}>
             <Dices />
             {t.again}
           </Button>
-          <Button variant="ghost" disabled={steps === 0} onClick={resetModel}>
+          <Button size="sm" variant="ghost" disabled={steps === 0} onClick={resetModel}>
             <RotateCcw />
             {t.reset}
           </Button>
