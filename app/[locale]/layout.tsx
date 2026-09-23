@@ -25,11 +25,11 @@ export function generateStaticParams() {
 // never our own 404. Unknown values are rendered on demand instead and end in notFound() in the page: for a
 // locale, a slug or a tag alike. Known pages are still prerendered (generateStaticParams).
 
+// One colour, not a prefers-color-scheme pair: the theme is a class next-themes puts on <html> and the default is
+// dark whatever the OS says, so this is the right answer for the first paint. ThemeColor in components/theme-provider
+// keeps it on whatever the reader actually chose after that.
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#070918" },
-    { media: "(prefers-color-scheme: light)", color: "#fbfbfe" },
-  ],
+  themeColor: "#070918",
 };
 
 /**
