@@ -5,15 +5,18 @@ import { runWhenSeen } from "@/components/lab/run-when-seen";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { draw, readPalette } from "@/content/posts/ai-flappy-bird/components/render";
 import { FlappyWorld, WORLD } from "@/content/posts/ai-flappy-bird/components/world";
+import { StationReset } from "./reset";
 
 /**
  * "Act": article 002's flock. Fifty birds with random 2-2-1 brains; the ones that last longest breed the next
  * generation. Runs at two and a half times the article's normal speed, by the clock, so that a reader sees a few generations die
  * before the first one flies.
  */
-export default function HeroAct({ t }: { t: { generation: string; alive: string; best: string } }) {
+export default function HeroAct({ t }: { t: { generation: string; alive: string; best: string; again: string } }) {
   const canvas = useRef<HTMLCanvasElement>(null), still = useReducedMotion();
   const [seen, setSeen] = useState({ generation: 1, alive: 50, best: 0 });
+  // Bumping this restarts the effect below with a brand new flock, which is what "evolve again" means here.
+  const [run, setRun] = useState(0);
 
   useEffect(() => {
     const el = canvas.current, ctx = el?.getContext("2d");
@@ -37,7 +40,7 @@ export default function HeroAct({ t }: { t: { generation: string; alive: string;
     if (still) { draw(ctx, world, palette, (el.width = Math.round(el.clientWidth)) / WORLD.width); return; }
     // Off screen or in a background tab the flock waits; `last` is forgotten so the pause is not paid back as ticks.
     return runWhenSeen(el, () => { last = 0; frame = requestAnimationFrame(loop); }, () => cancelAnimationFrame(frame));
-  }, [still]);
+  }, [still, run]);
 
   return (
     // Sized by the panel (a container query). Narrow (every phone): the flock on top at full width, the three numbers
@@ -48,13 +51,14 @@ export default function HeroAct({ t }: { t: { generation: string; alive: string;
         <div className="grid h-full min-h-0 place-items-center [container-type:size]">
           <canvas ref={canvas} aria-hidden className="rounded-sm border border-border bg-background text-foreground" style={{ width: `min(100cqw, 100cqh * ${WORLD.width} / ${WORLD.height})`, aspectRatio: `${WORLD.width} / ${WORLD.height}` }} />
         </div>
-        <dl className="grid grid-cols-3 gap-3 border-t border-border pt-3 font-mono @[26rem]:grid-cols-1 @[26rem]:gap-4 @[26rem]:border-t-0 @[26rem]:pt-0">
+        <dl className="grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-center gap-3 border-t border-border pt-3 font-mono @[26rem]:grid-cols-1 @[26rem]:gap-4 @[26rem]:border-t-0 @[26rem]:pt-0">
           {([[t.generation, seen.generation], [t.alive, seen.alive], [t.best, seen.best]] as const).map(([label, value], i) => (
             <div key={label} className="flex flex-col gap-1 @[26rem]:flex-row @[26rem]:items-baseline @[26rem]:justify-between @[26rem]:gap-2 @[26rem]:border-b @[26rem]:border-border @[26rem]:pb-2">
               <dt className="label">{label}</dt>
               <dd className={`tabular leading-none ${i === 0 ? "text-2xl text-signal-2 @[26rem]:text-4xl" : "text-2xl"}`}>{value}</dd>
             </div>
           ))}
+          <StationReset label={t.again} onClick={() => { setSeen({ generation: 1, alive: 50, best: 0 }); setRun((n) => n + 1); }} testId="hero-act-again" />
         </dl>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { HeatCanvas } from "@/components/lab/heat-canvas";
 import { runWhenSeen } from "@/components/lab/run-when-seen";
 import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { Trainer } from "@/content/posts/transformer-from-scratch/components/task";
+import { StationReset } from "./reset";
 import { mulberry32 } from "@/lib/ml";
 
 const PROBLEM = [3, 1, 4, 1, 5, 9], WANT = [...PROBLEM].reverse();
@@ -106,10 +107,10 @@ export default function HeroThink({ t, layout = "half" }: { t: { steps: string; 
             })}
           </p>
         </div>
-        <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-3 text-sm">
+        <p className="flex items-center gap-x-3 border-t border-border pt-3 text-sm">
           <span className="label">{t.steps}</span>
           <span className="tabular text-signal-3">{view.steps.toLocaleString()}</span>
-          {view.done && <button type="button" onClick={() => setRun((r) => r + 1)} className="label tap cursor-pointer underline decoration-dotted underline-offset-4 hover:text-foreground">{t.again}</button>}
+          <StationReset label={t.again} onClick={() => setRun((r) => r + 1)} testId="hero-think-again" />
         </p>
       </div>
     </div>

@@ -32,8 +32,8 @@ interface Props {
   hint: string;
   t: {
     think: { steps: string; input: string; output: string; attention: string; again: string };
-    generate: { note: string };
-    act: { generation: string; alive: string; best: string };
+    generate: { note: string; again: string };
+    act: { generation: string; alive: string; best: string; again: string };
   };
 }
 

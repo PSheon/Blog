@@ -49,9 +49,9 @@ const en: Dictionary = {
       generate: { title: "replay · diffusion", caption: "A cloud of coloured noise settles into an apple, step by step. This replays the diffusion process itself; the real model is in the article, trained by you in the browser.", more: "Go and train one" },
       act: { title: "live · neuroevolution", caption: "Fifty birds, each with a six-weight brain. Whoever lasts longest breeds the next generation. Nobody teaches them to fly.", more: "See what they learn" },
     },
-    think: { steps: "Training steps", input: "Problem", output: "The model writes", attention: "Which digit each answer looks at", again: "Learn it again" },
-    generate: { note: "A replay of the diffusion process; no model runs here" },
-    act: { generation: "Generation", alive: "Still flying", best: "Most pipes" },
+    think: { steps: "Training steps", input: "Problem", output: "The model writes", attention: "Which digit each answer looks at", again: "Learn it again from scratch" },
+    generate: { note: "A replay of the diffusion process; no model runs here", again: "Play it again" },
+    act: { generation: "Generation", alive: "Still flying", best: "Most pipes", again: "Evolve again from generation one" },
   },
   home: {
     latest: "Latest",
