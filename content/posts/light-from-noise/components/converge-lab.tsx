@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
@@ -118,7 +119,7 @@ export function ConvergeLab() {
         <Button size="sm" variant={ask ? "default" : "outline"} aria-pressed={ask} disabled={!live} onClick={() => { setGhost({ points, asked: ask }); asking.current = !ask; setAsk(!ask); fresh(); tracer.restart(); }} data-testid="light-ask">{t.askLamp}</Button>
       </div>
       <p className="text-muted-foreground">{t.measured}</p>
-      {unavailable && <Button size="sm" variant="outline" className="justify-self-start" onClick={tracer.rebuild}>{t.restart}</Button>}
+      {unavailable && <Button size="sm" variant="outline" className="justify-self-start" onClick={tracer.rebuild}><RotateCcw />{t.restart}</Button>}
     </div>
   );
 }

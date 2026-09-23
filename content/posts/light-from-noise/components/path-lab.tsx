@@ -1,5 +1,6 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { type PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
@@ -122,7 +123,7 @@ export function PathLab() {
       <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
         <Button size="sm" disabled={!ready} onClick={() => shoot(1)} data-testid="light-shoot">{t.shootOne}</Button>
         <Button size="sm" variant="outline" disabled={!ready} onClick={() => shoot(100)} data-testid="light-shoot-100">{t.shootMany}</Button>
-        <Button size="sm" variant="ghost" disabled={!ready} onClick={() => { setShots([]); setTotal({ n: 0, lit: 0, sum: [0, 0, 0] }); }}>{t.restart}</Button>
+        <Button size="sm" variant="ghost" disabled={!ready} onClick={() => { setShots([]); setTotal({ n: 0, lit: 0, sum: [0, 0, 0] }); }}><RotateCcw />{t.restart}</Button>
         <p className="basis-full text-muted-foreground">{t.pathHint}</p>
       </div>
     </div>
