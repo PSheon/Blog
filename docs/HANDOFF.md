@@ -126,6 +126,9 @@ stays in `lib/rt` with its tests. Read before touching it:
 - 404s: see "How a URL that does not exist is answered" below before touching `dynamicParams`, `notFound()` or the proxy.
 - A yielding loop: MessageChannel, not nested `setTimeout(0)` (clamped to 4 ms). A time budget only works if one
   unit of work is much smaller than the budget.
+  When a unit of work CANNOT be made small — Brent's rho advances y by r steps and r doubles, so at 96 bits one
+  unit is 2.1 s with no chance to check the clock — the answer is not a smaller budget but a worker you can
+  `terminate()` (measured by paul-e9, `docs/research/rsa/RESULTS.md`).
 - Inside an `Instrument`, titles are `<p>`, not headings (axe `heading-order`).
 - Scrollable regions (tables, display maths) need `tabIndex={0}` + a name (axe).
 - An `IntersectionObserver` callback gets a batch: read the LAST entry, not `([entry]) =>`, or a quick scroll
