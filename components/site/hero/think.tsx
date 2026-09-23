@@ -67,7 +67,7 @@ export default function HeroThink({ t }: { t: { steps: string; input: string; ou
   const box = "grid aspect-square w-full place-items-center rounded-sm border bg-background text-[clamp(0.75rem,4.2cqw,1.25rem)] leading-none";
   const row = "grid max-w-[12.5rem] grid-cols-6 gap-1";
   return (
-    <div ref={root} className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
+    <div ref={root} data-station="think" className="@container grid h-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-4 sm:gap-5">
       <div className="mx-auto w-full max-w-[15rem]">
         {/* Input digits along the top, the answer down the side: a trained model lights the anti-diagonal. */}
         <div className="grid grid-cols-[1rem_1fr] gap-1 font-mono text-[0.7rem] text-muted-foreground">

@@ -1,12 +1,10 @@
 "use client";
 
-import { motion } from "framer-motion";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { CornerMarks } from "@/components/lab/corner-marks";
 import { ErrorBoundary } from "@/components/lab/error-boundary";
-import { useReducedMotion } from "@/components/lab/use-reduced-motion";
 import { cn } from "@/lib/utils";
 import { type StationKey, setStation, useStation } from "./hero/station-store";
 import { ChunkLoading } from "./chunk-loading";
@@ -54,7 +52,6 @@ interface Props {
 const OWN_HEIGHT = new Set<StationKey>(["think"]);
 export function HeroStations({ stations, label, hint, t }: Props) {
   const active = useStation(), setActive = setStation;
-  const still = useReducedMotion();
   const seeRef = useRef<HTMLDivElement>(null), ownRef = useRef<HTMLDivElement>(null);
   const [seeHeight, setSeeHeight] = useState<number>();
   const [ownHeight, setOwnHeight] = useState<number>();
@@ -64,18 +61,25 @@ export function HeroStations({ stations, label, hint, t }: Props) {
   // Both panes are measured as they are laid out and as the window changes: the classifier is always in flow (it is
   // only invisible), and a station with its own height is placed against the top rather than stretched.
   useEffect(() => {
-    const watch = (element: HTMLElement | null, set: (height: number) => void) => {
+    const watch = (element: HTMLElement | null, set: (height: number) => void, real = () => true) => {
       if (!element) return () => {};
-      const observer = new ResizeObserver(() => set(element.offsetHeight));
+      const measure = () => { if (real()) set(element.offsetHeight); };
+      const observer = new ResizeObserver(measure);
       observer.observe(element);
-      set(element.offsetHeight);
+      measure();
       return () => observer.disconnect();
     };
-    const stop = [watch(seeRef.current, setSeeHeight), watch(ownRef.current, setOwnHeight)];
+    const stop = [
+      watch(seeRef.current, setSeeHeight),
+      // Only once the station itself is on screen: its chunk arrives a moment after the tab is pressed, and the
+      // loading placeholder is short, so measuring that would collapse the box and then grow it again.
+      watch(ownRef.current, setOwnHeight, () => !!ownRef.current?.querySelector("[data-station]")),
+    ];
     return () => stop.forEach((fn) => fn());
   }, [active]);
 
-  const height = ownsHeight ? ownHeight : seeHeight;
+  // Until a station with its own height has measured one, the classifier's height holds the box open.
+  const height = ownsHeight ? (ownHeight ?? seeHeight) : seeHeight;
   const move = (from: number, by: number) => {
     const next = stations[(from + by + stations.length) % stations.length];
     setActive(next.key);
@@ -131,11 +135,11 @@ export function HeroStations({ stations, label, hint, t }: Props) {
           </div>
           <div id={`${id}-panel`} role="tabpanel" aria-labelledby={`${id}-${active}`} className="dot-grid p-4 font-sans sm:p-5">
             <ErrorBoundary fallback={<p className="py-10 text-center text-sm text-muted-foreground">This instrument hit an error. The rest of the page is unaffected.</p>}>
-              <motion.div
-                className="relative overflow-hidden"
-                initial={false}
-                animate={{ height: height ?? "auto" }}
-                transition={still ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 38, mass: 0.7 }}
+              {/* A plain CSS transition on an explicit height: the site installs no animation library (DESIGN §7),
+                  and one number moving between two known values does not need one. */}
+              <div
+                className="relative overflow-hidden transition-[height] duration-300 ease-out motion-reduce:transition-none"
+                style={{ height: height ?? "auto" }}
               >
                 <div ref={seeRef} className={cn(active !== "see" && "invisible")} inert={active !== "see"} data-lab>
                   <HeroInstrumentLazy hint={hint} />
@@ -149,7 +153,7 @@ export function HeroStations({ stations, label, hint, t }: Props) {
                     {active === "act" && <Act t={t.act} />}
                   </div>
                 )}
-              </motion.div>
+              </div>
             </ErrorBoundary>
           </div>
         </div>
