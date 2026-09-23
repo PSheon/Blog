@@ -14,7 +14,7 @@ export default function HeroGenerate({ t }: { t: { note: string; again: string }
       <div className="grid min-h-0 place-items-center rounded-sm border border-border bg-background [container-type:size]">
         <DiffusionPreview key={run} className="block aspect-[8/5] w-[min(100cqw,100cqh*8/5)]" />
       </div>
-      <p className="flex items-center gap-x-3 border-t border-border pt-3">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-3">
         <span className="label normal-case">{t.note}</span>
         <StationReset label={t.again} onClick={() => setRun((n) => n + 1)} testId="hero-generate-again" />
       </p>

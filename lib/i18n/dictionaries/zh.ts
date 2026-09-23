@@ -50,9 +50,9 @@ const zh = {
       generate: { title: "replay · diffusion", caption: "一團彩色雜訊一步一步收成一顆蘋果。這裡重播的是擴散過程本身；真正的模型在文章裡，由你在瀏覽器裡訓練。", more: "去訓練一個" },
       act: { title: "live · neuroevolution", caption: "五十隻小鳥，各有一顆六個權重的大腦。活最久的生下一代，沒有人教牠們怎麼飛。", more: "看牠們學到了什麼" },
     },
-    think: { steps: "訓練步數", input: "題目", output: "模型寫的", attention: "每個答案在看哪個數字", again: "從頭再學一次" },
-    generate: { note: "擴散過程的重播，這裡沒有模型在跑", again: "從頭重播" },
-    act: { generation: "第幾代", alive: "還在飛", best: "最多過幾根", again: "從第一代重新演化" },
+    think: { steps: "訓練步數", input: "題目", output: "模型寫的", attention: "每個答案在看哪個數字", again: "重新訓練" },
+    generate: { note: "擴散過程的重播，這裡沒有模型在跑", again: "重播" },
+    act: { generation: "第幾代", alive: "還在飛", best: "最多過幾根", again: "重新演化" },
   },
   home: {
     latest: "最新文章",

@@ -11,9 +11,10 @@ import { SAMPLES } from "./strokes";
  *
  * It has to stay one row. Label plus six digits plus a worded button is about 330 px, which fits the instrument on
  * a desktop and not on a phone — and wrapped, the eraser ended up on a line of its own under the digits. So the
- * pieces that are only there for comfort go as the panel narrows: the word "Clear" first (the eraser says it), then
- * the group's label, which stays as the group's accessible name either way. The container query asks about the
- * panel, not the window: this sits in the hero on a laptop as well as in the article on a phone.
+ * pieces that are only there for comfort go as the panel narrows: the group's label first, then the word beside the
+ * eraser, which holds on down to a 17rem panel so that on a phone this control still reads the way the other
+ * stations' reset buttons do. The container query asks about the panel, not the window: this sits in the hero on a
+ * laptop as well as in the article on a phone.
  */
 export function SamplePicker({ t, digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }: { t: Labels; digits?: number[] }) {
   return (
@@ -34,7 +35,7 @@ export function SamplePicker({ t, digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }: { t
         </div>
         <Button size="sm" variant="ghost" aria-label={t.clear} className="ml-auto" onClick={() => setStrokes([])}>
           <Eraser />
-          <span className="hidden @[23rem]:inline">{t.clear}</span>
+          <span className="hidden @[17rem]:inline">{t.clear}</span>
         </Button>
       </div>
     </div>

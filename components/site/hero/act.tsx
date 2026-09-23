@@ -46,7 +46,9 @@ export default function HeroAct({ t }: { t: { generation: string; alive: string;
     // Sized by the panel (a container query). Narrow (every phone): the flock on top at full width, the three numbers
     // in a row under it. Wide: side by side, like the other stations.
     <div className="@container h-full">
-      <div className="grid h-full grid-rows-[minmax(0,1fr)_auto] gap-3 @[26rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] @[26rem]:grid-rows-1 @[26rem]:items-center @[26rem]:gap-5">
+      {/* Six-four, not half and half: the flock is the thing to look at, and three short numbers do not need an
+          equal share. It is what closes the 73 px of empty panel this station had at 1152 and up. */}
+      <div className="grid h-full grid-rows-[minmax(0,1fr)_auto] gap-3 @[26rem]:grid-cols-[minmax(0,6fr)_minmax(0,4fr)] @[26rem]:grid-rows-1 @[26rem]:items-center @[26rem]:gap-5">
         {/* As large as fits both ways, at the world's own shape. */}
         <div className="grid h-full min-h-0 place-items-center [container-type:size]">
           <canvas ref={canvas} aria-hidden className="rounded-sm border border-border bg-background text-foreground" style={{ width: `min(100cqw, 100cqh * ${WORLD.width} / ${WORLD.height})`, aspectRatio: `${WORLD.width} / ${WORLD.height}` }} />
