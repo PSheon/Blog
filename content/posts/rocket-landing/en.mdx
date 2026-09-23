@@ -1,0 +1,149 @@
+---
+title: "Teaching a Starship to land itself: you fly first, then it does"
+description: "It falls flat on its belly like a skydiver, steering with four flaps, and only flips upright in the last few hundred metres. One Raptor's thrust range straddles the ship's weight and two engines' does not — which makes how many to light the real decision of a landing."
+seoTitle: "Teaching a Starship to flip and land itself"
+seoDescription: "Belly-down at 66 m/s, four flaps for arms and legs, one flip at the end. Fly it yourself, then watch ten numbers and a neural network learn the same landing in your browser."
+date: 2026-09-24
+tags: [reinforcement-learning, from-scratch]
+no: 15
+draft: true
+interactive: true
+---
+
+import { LanderLab } from "./components";
+
+Fly it yourself first. The ship below is falling flat on its belly at 66 metres per second. Space lights the engines
+and starts the flip, the arrow keys gimbal the engines and work the flaps. Land upright inside the circle at under 6
+metres per second.
+
+<Instrument fig="01" title="starship / flip and land" size="wide" caption="The 3D view looks on from the sea; the cutaway below it shows height and speed. The built-in autopilot is ten trained numbers — “train one” searches for them again in your browser in about a second, and “teach a network” has a real neural network copy it, in about ten.">
+  <LanderLab />
+</Instrument>
+
+## Why it falls on its belly
+
+A Starship is a 50.3 m tube, 9 m across. Nose-first it shows 64 m² to the air; lying flat it shows 450 m², seven
+times as much.
+
+Seven times the area is almost three times the terminal velocity: **66 m/s on its belly against 177 m/s nose-first**.
+So the whole descent is a skydive, and the four flaps are arms and legs — which also means they only work while the
+air is moving, and lose their grip exactly when it slows down.
+
+## How many engines to light is a real decision
+
+The ship carries six engines: three sea-level Raptors and three vacuum ones. (The 33 everyone remembers belong to
+the booster.) Only the sea-level three matter for landing, and **how many of them to light is the decision the whole
+manoeuvre turns on**.
+
+One Raptor gives 2,256 kN and throttles down to 40 %, so a single engine covers 0.90–2.26 MN. The ship weighs about
+128 t at touchdown, which is 1.26 MN:
+
+| lit | thrust range | against its own weight |
+| --- | --- | --- |
+| 1 | 0.90–2.26 MN | its weight **falls inside the range** — it can ask for exactly what it needs |
+| 2 | 1.80–4.51 MN | the floor is already 1.4× the weight |
+| 3 | 2.71–6.77 MN | the floor is 2.2× the weight |
+
+One engine straddles the weight; two cannot. On two or more, lighting them means accelerating upward and cutting
+them means falling — all it can do is stutter down. On one, it can hold any descent rate it likes, like a throttle.
+
+So the autopilot in figure 1 never decides on a number of engines. It works out **the thrust it wants, then lights
+the fewest engines that can produce it**. In a single descent that changes three times:
+
+| height | falling at | it lights |
+| --- | --- | --- |
+| 1434 m | 69 m/s | nothing — belly-down |
+| 770 m | 67 m/s | **1** × 53 %, and the flip begins |
+| 105 m | 41 m/s | **2** × 50 %, because one cannot brake this |
+| 42 m | 5 m/s | **1** × 90 % for the last forty metres |
+
+Nobody wrote that sequence. I gave it one equation — how much thrust do you want — and the rest is arithmetic. Across
+eight independent training runs, **every single one chose to flip on one engine**, and to brake on two, which is what
+the real ship does.
+
+## The flip throws the ship sideways
+
+This is the thing the simulator taught me, and it explains why the real flight path looks the way it does.
+
+When the engines light, the ship is still horizontal, so they are pointing sideways. Measured: **the flip itself
+moves the ship 64 m across and leaves it with 21.5 m/s of sideways speed** — the remaining hundred-odd metres are
+covered by coasting on that.
+
+So it cannot aim at the target. The real answer is to **come down deliberately off to one side** and let the flip
+throw you onto the pad. In figure 1 the ship always starts 150–270 m to the left, 207 m on average.
+
+My first version dropped it straight at the pad, and no amount of training got above 0 % — the manoeuvre itself
+carried it away. Offset to one side, the same trainer reached 200 of 200 in ten rounds. The real trajectory is
+shaped that way for a reason.
+
+## Letting it find the ten numbers
+
+The shape of the manoeuvre is fixed, and it is SpaceX's: fall flat, hold the belly into the airflow with the flaps,
+light the engines at some height, swing upright, and arrive with nothing left over. **What is learned is ten
+constants** — the ignition height, how hard to swing, how much braking margin to keep, the touchdown speed to aim
+for, how stiffly to hold the attitude, how much to correct sideways, the flip throttle, how many engines for the
+flip, the most to allow while braking, and how hard to chase the target speed.
+
+The trainer is the cross-entropy method, about as simple as search gets: draw 40 sets of numbers, fly 10 descents
+with each, keep the best 6, and redraw from their mean and spread. No gradients, no network, 35 rounds and done.
+
+That is what runs when you press "train one" in figure 1 — in your browser, in about a second. Ten different random
+seeds, each flown 200 unseen descents: **nine of the ten land more than 80 % of the time, with a median of 95 %**.
+
+The tenth never lands at all. The difference is one choice: **those nine flip on a single engine and it flips on
+two.** Twice the thrust while the ship is still sideways throws it too far off the pad to recover.
+
+Which is also why the search must not settle too quickly. CEM draws each round from the spread of the previous
+round's elite, and the elite agree on "two, then" very easily; adding a little extra noise that fades out over the
+run moved the median from 88 % to 95 %.
+
+## Handing it to a neural network
+
+Those ten numbers are a shape I chose; the trainer only fills in the blanks. So figure 1 has a second button: teach
+a neural network — 8 × 24 × 3, a little over seven hundred weights, which knows nothing about landing. State in,
+controls out.
+
+First it **copies** (behaviour cloning): the autopilot flies 120 descents, every state and action is written down,
+and the network fits them. It copies well and lands 0 % of the time. What it cannot copy is the part that is not
+there: the student's first small error takes the ship somewhere the teacher never went, and there it has nothing.
+
+Then **DAgger**: the *student* flies while the teacher labels every state the student reaches, and those go into the
+pile. That is the part that is actually teaching.
+
+And then it learned to hover. It copied beautifully from 1450 m down to about 40 m and then stopped — hanging
+between 3 and 16 m for ninety seconds until the clock ran out. Not a crash. It simply never landed. The reason is
+the thrust table above: when firing is a switch, a duty cycle a few percent too generous balances gravity exactly.
+
+The fix was not a parameter. It was **the question**. The network had three heads — fire or not, how hard, how many
+engines — three discrete decisions that all have to agree. Replacing them with **one number, the thrust it wants**
+(in units of the ship's own weight), fed through the same arithmetic the autopilot uses, with the same training and
+the same seconds:
+
+| seed | 7 | 19 | 31 | 43 | 57 |
+| --- | --- | --- | --- | --- | --- |
+| three heads | 0 % | 0 % | 0 % | 0 % | 0 % |
+| one thrust number | 46.5 % | 4.5 % | **98.0 %** | 88.5 % | 60.0 % |
+
+The best of them matches the teacher: 98.0 % at 1.01 m/s. The worst is useless.
+
+Which is the thing worth taking away: **ten numbers land every time you train them; seven hundred weights copying
+those ten numbers land anywhere between 5 % and 98 %, depending on where they started.** More parameters is not more
+learning, and how you ask matters more than how big it is.
+
+## When the reward is wrong, it does exactly what you wrote
+
+I wrote the score, so the mistakes in it are mine too. Same simulator, same trainer, three ways of writing it:
+
+| the reward I wrote | what it became |
+| --- | --- |
+| 500 for landing, plus up to 60 for leftover fuel (**only if it landed**) | 97.5 % landed, 1.2 m/s, 14.7 t left |
+| the same, but fuel counts **whether it lands or not** | 96.0 % landed — the trap did not spring |
+| "stay alive, and be near the pad" | **15 % landed**, engines lit 86 % of the time, 106 of 200 ran the tanks dry and 54 were still in the air at the 90-second cutoff |
+
+The third row is reward hacking out of the textbook. I wanted "don't crash" and I wrote "stay alive," so it learned
+to **hover until the propellant ran out** — every step in the air scored, and landing only stopped the scoring. It
+was not cheating. It was doing very carefully what I asked.
+
+The second row is the better lesson. I predicted it would learn never to light the engines at all, to keep a full
+tank, and I was wrong: the 500 for landing still dominates. Guessing how a reward will break is no more reliable
+than guessing what a model will learn, which is why all three rows were measured rather than reasoned.
