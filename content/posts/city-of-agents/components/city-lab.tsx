@@ -4,6 +4,7 @@ import { Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
+import { ActivityColumns, HourTicks } from "./activity-chart";
 import { personTask } from "./describe";
 import { personName, useLabels } from "./labels";
 import type { PanelState } from "./session";
@@ -43,6 +44,21 @@ export function FollowBadge({ panel }: { panel: PanelState | null }) {
 }
 
 /**
+ * The day so far under the picture: people go indoors, so the scene alone no longer shows how many are at work or
+ * asleep. Yesterday shows, faint, only where today has not got to yet.
+ */
+export function DayStrip({ panel }: { panel: PanelState | null }) {
+  const t = useLabels();
+  if (!panel) return null;
+  return (
+    <div className="grid gap-1" data-testid="city-day">
+      <ActivityColumns layers={[{ columns: panel.yesterday.map((c, k) => (panel.today[k] ? null : c)), opacity: 0.3 }, { columns: panel.today }]} now={(panel.t % 1440) / 10} label={t.today} className="h-12" />
+      <HourTicks />
+    </div>
+  );
+}
+
+/**
  * The city and the people in it, with as few controls as the point needs: play, speed, follow someone. With `modes`,
  * also who decides and whether duty exists — the same city and the same legs under a different head.
  */
@@ -61,6 +77,7 @@ export function CityLab({ seed = 1, n = 8, agents = 300, modes = false }: { seed
         {!ready && <p className="label absolute inset-0 grid place-items-center text-muted-foreground">{t.loading}</p>}
         <FollowBadge panel={panel} />
       </div>
+      <DayStrip panel={panel} />
       <Legend />
       {modes && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">

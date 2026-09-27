@@ -1,7 +1,7 @@
 import type { CityView, PeopleFrame } from "./city-view3d";
 import {
   type Action, type AgentInfo, type AgentState, arrivalsAfter, type City, type Context, cursorAt, departureHistogram, generateCity, initialSnapshot, type Log,
-  modalShare, type Mode, type Needs, needsAt, PARAMS, peakDepartureShare, record, replayPositions, type SimEvent, snapshotAt, World,
+  activityShares, modalShare, type Mode, type Needs, needsAt, PARAMS, peakDepartureShare, record, replayPositions, type SimEvent, snapshotAt, World,
 } from "./sim";
 
 export type Setup = { seed: number; n: number; agents: number };
@@ -13,6 +13,8 @@ export type PanelState = {
   histogram: number[]; peak: number; sync: number; frame: number; calls: number;
   /** Who the camera follows, or −1; never past the end of `people`. */
   follow: number;
+  /** What share of people did what in each ten minutes of the live day and of the day before (null: not reached, or before the start). */
+  today: (Float32Array | null)[]; yesterday: (Float32Array | null)[];
 };
 
 /** At most this many simulated minutes per frame: a slow frame drops simulated time instead of snowballing. */
@@ -41,6 +43,9 @@ export class CitySession {
   private frames = 0;
   private since = 0;
   private frameMs = 0;
+  /** One sample of what everyone is doing per ten simulated minutes, for today and yesterday; slot k is k × 10 minutes after midnight. */
+  private today: (Float32Array | null)[] = [];
+  private yesterday: (Float32Array | null)[] = [];
   /** Set by whoever owns the canvas: a rebuilt city needs a rebuilt scene. */
   onRebuild: (() => void) | null = null;
 
@@ -59,6 +64,8 @@ export class CitySession {
     this.world.onEvent = (e) => record(this.log, e, this.ctx);
     this.frame = { count, x: new Float64Array(count), y: new Float64Array(count), px: Float64Array.from(this.world.x), py: Float64Array.from(this.world.y), heading: new Float64Array(count), action: new Array<Action | null>(count).fill(null), walking: new Uint8Array(count), at: new Int32Array(count).fill(-1) };
     this.replayT = null; this.pending = 0; this.dirty = true;
+    this.today = new Array<Float32Array | null>(144).fill(null); this.yesterday = new Array<Float32Array | null>(144).fill(null);
+    this.sample();
     this.onRebuild?.();
   }
 
@@ -74,7 +81,7 @@ export class CitySession {
     const started = performance.now(), { world, frame } = this, live = this.replayT === null;
     if (live && this.running) {
       this.pending += dt * PARAMS.minutesPerSecond * this.rate;
-      for (let k = 0; this.pending >= 1 && k < MAX_TICKS; k++, this.pending--) { frame.px.set(world.x); frame.py.set(world.y); world.tick(); }
+      for (let k = 0; this.pending >= 1 && k < MAX_TICKS; k++, this.pending--) { frame.px.set(world.x); frame.py.set(world.y); world.tick(); if (world.t % 10 === 0) this.sample(); }
       if (this.pending >= 1) this.pending = 0;
       this.dirty = true;
     }
@@ -105,6 +112,13 @@ export class CitySession {
     this.shownReplay = t;
   }
 
+  /** Records what everyone is doing in the current ten-minute slot; midnight turns today into yesterday. */
+  private sample(): void {
+    const slot = Math.floor((this.world.t % 1440) / 10);
+    if (slot === 0 && this.today.some((v) => v)) { this.yesterday = this.today; this.today = new Array<Float32Array | null>(144).fill(null); }
+    this.today[slot] = activityShares(this.world.agents);
+  }
+
   pick(clientX: number, clientY: number): number { return this.view ? this.view.pick(clientX, clientY, this.frame) : -1; }
 
   /** What the panel shows, live or at the replay time — the latter from the record alone. */
@@ -123,7 +137,7 @@ export class CitySession {
     for (let k = cursor - 1; k >= 0 && events.length < eventCount; k--) if (log.events[k].type !== "arrived") events.push(log.events[k]);
     const histogram = departureHistogram(log.events, t - 1440, t + 1e-9);
     return { city: this.city, follow: Math.min(this.follow, people.length - 1), t, from: log.base.t, now: world.t, replaying: !live, mode, duty, people, events, marks: log.events.filter((e) => e.type === "config").map((e) => e.t), histogram,
-      peak: peakDepartureShare(histogram, people.length), sync, frame: this.frameMs, calls: this.view?.calls ?? 0 };
+      peak: peakDepartureShare(histogram, people.length), sync, frame: this.frameMs, calls: this.view?.calls ?? 0, today: this.today.slice(), yesterday: this.yesterday.slice() };
   }
 
   dispose(): void { this.view?.dispose(); this.view = null; }

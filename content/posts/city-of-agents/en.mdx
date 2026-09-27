@@ -16,7 +16,7 @@ import { PARAMS } from "./components/sim/params";
 
 Look first. One second in the city is ten minutes outside, so a day takes two and a half minutes; 20× is faster still. Click any person in the scene, or press "Follow someone", and the camera comes down to the street and walks with them.
 
-<Instrument fig="01" title="city / day" size="wide" caption="300 people (100 on a phone). A person's colour is what they are doing, or on their way to do. Sky, street lamps and lit windows all follow the city's clock.">
+<Instrument fig="01" title="city / day" size="wide" caption="300 people (100 on a phone). A person's colour is what they are doing, or on their way to do. Sky, street lamps and lit windows all follow the city's clock. People who go indoors cannot be seen, so the strip underneath counts them: what share of people is doing what in each ten minutes of today, with yesterday faint.">
   <CityLab />
 </Instrument>
 
@@ -63,7 +63,7 @@ Here are three days of one of them, worked out by your browser just now.
 
 Hunger is the most regular: eight hours to reach 0.6, forty minutes to eat, three meals a day. **The backlog** is the one need that is not bodily: it is the work waiting on the desk. By day work keeps coming in, so it keeps rising, and only being at the office brings it down; after {PARAMS.dutyHours[1]}:00 nothing new arrives, so whoever has cleared it can leave. Switching it off means nobody in this city has a job to go to.
 
-Fatigue has one thing the others do not: **it grows faster at night.** Its rate is multiplied by (1 − {PARAMS.circadian} × the sun's height), so the lower the sun, the sooner people tire. I measured what happens without it: the sleep of 300 people spreads evenly over the day, with a fifth to almost half of them asleep at any hour, and the city has no night. With it, two thirds are asleep at one in the morning and 2% at noon.
+Fatigue has one thing the others do not: **it grows faster at night.** Its rate is multiplied by (1 − {PARAMS.circadian} × the sun's height), so the lower the sun, the sooner people tire. I measured what happens without it: the sleep of 300 people spreads evenly over the day, with a fifth to almost half of them asleep at any hour, and the city has no night. With it, two thirds are asleep at one in the morning and 2% at noon. Figure 04 below has the switch, so you can turn it off yourself.
 
 <Sidenote>My first version of this table did not fit into a day. Add up the time the four needs each demand and you get 28.8 hours out of every 24, before any walking. Run, it gave a city where nobody had a free minute, every need sat at 1.0 for more than a quarter of the time, and the median start of work was two in the afternoon. The numbers above were changed against measurements; the comparison is in this project's `docs/research/city-of-agents/RESULTS.md`.</Sidenote>
 
@@ -95,7 +95,7 @@ To know whether the daily rhythm really grows out of the needs, swap the head an
 - **Each by their needs**: the formula from the last section.
 - **At random**: pick any place, stay half an hour to two hours.
 
-<Instrument fig="04" title="city / modes" size="wide" caption="Each head is run for two days by your browser in the background (no picture, so it is quick). The chart is day two: in every ten minutes, what share of people was doing what.">
+<Instrument fig="04" title="city / modes" size="wide" caption="Each head is run for two days by your browser in the background (no picture, so it is quick). The chart is day two: in every ten minutes, what share of people was doing what. Untick the body clock and the middle one is run again with fatigue growing as fast by day as by night; the other two heads never read the needs, so they do not change.">
   <ModesLab />
 </Instrument>
 
@@ -104,6 +104,8 @@ The timetable's day is cut with a knife. At eight sharp, 100% of people leave wi
 The random day is flat: three in the morning looks like three in the afternoon.
 
 The one in the middle keeps hours: most people asleep at night, the cyan of work rising through the morning and ebbing through the evening, meals and company scattered across the day. Nobody drew up that rota; it is what three hundred slightly different sets of numbers work out separately. In its busiest ten minutes only 11% of people set off together, much like random's 9% — but random has no shape.
+
+Half of that shape is the body clock's. Untick it and the middle chart's night smears out: people at home at one in the morning fall from 73% to 38%, and at noon rise from 3% to 16%. None of the four needs is missing; fatigue just no longer follows the sun.
 
 Switch the backlog off and measure again (offline: 300 people, seed 1, the last of five days): sleeping, eating and company barely change, and free time goes from 11% to 40%. People do not find themselves something to do, and that is the most honest thing about this model: **it only answers the needs you give it.** If you want them to shop or exercise, that is another number.
 

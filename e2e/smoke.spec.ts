@@ -577,6 +577,15 @@ test("a city of people runs in the page: the clock moves, the three heads differ
   await expect(page.getByTestId("modes-fsm")).toContainText("100%", { timeout: 60_000 });
   await expect(page.getByTestId("modes-utility")).toContainText("%", { timeout: 60_000 });
   await expect(page.getByTestId("modes-utility")).not.toContainText("100%");
+  // Without the body clock the needs head is run again, and its night smears out.
+  const asleep = page.getByTestId("modes-utility-asleep"), withClock = await asleep.textContent();
+  await page.getByTestId("modes-clock").uncheck();
+  await expect(asleep).not.toHaveText(withClock ?? "", { timeout: 60_000 });
+  await expect(asleep).not.toContainText("—");
+
+  // Fig. 01 counts the day under the picture, indoors or not.
+  await page.getByTestId("city-canvas").first().scrollIntoViewIfNeeded();
+  await expect(page.getByTestId("city-day").locator("path").first()).toBeAttached({ timeout: 60_000 });
 
   // The Overseer: the table fills, a row follows a person, the record replays and comes back.
   await page.getByTestId("city-play").scrollIntoViewIfNeeded();
