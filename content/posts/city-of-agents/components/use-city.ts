@@ -29,6 +29,8 @@ export function useCity(root: RefObject<HTMLElement | null>, canvas: RefObject<H
     // Under reduced motion the clock starts paused and the camera never circles.
     s.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; s.running = !s.reduced;
     session.current = s;
+    // In development every session is reachable from the console (`__cities`, in mount order): for looking at the people up close.
+    if (process.env.NODE_ENV !== "production") ((window as unknown as { __cities?: CitySession[] }).__cities ??= []).push(s);
     let cancelled = false, loading = false, raf = 0, last = 0, polled = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);

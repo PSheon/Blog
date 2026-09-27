@@ -57,7 +57,7 @@ export class CitySession {
     this.ctx = { infos, params: PARAMS };
     this.log = { base: initialSnapshot(infos, this.world.agents.map((a) => a.needs), this.world.t, mode, duty), events: [], dropped: 0 };
     this.world.onEvent = (e) => record(this.log, e, this.ctx);
-    this.frame = { count, x: new Float64Array(count), y: new Float64Array(count), px: Float64Array.from(this.world.x), py: Float64Array.from(this.world.y), heading: new Float64Array(count), action: new Array<Action | null>(count).fill(null), walking: new Uint8Array(count) };
+    this.frame = { count, x: new Float64Array(count), y: new Float64Array(count), px: Float64Array.from(this.world.x), py: Float64Array.from(this.world.y), heading: new Float64Array(count), action: new Array<Action | null>(count).fill(null), walking: new Uint8Array(count), at: new Int32Array(count).fill(-1) };
     this.replayT = null; this.pending = 0; this.dirty = true;
     this.onRebuild?.();
   }
@@ -93,7 +93,7 @@ export class CitySession {
   private fillLive(): void {
     const { world, frame } = this;
     frame.x.set(world.x); frame.y.set(world.y); frame.heading.set(world.heading);
-    for (const a of world.agents) { frame.action[a.id] = a.action; frame.walking[a.id] = a.state === "traveling" ? 1 : 0; }
+    for (const a of world.agents) { frame.action[a.id] = a.action; frame.walking[a.id] = a.state === "traveling" ? 1 : 0; frame.at[a.id] = a.state === "acting" ? a.place : -1; }
     this.shownReplay = NaN;
   }
 
@@ -101,7 +101,7 @@ export class CitySession {
     const { frame, log, ctx } = this, cursor = cursorAt(log, t), snapshot = snapshotAt(log, cursor, ctx);
     replayPositions(this.city, this.world.paths, snapshot, ctx, arrivalsAfter(log, cursor, snapshot), t, frame.x, frame.y, frame.heading);
     frame.px.set(frame.x); frame.py.set(frame.y);
-    snapshot.agents.forEach((a, i) => { frame.action[i] = a.action; frame.walking[i] = a.state === "traveling" ? 1 : 0; });
+    snapshot.agents.forEach((a, i) => { frame.action[i] = a.action; frame.walking[i] = a.state === "traveling" ? 1 : 0; frame.at[i] = a.state === "acting" ? a.place : -1; });
     this.shownReplay = t;
   }
 
