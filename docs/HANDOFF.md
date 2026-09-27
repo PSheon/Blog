@@ -67,6 +67,28 @@ stays in `lib/rt` with its tests. Read before touching it:
 - CI has no GPU. The light E2E tests take the "no adapter" branch; what needs a GPU was checked by hand
   in the Playwright MCP browser, whose own tab must be in front for pointer lock (a `newContext()` window is refused).
 
+### № 015, the Starship landing — PAUSED, and not on any branch (2026-09-23)
+
+Paul read the draft, found the prose 不有趣又有點雜亂, paused it for Fable to write, and had `dev` reset back to
+3cee702 — so none of it is on a branch. **It is all in the tag `rocket-draft-2026-09-23`** (pushed), thirteen
+commits: the simulator, the packed Ship 24 geometry, the four-pilot figure, the network, both languages, the cover,
+an E2E spec, `docs/research/rocket/RESULTS.md`, and paul-e9's `docs/research/rsa/` notes, which went with it.
+
+```
+git show rocket-draft-2026-09-23:docs/research/rocket/RESULTS.md   # read one file
+git checkout -b rocket rocket-draft-2026-09-23                     # pick it up again
+```
+
+The one idea worth not losing: a Raptor spans 0.90–2.26 MN and the ship weighs 1.26 MN, so **one engine straddles
+its own weight and two do not**. The pilot asks for a thrust and lights the fewest engines that can deliver it, and
+a descent goes 0 → 1 → 2 → 1 on its own. Ten learned constants land 98 %; seven hundred weights copying them land
+between 5 % and 98 % depending on where they started.
+
+What the read-through found, for whoever writes it: the three best moments (it cannot hover, the flip throws it
+64 m sideways so it must aim off-target, the network hovering 3 m above the deck for ninety seconds) were all
+buried in engineering notes; the engine-count thread is told three separate times; and the last three sections
+share one shape — setup, table, moral.
+
 ### The UI/UX batch (2026-09-23)
 
 paul-8b measured the whole site and Paul picked thirteen fixes; they are on dev as one commit each. Two he turned

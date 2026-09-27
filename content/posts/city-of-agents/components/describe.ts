@@ -1,4 +1,5 @@
 import { type Labels, personName } from "./labels";
+import type { PersonRow } from "./session";
 import { type City, formatTime, type SimEvent } from "./sim";
 
 /** Place ids only mean something in the city they came from: always pass the city of the same snapshot as the rows. */
@@ -7,6 +8,10 @@ export const placeName = (t: Labels, city: City, id: number): string => {
   const place = city.places[id], block = city.blocks[place.block];
   return `${t.places[place.kind]}(${t.zones[block.zone]} ${block.label})`;
 };
+
+/** What a person is up to, as the Overseer's table and the follow badge say it: "前往 工作 · 辦公(商業區 D5)", or "沒事". */
+export const personTask = (t: Labels, city: City, p: PersonRow): string =>
+  p.state === "idle" ? t.states.idle : `${p.state === "traveling" ? `${t.states.traveling} ` : ""}${p.action ? t.actions[p.action] : ""} · ${placeName(t, city, p.place)}`;
 
 /** "Day 2 07:40 阿凱 離開 家(住宅區 B3) → 前往 辦公(商業區 D5)" — put together here; the record itself holds no text. */
 export function describeEvent(t: Labels, city: City, e: SimEvent): string {

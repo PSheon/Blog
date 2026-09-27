@@ -1,6 +1,19 @@
 import type { Agent } from "./agent";
 import type { SimEvent } from "./types";
 
+/** What a person counts as in the activity charts, bottom to top of each column. */
+export const ACTIVITIES = ["sleep", "work", "eat", "social", "walking", "idle"] as const;
+export type Activity = (typeof ACTIVITIES)[number];
+export const activityOf = (a: Pick<Agent, "state" | "action">): Activity => (a.state === "traveling" ? "walking" : a.state === "acting" && a.action ? a.action : "idle");
+
+/** Share of each activity among `agents`, in the order of `ACTIVITIES`. */
+export function activityShares(agents: Pick<Agent, "state" | "action">[]): Float32Array {
+  const shares = new Float32Array(ACTIVITIES.length);
+  for (const a of agents) shares[ACTIVITIES.indexOf(activityOf(a))]++;
+  if (agents.length) for (let k = 0; k < shares.length; k++) shares[k] /= agents.length;
+  return shares;
+}
+
 /** Share of people doing the most common thing right now (an action, walking, or nothing). Near 1 at night in every mode. */
 export function modalShare(agents: Agent[]): number {
   const counts = new Map<string, number>();

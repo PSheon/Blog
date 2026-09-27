@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { type Labels, personName } from "./labels";
 import type { PanelState, PersonRow } from "./session";
-import { describeEvent, placeName } from "./describe";
+import { describeEvent, personTask } from "./describe";
 import { type City, formatTime, type SimEvent } from "./sim";
 import { SWATCH } from "./use-city";
 
 const ROW = 30, VIEWPORT = 8;
 
-function Dot({ action }: { action: PersonRow["action"] }) {
+export function Dot({ action }: { action: PersonRow["action"] }) {
   return <span className="dark contents"><span aria-hidden className={`size-2 shrink-0 rounded-full border border-border ${SWATCH[action ?? "idle"]}`} /></span>;
 }
 
@@ -30,7 +30,7 @@ export function StatusTable({ t, city, people, follow, onFollow }: { t: Labels; 
               <span className="truncate font-sans text-xs">{personName(t, p.id)}</span>
               <span className="flex min-w-0 items-center gap-1.5 text-xs">
                 <Dot action={p.action} />
-                <span className="truncate text-muted-foreground">{p.state === "idle" ? t.states.idle : `${p.state === "traveling" ? `${t.states.traveling} ` : ""}${p.action ? t.actions[p.action] : ""} · ${placeName(t, city, p.place)}`}</span>
+                <span className="truncate text-muted-foreground">{personTask(t, city, p)}</span>
               </span>
               <span className="grid grid-cols-4 gap-0.5" aria-label={p.needs.map((v, i) => `${t.needNames[i]} ${Math.round(v * 100)}%`).join(", ")} role="img">
                 {p.needs.map((v, i) => <span key={i} className="flex h-3.5 items-end rounded-[1px] bg-muted"><span className={`w-full rounded-[1px] ${v > 0.75 ? "bg-signal-2" : "bg-signal"}`} style={{ height: `${Math.round(v * 100)}%` }} /></span>)}

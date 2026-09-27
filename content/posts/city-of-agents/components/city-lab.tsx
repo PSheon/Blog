@@ -4,7 +4,10 @@ import { Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
+import { ActivityColumns, HourTicks } from "./activity-chart";
+import { personTask } from "./describe";
 import { personName, useLabels } from "./labels";
+import type { PanelState } from "./session";
 import { formatTime, type Mode, PARAMS } from "./sim";
 import { SWATCH, useCity } from "./use-city";
 
@@ -25,6 +28,37 @@ export function Legend() {
 }
 
 /**
+ * Who the camera follows and what they are up to right now, in the Overseer's words. Only the name is announced: the
+ * task changes every few seconds at speed, and a screen reader would never stop talking.
+ */
+export function FollowBadge({ panel }: { panel: PanelState | null }) {
+  const t = useLabels(), id = panel?.follow ?? -1, p = panel && id >= 0 ? panel.people[id] : undefined;
+  if (!panel || !p) return null;
+  return (
+    <div className="label absolute top-2 left-2 flex max-w-[calc(100%-1rem)] items-center gap-1.5 rounded-sm bg-background/80 px-2 py-1 text-foreground">
+      <span role="status" className="shrink-0">{t.following} · {personName(t, id)}</span>
+      <span aria-hidden className={`size-2 shrink-0 rounded-full border border-border ${SWATCH[p.action ?? "idle"]}`} />
+      <span className="truncate" data-testid="city-follow-task">{personTask(t, panel.city, p)}</span>
+    </div>
+  );
+}
+
+/**
+ * The day so far under the picture: people go indoors, so the scene alone no longer shows how many are at work or
+ * asleep. Yesterday shows, faint, only where today has not got to yet.
+ */
+export function DayStrip({ panel }: { panel: PanelState | null }) {
+  const t = useLabels();
+  if (!panel) return null;
+  return (
+    <div className="grid gap-1" data-testid="city-day">
+      <ActivityColumns layers={[{ columns: panel.yesterday.map((c, k) => (panel.today[k] ? null : c)), opacity: 0.3 }, { columns: panel.today }]} now={(panel.t % 1440) / 10} label={t.today} className="h-12" />
+      <HourTicks />
+    </div>
+  );
+}
+
+/**
  * The city and the people in it, with as few controls as the point needs: play, speed, follow someone. With `modes`,
  * also who decides and whether duty exists — the same city and the same legs under a different head.
  */
@@ -41,8 +75,9 @@ export function CityLab({ seed = 1, n = 8, agents = 300, modes = false }: { seed
         <canvas ref={canvas} role="img" aria-label={t.scene} className="aspect-[4/5] w-full cursor-pointer rounded-sm bg-[#070918] sm:aspect-[16/9]" data-testid="city-canvas"
           onClick={(e) => act(() => s?.setFollow(s.pick(e.clientX, e.clientY)))} />
         {!ready && <p className="label absolute inset-0 grid place-items-center text-muted-foreground">{t.loading}</p>}
-        {follow >= 0 && <p className="label absolute top-2 left-2 rounded-sm bg-background/80 px-2 py-1 text-foreground" role="status">{t.following} · {personName(t, follow)}</p>}
+        <FollowBadge panel={panel} />
       </div>
+      <DayStrip panel={panel} />
       <Legend />
       {modes && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
