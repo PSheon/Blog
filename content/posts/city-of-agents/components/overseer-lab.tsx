@@ -4,8 +4,8 @@ import { Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";
 import { Readout } from "@/components/lab/readout";
 import { Button } from "@/components/ui/button";
-import { Legend } from "./city-lab";
-import { personName, useLabels } from "./labels";
+import { FollowBadge, Legend } from "./city-lab";
+import { useLabels } from "./labels";
 import { DepartureChart, EventStream, StatusTable, Timeline } from "./overseer-panel";
 import { Param } from "@/components/lab/param";
 import { MAX_N, MIN_N, type Mode, PARAMS } from "./sim";
@@ -31,7 +31,7 @@ export function OverseerLab({ seed = 1, n = 8, agents = 300 }: { seed?: number; 
           <canvas ref={canvas} role="img" aria-label={t.scene} className="aspect-[4/5] w-full cursor-pointer rounded-sm bg-[#070918] sm:aspect-[4/3]" data-testid="city-canvas"
             onClick={(e) => act(() => s?.setFollow(s.pick(e.clientX, e.clientY)))} />
           {!ready && <p className="label absolute inset-0 grid place-items-center text-muted-foreground">{t.loading}</p>}
-          {follow >= 0 && <p className="label absolute top-2 left-2 rounded-sm bg-background/80 px-2 py-1 text-foreground" role="status">{t.following} · {personName(t, follow)}</p>}
+          <FollowBadge panel={panel} />
           {panel?.replaying && <p className="label absolute top-2 right-2 rounded-sm bg-background/80 px-2 py-1 text-signal-2">● {t.replay}</p>}
         </div>
         <Legend />
