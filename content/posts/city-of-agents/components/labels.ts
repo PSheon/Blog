@@ -36,7 +36,7 @@ const zh = {
   anotherPerson: "換一個人", threshold: "門檻", day: "第", dayUnit: "天", walking: "走路",
   optionA: "選項 A", optionB: "選項 B", need: "需求", walk: "要走幾分鐘", utilityOf: "效用", wins: "勝出", formula: "效用 = 需求² − 0.1 × 路程（小時）",
   computing: "計算中…", modesChart: "同樣 300 個人、同一座城市，第二天每 10 分鐘各有多少比例的人在做什麼", peakShort: "最擠的 10 分鐘", tripsPerDay: "每人每天出門", tripsUnit: "趟",
-  asleepAt: "01:00 / 12:00 在家", bodyClock: "生理時鐘（晚上比較容易累）",
+  asleepAt: "01:00 / 12:00 在家睡覺", bodyClock: "生理時鐘（晚上比較容易累）",
   today: "今天每 10 分鐘各有多少比例的人在做什麼；淡色是昨天，直線是現在", todayTitle: "這一天",
   names: ["阿凱", "小美", "志明", "春嬌", "阿土", "佩君", "冠宇", "怡君", "家豪", "雅婷", "承恩", "宜蓁", "柏翰", "欣怡", "俊傑", "淑芬", "建宏", "美玲", "宗翰", "詩涵", "信宏", "惠雯", "文傑", "佳穎", "明哲", "筱涵", "國華", "雅雯", "子軒", "思妤", "彥廷", "郁婷", "哲瑋", "靜宜", "育成", "婉婷", "志豪", "曉玲", "政憲", "珮瑜"],
 };
@@ -75,7 +75,7 @@ const en: typeof zh = {
   anotherPerson: "Another person", threshold: "threshold", day: "day", dayUnit: "", walking: "walking",
   optionA: "Option A", optionB: "Option B", need: "need", walk: "minutes on foot", utilityOf: "utility", wins: "wins", formula: "utility = need² − 0.1 × walk (hours)",
   computing: "computing…", modesChart: "The same 300 people in the same city: what share of them is doing what, in each ten minutes of day two", peakShort: "busiest ten minutes", tripsPerDay: "trips per person per day", tripsUnit: "",
-  asleepAt: "at home at 01:00 / 12:00", bodyClock: "body clock (tiring faster at night)",
+  asleepAt: "asleep at home at 01:00 / 12:00", bodyClock: "body clock (tiring faster at night)",
   today: "What share of people is doing what, in each ten minutes of today; yesterday is faint, the line is now", todayTitle: "the day so far",
   names: ["Kai", "Mei", "Ming", "Jiao", "Tu", "Pei", "Yu", "Yi", "Hao", "Ting", "En", "Zhen", "Han", "Xin", "Jie", "Fen", "Hong", "Ling", "Zong", "Shi", "Xinh", "Wen", "Wei", "Ying", "Zhe", "Xiao", "Hua", "Ya", "Xuan", "Si", "Yan", "Yuting", "Zhewei", "Jing", "Cheng", "Wan", "Zhihao", "Lin", "Xian", "Peiyu"],
 };
