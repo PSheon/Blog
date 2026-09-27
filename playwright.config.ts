@@ -7,7 +7,8 @@ export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
   reporter: "list",
-  use: { baseURL: `http://localhost:${PORT}`, locale: "zh-TW" },
+  // A failure keeps a picture of the page: a CI-only failure (one run of two, never locally) can then be read, not guessed.
+  use: { baseURL: `http://localhost:${PORT}`, locale: "zh-TW", screenshot: "only-on-failure" },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
     { name: "mobile", use: { ...devices["Pixel 7"] } },
