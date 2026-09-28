@@ -40,7 +40,7 @@
     "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "remark-mdx-frontmatter": "^5.2.0",
+    "remark-mdx-frontmatter": "^6.0.0",
     "server-only": "^0.0.1",
     "shiki": "^4.4.3",
     "three": "^0.186.0",
